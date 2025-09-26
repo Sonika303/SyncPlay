@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SyncPlay Hub</title>
+  <style>
+    body { font-family: sans-serif; background: #222; color: white; text-align: center; }
+    h1 { margin-top: 30px; }
+    .game-card {
+      display:inline-block;
+      margin:20px;
+      padding:20px 50px;
+      border:2px solid #fff;
+      border-radius:10px;
+      cursor:pointer;
+      transition:0.2s;
+      background:#333;
+    }
+    .game-card:hover { background:#555; }
+  </style>
+</head>
+<body>
+<h1>SyncPlay Hub</h1>
+<p>Click a game to start!</p>
+
+<div class="game-card" onclick="playGame('pong')">Pong</div>
+<div class="game-card" onclick="playGame('trivia')">Trivia</div>
+
+<script>
+function playGame(game){
+  // Redirect to game page with query parameter
+  window.location.href = `games/${game}.html`;
+}
+</script>
+</body>
+</html>
