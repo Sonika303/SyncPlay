@@ -1,51 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Pong Controller</title>
-  <style>
-    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; background:#222; color:white; }
-    button { font-size: 24px; padding:20px 40px; margin:10px; }
-  </style>
+<meta charset="UTF-8">
+<title>SyncPlay Controller</title>
+<style>
+  body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; background:#222; color:white; }
+  button { font-size:24px; padding:20px 40px; margin:10px; }
+</style>
 </head>
 <body>
-<h2>Move your paddle</h2>
-<button onclick="move(-10)">Up</button>
-<button onclick="move(10)">Down</button>
+<h2 id="title">Controller</h2>
+<div id="buttons"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase.js"></script>
+
 <script>
-  // ===== FIREBASE CONFIG =====
- const firebaseConfig = {
-    apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-    authDomain: "syncplay-17b6e.firebaseapp.com",
-    projectId: "syncplay-17b6e",
-    storageBucket: "syncplay-17b6e.firebasestorage.app",
-    messagingSenderId: "86016195929",
-    appId: "1:86016195929:web:40262a28786f2ead712048",
-    measurementId: "G-3NBT4GJ0FX"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const inputsRef = db.ref('pongInputs');
+// Get game from URL
+const urlParams = new URLSearchParams(window.location.search);
+const game = urlParams.get('game') || 'pong';
+document.getElementById('title').innerText = `Controller - ${game.charAt(0).toUpperCase() + game.slice(1)}`;
 
-  // Assign unique ID for player
-  const playerId = 'player_' + Date.now();
+// Assign unique player ID
+const playerId = 'player_' + Date.now();
 
-  // Default paddle position
-  inputsRef.child(playerId).set({y: 160});
+// Reference node based on game
+const gameRef = db.ref(`${game}Inputs`);
+gameRef.child(playerId).set({y:160});
+gameRef.child(playerId).onDisconnect().remove();
 
-  // Remove player on disconnect
-  inputsRef.child(playerId).onDisconnect().remove();
+const buttonsDiv = document.getElementById('buttons');
+
+if(game === 'pong'){
+  // Pong buttons
+  const up = document.createElement('button');
+  up.innerText = 'Up';
+  up.onclick = ()=>move(-10);
+  const down = document.createElement('button');
+  down.innerText = 'Down';
+  down.onclick = ()=>move(10);
+  buttonsDiv.appendChild(up);
+  buttonsDiv.appendChild(down);
 
   function move(dy){
-    inputsRef.child(playerId).once('value').then(snapshot=>{
-      const pos = snapshot.val().y + dy;
+    gameRef.child(playerId).once('value').then(s=>{
+      const pos = s.val().y + dy;
       const newY = Math.min(Math.max(pos,0),320);
-      inputsRef.child(playerId).update({y:newY});
+      gameRef.child(playerId).update({y:newY});
     });
   }
+}
+
+// You can add more games like Trivia here
 </script>
 </body>
 </html>
