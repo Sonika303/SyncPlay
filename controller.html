@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pong Controller</title>
+  <style>
+    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; background:#222; color:white; }
+    button { font-size: 24px; padding:20px 40px; margin:10px; }
+  </style>
+</head>
+<body>
+<h2>Move your paddle</h2>
+<button onclick="move(-10)">Up</button>
+<button onclick="move(10)">Down</button>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  // ===== FIREBASE CONFIG =====
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const inputsRef = db.ref('pongInputs');
+
+  // Assign unique ID for player
+  const playerId = 'player_' + Date.now();
+
+  // Default paddle position
+  inputsRef.child(playerId).set({y: 160});
+
+  // Remove player on disconnect
+  inputsRef.child(playerId).onDisconnect().remove();
+
+  function move(dy){
+    inputsRef.child(playerId).once('value').then(snapshot=>{
+      const pos = snapshot.val().y + dy;
+      const newY = Math.min(Math.max(pos,0),320);
+      inputsRef.child(playerId).update({y:newY});
+    });
+  }
+</script>
+</body>
+</html>
