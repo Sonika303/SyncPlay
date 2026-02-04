@@ -2,34 +2,38 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stickman Tag</title>
+<title>Stickman Parkour</title>
 <style>
 body{
+  margin:0;
   font-family:Arial;
   background:#fff;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
   height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.box{
+  width:280px;
+  text-align:center;
 }
 input,button{
+  width:100%;
   padding:12px;
-  margin:6px;
+  margin:6px 0;
   font-size:16px;
-  width:220px;
 }
 </style>
 </head>
 <body>
 
-<h2>Stickman Tag</h2>
-
-<input id="username" placeholder="Username">
-<button type="button" onclick="create()">Create Party</button>
-
-<input id="code" placeholder="5-digit Code">
-<button type="button" onclick="join()">Join Party</button>
+<div class="box">
+  <h2>Stickman Parkour</h2>
+  <input id="username" placeholder="Username">
+  <button onclick="create()">Create Party</button>
+  <input id="code" placeholder="5-digit Code">
+  <button onclick="join()">Join Party</button>
+</div>
 
 <script>
 function create(){
