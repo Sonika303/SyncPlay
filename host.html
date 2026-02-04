@@ -1,67 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Host</title>
+<title>Host</title>
+<style>
+body{margin:0;background:#111;color:#fff;font-family:Arial}
+#top{padding:10px;background:#000;display:flex;justify-content:space-between}
+canvas{display:block;margin:auto;background:#222}
+.playerTag{padding:4px}
+.it{color:#ff4444;font-weight:bold}
+</style>
 </head>
 <body>
 
-<h2>Display Screen</h2>
-<p>Party Code: <b id="partyCode"></b></p>
+<div id="top">
+  <span>Code: <b id="code"></b></span>
+  <button onclick="location.href='index.html'">Exit</button>
+</div>
 
-<select id="gameSelect">
-  <option value="">Select Game</option>
-  <option value="tag">Tag</option>
-</select>
-
-<button onclick="exitParty()">Exit Party</button>
-
-<div id="gameContainer"></div>
+<canvas id="game" width="800" height="500"></canvas>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const username = sessionStorage.getItem("username");
-if (!username) location.href = "index.html";
+const name=sessionStorage.getItem("name");
+if(!name)location.href="index.html";
 
-const code = Math.floor(10000 + Math.random() * 90000).toString();
-partyCode.innerText = code;
+const partyCode=Math.floor(10000+Math.random()*90000)+"";
+code.textContent=partyCode;
 
-const peer = new Peer(code);
-const players = {}; // id -> { name, conn }
+const peer=new Peer(partyCode);
+const players={};
+let itId=null;
+const ctx=game.getContext("2d");
 
-peer.on("connection", conn => {
-  conn.on("data", data => handle(conn.peer, data));
-  players[conn.peer] = { conn, name: "..." };
+peer.on("connection",c=>{
+ players[c.peer]={id:c.peer,name:"",x:Math.random()*700,y:400,conn:c};
+ c.on("data",d=>onData(c.peer,d));
 });
 
-function handle(id, data) {
-  if (data.type === "join") {
-    players[id].name = data.name;
-    broadcast({ type: "players", players: getPlayerList() });
-  }
+function onData(id,d){
+ if(d.type==="join"){players[id].name=d.name;assignIT()}
+ if(d.type==="move" && id!==itId){
+   players[id].x+=d.dx;
+   players[id].x=Math.max(0,Math.min(760,players[id].x));
+ }
+ if(d.type==="tag" && id===itId){
+   const target=Object.values(players)
+     .find(p=>Math.abs(p.x-players[id].x)<40 && p.id!==id);
+   if(target){itId=target.id;checkWin()}
+ }
 }
 
-function broadcast(msg) {
-  Object.values(players).forEach(p => p.conn.send(msg));
+function assignIT(){
+ if(!itId)itId=Object.keys(players)[0];
+ broadcast();
 }
 
-function getPlayerList() {
-  return Object.entries(players).map(([id, p]) => ({
-    id, name: p.name
-  }));
+function checkWin(){
+ const safe=Object.keys(players).filter(p=>p!==itId);
+ if(safe.length===0){
+   alert(players[itId].name+" WINS!");
+   location.reload();
+ }
+ broadcast();
 }
 
-gameSelect.onchange = () => {
-  if (gameSelect.value === "tag") {
-    gameContainer.innerHTML =
-      `<iframe src="tag.html" width="800" height="500"></iframe>`;
-    broadcast({ type: "game", game: "tag" });
-  }
-};
-
-function exitParty() {
-  location.href = "index.html";
+function broadcast(){
+ Object.values(players).forEach(p=>{
+   p.conn.send({type:"state",players,it:itId});
+ });
 }
-</script>
 
-</body>
-</html>
+function drawStickman(p,isIt){
+ ctx.strokeStyle=isIt?"red":"white";
+ ctx.beginPath();
+ ctx.arc(p.x+20,p.y,8,0,Math.PI*2);
+ ctx.moveTo(p.x+20,p.y+8);
+ ct
