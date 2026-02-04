@@ -1,72 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SyncPlay</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #ffffff;
-      color: #000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    h1 { margin-bottom: 20px; }
-    input, button {
-      padding: 12px;
-      font-size: 16px;
-      margin: 6px;
-      width: 220px;
-    }
-    button {
-      cursor: pointer;
-    }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dot Chase</title>
+<style>
+body{
+  font-family:Arial;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+input,button{
+  padding:12px;
+  margin:6px;
+  font-size:16px;
+}
+</style>
 </head>
 <body>
 
-<h1>SyncPlay</h1>
+<h2>Dot Chase</h2>
 
-<input id="usernameInput" placeholder="Username">
-<button onclick="createParty()">Create Party</button>
+<input id="username" placeholder="Username">
+<button onclick="create()">Create Party</button>
 
 <br>
 
-<input id="codeInput" placeholder="5-digit Code">
-<button onclick="joinParty()">Join Party</button>
+<input id="code" placeholder="5-digit Code">
+<button onclick="join()">Join Party</button>
 
 <script>
-function createParty() {
-  const username = document.getElementById("usernameInput").value.trim();
-  if (username.length === 0) {
-    alert("Username required");
-    return;
-  }
-  sessionStorage.setItem("username", username);
-  sessionStorage.removeItem("partyCode");
-  window.location.href = "host.html";
+function create(){
+  const u=username.value.trim();
+  if(!u) return alert("Username required");
+  sessionStorage.setItem("u",u);
+  location.href="host.html";
 }
-
-function joinParty() {
-  const username = document.getElementById("usernameInput").value.trim();
-  const code = document.getElementById("codeInput").value.trim();
-
-  if (username.length === 0) {
-    alert("Username required");
-    return;
-  }
-  if (code.length !== 5) {
-    alert("Enter a 5-digit code");
-    return;
-  }
-
-  sessionStorage.setItem("username", username);
-  sessionStorage.setItem("partyCode", code);
-  window.location.href = "controller.html";
+function join(){
+  const u=username.value.trim();
+  const c=code.value.trim();
+  if(!u||c.length!==5) return alert("Invalid");
+  sessionStorage.setItem("u",u);
+  sessionStorage.setItem("c",c);
+  location.href="controller.html";
 }
 </script>
 
