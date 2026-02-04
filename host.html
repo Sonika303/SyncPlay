@@ -1,144 +1,111 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Host</title>
-<style>
-body{margin:0;font-family:Arial;background:#fff}
-#top{
-  display:flex;justify-content:space-between;
-  padding:10px;border-bottom:1px solid #ccc;
-}
-canvas{
-  display:block;margin:auto;
-  border:1px solid #ccc;
-}
-#winner{
-  position:fixed;inset:0;
-  background:#fff;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  font-size:24px;
-}
-</style>
-</head>
 <body>
 
 <div id="top">
-  <div>Code: <b id="code"></b> | Round <span id="round">1</span>/3</div>
+  <div>Code: <b id="code"></b></div>
   <button onclick="exit()">Exit</button>
 </div>
 
-<canvas id="c" width="800" height="400"></canvas>
+<!-- LOBBY -->
+<div id="lobby">
+  <h2>Select Game</h2>
 
-<div id="winner">
-  <div id="winnerText"></div>
-  <button onclick="location.reload()">Restart</button>
+  <div id="carousel">
+    <button onclick="move(-1)">◀</button>
+    <div id="card"></div>
+    <button onclick="move(1)">▶</button>
+  </div>
+
+  <button onclick="startGame()">Start Game</button>
 </div>
+
+<!-- GAME -->
+<canvas id="c" width="800" height="400" style="display:none"></canvas>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const name=sessionStorage.getItem("u");
-if(!name) location.href="index.html";
+const partyCode = (Math.floor(10000 + Math.random()*90000))+"";
+code.textContent = partyCode;
 
-const partyCode=(Math.floor(10000+Math.random()*90000))+"";
-code.textContent=partyCode;
+const games = [
+  { name:"Stickman Tag", id:"tag" },
+  { name:"Dot Chase", id:"dot" }
+];
 
-const peer=new Peer(partyCode);
-const players={};
-let it=null;
-let round=1;
-const MAX_ROUNDS=3;
+let selectedGame = 0;
+let phase = "lobby";
 
-const ctx=c.getContext("2d");
-const ground=340;
-const gravity=0.6;
+const peer = new Peer(partyCode);
+const players = [];
 
 peer.on("connection",conn=>{
-  players[conn.peer]={
-    id:conn.peer,
-    name:"",
-    x:100+Math.random()*500,
-    y:ground,
-    vy:0,
-    score:0,
-    conn
-  };
-  if(!it) it=conn.peer;
-
-  conn.on("data",d=>{
-    if(d.type==="join") players[conn.peer].name=d.name;
-    if(d.type==="move"){
-      const p=players[conn.peer];
-      p.x+=d.dx;
-      if(d.jump && p.y===ground) p.vy=-12;
-    }
-  });
+  players.push(conn);
+  syncLobby();
 });
 
-function update(){
-  for(const id in players){
-    const p=players[id];
-    p.vy+=gravity;
-    p.y+=p.vy;
-    if(p.y>=ground){p.y=ground;p.vy=0;}
-  }
-  checkTag();
+function move(dir){
+  selectedGame = (selectedGame + dir + games.length) % games.length;
+  syncLobby();
 }
 
-function checkTag(){
-  const itP=players[it];
-  for(const id in players){
-    if(id===it) continue;
-    const p=players[id];
-    if(Math.abs(p.x-itP.x)<20 && Math.abs(p.y-itP.y)<20){
-      itP.score++;
-      it=id;
-      if(itP.score>=3){
-        round++;
-        if(round>MAX_ROUNDS){
-          winner.style.display="flex";
-          winnerText.textContent=itP.name+" WINS!";
-        }else resetRound();
-      }
-    }
-  }
+function syncLobby(){
+  card.textContent = games[selectedGame].name;
+  players.forEach(p=>{
+    p.send({
+      type:"lobby",
+      selectedGame,
+      phase
+    });
+  });
 }
 
-function resetRound(){
-  for(const id in players){
-    players[id].x=100+Math.random()*500;
-    players[id].y=ground;
-  }
-  roundSpan.textContent=round;
+function startGame(){
+  phase = "game";
+  lobby.style.display="none";
+  c.style.display="block";
+  players.forEach(p=>{
+    p.send({type:"start",game:games[selectedGame].id});
+  });
+  // game logic continues later
 }
-
-function drawStickman(p,isIt){
-  ctx.strokeStyle=isIt?"red":"black";
-  ctx.beginPath();
-  ctx.arc(p.x,p.y-25,6,0,Math.PI*2);
-  ctx.moveTo(p.x,p.y-19);
-  ctx.lineTo(p.x,p.y);
-  ctx.stroke();
-  ctx.fillText(p.name,p.x-10,p.y-35);
-}
-
-function loop(){
-  ctx.clearRect(0,0,800,400);
-  ctx.fillRect(0,ground+5,800,2);
-  update();
-  for(const id in players) drawStickman(players[id],id===it);
-  requestAnimationFrame(loop);
-}
-loop();
 
 function exit(){
   sessionStorage.clear();
   location.href="index.html";
 }
+
+syncLobby();
 </script>
 
+<style>
+#top{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-bottom:1px solid #ccc;
+}
+#lobby{
+  text-align:center;
+  margin-top:40px;
+}
+#carousel{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:20px;
+  margin:20px;
+}
+#card{
+  width:200px;
+  height:120px;
+  border:1px solid #000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+}
+button{
+  padding:10px 16px;
+}
+</style>
+
 </body>
-</html>
