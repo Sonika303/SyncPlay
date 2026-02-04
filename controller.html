@@ -4,35 +4,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Controller</title>
 <style>
-body{
-  font-family:Arial;
-  background:#fff;
-  text-align:center;
-}
-#joy{
-  width:150px;height:150px;
-  border:2px solid #000;
-  border-radius:50%;
-  margin:20px auto;
-  position:relative;
-}
-#stick{
-  width:50px;height:50px;
-  background:#000;
-  border-radius:50%;
-  position:absolute;
-  top:50px;left:50px;
-}
+body{text-align:center;font-family:Arial;background:#fff}
+button{padding:20px;font-size:20px;margin:10px}
 </style>
 </head>
 <body>
 
 <h3 id="status">Connecting…</h3>
 
-<div id="joy">
-  <div id="stick"></div>
-</div>
-
+<button onclick="send(-6,false)">⬅️</button>
+<button onclick="send(6,false)">➡️</button>
+<br>
+<button onclick="send(0,true)">JUMP</button>
+<br>
 <button onclick="exit()">Exit</button>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -42,34 +26,16 @@ const c=sessionStorage.getItem("c");
 if(!u||!c) location.href="index.html";
 
 const peer=new Peer();
-let conn,myId,paused=false;
+let conn;
 
-peer.on("open",id=>{
-  myId=id;
+peer.on("open",()=>{
   conn=peer.connect(c);
-  conn.on("data",d=>{
-    paused=d.paused;
-    status.textContent=paused?"PAUSED":(d.it===myId?"YOU ARE IT":"RUN");
-  });
+  conn.on("open",()=>conn.send({type:"join",name:u}));
 });
 
-let dragging=false;
-joy.addEventListener("touchstart",()=>dragging=true);
-joy.addEventListener("touchend",()=>{
-  dragging=false;
-  stick.style.top="50px"; stick.style.left="50px";
-});
-joy.addEventListener("touchmove",e=>{
-  if(!dragging||paused) return;
-  const r=joy.getBoundingClientRect();
-  const t=e.touches[0];
-  const dx=t.clientX-r.left-75;
-  const dy=t.clientY-r.top-75;
-  stick.style.left=(dx+75-25)+"px";
-  stick.style.top=(dy+75-25)+"px";
-  conn.send({type:"move",dx:dx/5,dy:dy/5});
-});
-
+function send(dx,jump){
+  if(conn) conn.send({type:"move",dx,jump});
+}
 function exit(){
   sessionStorage.clear();
   location.href="index.html";
