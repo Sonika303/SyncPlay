@@ -1,46 +1,60 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Controller</title>
-<style>
-body{text-align:center;font-family:Arial;background:#fff}
-button{padding:20px;font-size:20px;margin:10px}
-</style>
-</head>
 <body>
 
-<h3 id="status">Connecting…</h3>
+<h3 id="status">Lobby</h3>
 
-<button onclick="send(-6,false)">⬅️</button>
-<button onclick="send(6,false)">➡️</button>
-<br>
-<button onclick="send(0,true)">JUMP</button>
-<br>
-<button onclick="exit()">Exit</button>
+<div id="lobby">
+  <button onclick="move(-1)">◀</button>
+  <span id="game"></span>
+  <button onclick="move(1)">▶</button>
+</div>
+
+<div id="info"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const u=sessionStorage.getItem("u");
-const c=sessionStorage.getItem("c");
+const u = sessionStorage.getItem("u");
+const c = sessionStorage.getItem("c");
 if(!u||!c) location.href="index.html";
 
-const peer=new Peer();
+const peer = new Peer();
 let conn;
+let selectedGame = 0;
+const games = ["Stickman Tag","Dot Chase"];
 
 peer.on("open",()=>{
-  conn=peer.connect(c);
-  conn.on("open",()=>conn.send({type:"join",name:u}));
+  conn = peer.connect(c);
+  conn.on("data",d=>{
+    if(d.type==="lobby"){
+      selectedGame = d.selectedGame;
+      game.textContent = games[selectedGame];
+    }
+    if(d.type==="start"){
+      lobby.style.display="none";
+      status.textContent="Game Started";
+      info.textContent="Game: "+d.game;
+    }
+  });
 });
 
-function send(dx,jump){
-  if(conn) conn.send({type:"move",dx,jump});
-}
-function exit(){
-  sessionStorage.clear();
-  location.href="index.html";
+function move(dir){
+  // controllers can request browse
+  if(conn) conn.send({type:"browse",dir});
 }
 </script>
 
+<style>
+body{
+  font-family:Arial;
+  background:#fff;
+  text-align:center;
+}
+#lobby{
+  margin-top:40px;
+}
+button{
+  padding:12px;
+  font-size:20px;
+}
+</style>
+
 </body>
-</html>
