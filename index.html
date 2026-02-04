@@ -1,36 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SyncPlay</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SyncPlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{
+  background:#0e0e0e;color:#fff;font-family:Arial;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh
+}
+input,button{padding:12px;font-size:16px;margin:6px;border-radius:6px;border:none}
+button{background:#00ffaa;font-weight:bold;cursor:pointer}
+</style>
 </head>
 <body>
 
-<h2>SyncPlay</h2>
+<h1>SyncPlay</h1>
 
-<input id="username" placeholder="Username"><br><br>
-
-<button onclick="createParty()">Create Party</button><br><br>
+<input id="name" placeholder="Username">
+<button onclick="create()">Create Party</button>
 
 <input id="code" placeholder="5-digit Code">
-<button onclick="joinParty()">Join Party</button>
+<button onclick="join()">Join Party</button>
 
 <script>
-function createParty() {
-  const u = username.value.trim();
-  if (!u) return alert("Username required");
-  sessionStorage.setItem("username", u);
-  sessionStorage.removeItem("code");
-  location.href = "host.html";
+function create(){
+ if(!name.value)return alert("Username");
+ sessionStorage.setItem("name",name.value);
+ location.href="host.html";
 }
-
-function joinParty() {
-  const u = username.value.trim();
-  const c = code.value.trim();
-  if (!u || c.length !== 5) return alert("Invalid input");
-  sessionStorage.setItem("username", u);
-  sessionStorage.setItem("code", c);
-  location.href = "controller.html";
+function join(){
+ if(!name.value||code.value.length!==5)return alert("Invalid");
+ sessionStorage.setItem("name",name.value);
+ sessionStorage.setItem("code",code.value);
+ location.href="controller.html";
 }
 </script>
 
