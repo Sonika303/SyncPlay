@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dot Chase</title>
+<title>Stickman Tag</title>
 <style>
 body{
   font-family:Arial;
@@ -23,7 +23,7 @@ input,button{
 </head>
 <body>
 
-<h2>Dot Chase</h2>
+<h2>Stickman Tag</h2>
 
 <input id="username" placeholder="Username">
 <button type="button" onclick="create()">Create Party</button>
@@ -36,7 +36,7 @@ function create(){
   const u=username.value.trim();
   if(!u) return alert("Username required");
   sessionStorage.setItem("u",u);
-  window.location.assign("host.html");
+  location.href="host.html";
 }
 function join(){
   const u=username.value.trim();
@@ -44,7 +44,7 @@ function join(){
   if(!u||c.length!==5) return alert("Invalid");
   sessionStorage.setItem("u",u);
   sessionStorage.setItem("c",c);
-  window.location.assign("controller.html");
+  location.href="controller.html";
 }
 </script>
 
