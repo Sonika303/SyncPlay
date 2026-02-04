@@ -1,197 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>SyncPlay</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-body {
-  margin: 0;
-  font-family: sans-serif;
-  background: #111;
-  color: #fff;
-  text-align: center;
-}
-button, input, select {
-  font-size: 16px;
-  padding: 10px;
-  margin: 5px;
-}
-#menu, #display, #controller {
-  padding: 20px;
-}
-#display, #controller {
-  display: none;
-}
-canvas {
-  background: #000;
-  border: 2px solid #444;
-}
-.player {
-  padding: 5px;
-}
-.it {
-  color: red;
-  font-weight: bold;
-}
-</style>
+  <title>SyncPlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
 <body>
 
-<h1>SyncPlay</h1>
+<h2>SyncPlay</h2>
 
-<div id="menu">
-  <button onclick="createParty()">Create Party</button><br>
-  <input id="partyCodeInput" placeholder="5-digit code">
-  <button onclick="joinParty()">Join Party</button>
-</div>
+<input id="username" placeholder="Username"><br><br>
 
-<div id="display">
-  <h2>Host Display</h2>
-  <p>Party Code: <b id="partyCode"></b></p>
+<button onclick="createParty()">Create Party</button><br><br>
 
-  <select id="gameSelect" onchange="changeGame()">
-    <option value="lobby">Lobby</option>
-    <option value="tag">Tag Game</option>
-  </select>
+<input id="code" placeholder="5-digit Code">
+<button onclick="joinParty()">Join Party</button>
 
-  <button onclick="exitParty()">Exit Party</button>
-
-  <div id="gameArea"></div>
-</div>
-
-<div id="controller">
-  <h2>Controller</h2>
-  <p id="roleText"></p>
-  <button onclick="sendInput('tag')">TAG</button><br>
-  <button onclick="exitParty()">Exit Party</button>
-</div>
-
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-let peer;
-let conn;
-let isHost = false;
-let players = {};
-let currentGame = "lobby";
-let myId = null;
-let itPlayer = null;
-
-/* ---------- UTIL ---------- */
-function generateCode() {
-  return Math.floor(10000 + Math.random() * 90000).toString();
-}
-function broadcast(data) {
-  Object.values(players).forEach(p => p.send(data));
-}
-
-/* ---------- PARTY ---------- */
 function createParty() {
-  isHost = true;
-  const code = generateCode();
-  peer = new Peer(code);
-
-  peer.on("open", id => {
-    document.getElementById("menu").style.display = "none";
-    document.getElementById("display").style.display = "block";
-    document.getElementById("partyCode").textContent = id;
-    renderLobby();
-  });
-
-  peer.on("connection", c => {
-    players[c.peer] = c;
-    c.on("data", data => handleData(c.peer, data));
-    renderLobby();
-  });
+  const u = username.value.trim();
+  if (!u) return alert("Username required");
+  sessionStorage.setItem("username", u);
+  sessionStorage.removeItem("code");
+  location.href = "host.html";
 }
 
 function joinParty() {
-  const code = document.getElementById("partyCodeInput").value;
-  peer = new Peer();
-
-  peer.on("open", id => {
-    myId = id;
-    conn = peer.connect(code);
-    document.getElementById("menu").style.display = "none";
-    document.getElementById("controller").style.display = "block";
-    document.getElementById("roleText").textContent = "Waiting for game...";
-  });
-
-  conn.on("data", data => handleData("host", data));
-}
-
-function exitParty() {
-  location.reload();
-}
-
-/* ---------- DATA ---------- */
-function handleData(sender, data) {
-  if (data.type === "game") {
-    currentGame = data.game;
-    if (currentGame === "tag") startTagGame(data);
-    if (currentGame === "lobby") renderLobby();
-  }
-
-  if (data.type === "tag" && isHost && currentGame === "tag") {
-    if (sender === itPlayer) {
-      itPlayer = data.target;
-      broadcast({ type: "it", it: itPlayer });
-      renderTag();
-    }
-  }
-
-  if (data.type === "it" && !isHost) {
-    document.getElementById("roleText").textContent =
-      data.it === myId ? "YOU ARE IT" : "You are safe";
-  }
-}
-
-/* ---------- GAME CONTROL ---------- */
-function changeGame() {
-  currentGame = document.getElementById("gameSelect").value;
-  broadcast({ type: "game", game: currentGame });
-  if (currentGame === "tag") startTagGame();
-  if (currentGame === "lobby") renderLobby();
-}
-
-/* ---------- LOBBY ---------- */
-function renderLobby() {
-  document.getElementById("gameArea").innerHTML =
-    "<h3>Lobby</h3><p>Players: " + Object.keys(players).length + "</p>";
-}
-
-/* ---------- TAG GAME ---------- */
-function startTagGame(data = null) {
-  if (isHost) {
-    const ids = Object.keys(players);
-    if (!ids.length) return;
-    itPlayer = ids[Math.floor(Math.random() * ids.length)];
-    broadcast({ type: "it", it: itPlayer });
-    renderTag();
-  }
-}
-
-function renderTag() {
-  let html = "<h3>Tag Game</h3>";
-  for (let id in players) {
-    html += `<div class="player ${id === itPlayer ? "it" : ""}">
-      ${id} ${id === itPlayer ? "(IT)" : ""}
-    </div>`;
-  }
-  document.getElementById("gameArea").innerHTML = html;
-}
-
-/* ---------- CONTROLLER ---------- */
-function sendInput(action) {
-  if (!conn) return;
-  if (action === "tag") {
-    conn.send({
-      type: "tag",
-      target: Object.keys(players)[Math.floor(Math.random() * Object.keys(players).length)]
-    });
-  }
+  const u = username.value.trim();
+  const c = code.value.trim();
+  if (!u || c.length !== 5) return alert("Invalid input");
+  sessionStorage.setItem("username", u);
+  sessionStorage.setItem("code", c);
+  location.href = "controller.html";
 }
 </script>
 
