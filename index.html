@@ -3,6 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dot Chase</title>
+
 <style>
 body{
   font-family:Arial;
@@ -25,27 +26,43 @@ input,button{
 <h2>Dot Chase</h2>
 
 <input id="username" placeholder="Username">
-<button onclick="create()">Create Party</button>
+
+<button type="button" onclick="create()">Create Party</button>
 
 <br>
 
 <input id="code" placeholder="5-digit Code">
-<button onclick="join()">Join Party</button>
+
+<button type="button" onclick="join()">Join Party</button>
 
 <script>
 function create(){
-  const u=username.value.trim();
-  if(!u) return alert("Username required");
-  sessionStorage.setItem("u",u);
-  location.href="host.html";
+  const u = document.getElementById("username").value.trim();
+  if(!u){
+    alert("Username required");
+    return;
+  }
+  sessionStorage.setItem("u", u);
+  sessionStorage.removeItem("c");
+  window.location.assign("host.html");
 }
+
 function join(){
-  const u=username.value.trim();
-  const c=code.value.trim();
-  if(!u||c.length!==5) return alert("Invalid");
-  sessionStorage.setItem("u",u);
-  sessionStorage.setItem("c",c);
-  location.href="controller.html";
+  const u = document.getElementById("username").value.trim();
+  const c = document.getElementById("code").value.trim();
+
+  if(!u){
+    alert("Username required");
+    return;
+  }
+  if(c.length !== 5){
+    alert("Enter 5-digit code");
+    return;
+  }
+
+  sessionStorage.setItem("u", u);
+  sessionStorage.setItem("c", c);
+  window.location.assign("controller.html");
 }
 </script>
 
