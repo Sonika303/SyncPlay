@@ -4,38 +4,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Host</title>
 <style>
-body{margin:0;background:#fff;font-family:Arial}
+body{margin:0;font-family:Arial;background:#fff}
 #top{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px;
-  border-bottom:1px solid #ccc;
-}
-#scores{
-  padding:10px;
-  font-size:14px;
+  display:flex;justify-content:space-between;
+  padding:10px;border-bottom:1px solid #ccc;
 }
 canvas{
-  width:100vw;
-  height:60vh;
-  display:block;
+  display:block;margin:auto;
+  border:1px solid #ccc;
 }
-button{padding:8px 12px}
+#winner{
+  position:fixed;inset:0;
+  background:#fff;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  font-size:24px;
+}
 </style>
 </head>
 <body>
 
 <div id="top">
-  <div>Code: <b id="code"></b></div>
-  <div>
-    <button onclick="togglePause()">Pause</button>
-    <button onclick="exit()">Exit</button>
-  </div>
+  <div>Code: <b id="code"></b> | Round <span id="round">1</span>/3</div>
+  <button onclick="exit()">Exit</button>
 </div>
 
-<div id="scores"></div>
-<canvas id="c"></canvas>
+<canvas id="c" width="800" height="400"></canvas>
+
+<div id="winner">
+  <div id="winnerText"></div>
+  <button onclick="location.reload()">Restart</button>
+</div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
@@ -48,74 +49,90 @@ code.textContent=partyCode;
 const peer=new Peer(partyCode);
 const players={};
 let it=null;
-let paused=false;
+let round=1;
+const MAX_ROUNDS=3;
 
-const canvas=c,ctx=canvas.getContext("2d");
-function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight*0.6;
-}
-window.onresize=resize; resize();
+const ctx=c.getContext("2d");
+const ground=340;
+const gravity=0.6;
 
 peer.on("connection",conn=>{
   players[conn.peer]={
-    id:conn.peer,x:Math.random()*canvas.width,
-    y:Math.random()*canvas.height,
-    score:0,conn
+    id:conn.peer,
+    name:"",
+    x:100+Math.random()*500,
+    y:ground,
+    vy:0,
+    score:0,
+    conn
   };
   if(!it) it=conn.peer;
 
   conn.on("data",d=>{
-    if(paused) return;
+    if(d.type==="join") players[conn.peer].name=d.name;
     if(d.type==="move"){
       const p=players[conn.peer];
-      p.x+=d.dx; p.y+=d.dy;
-      p.x=Math.max(10,Math.min(canvas.width-10,p.x));
-      p.y=Math.max(10,Math.min(canvas.height-10,p.y));
-      checkTag();
+      p.x+=d.dx;
+      if(d.jump && p.y===ground) p.vy=-12;
     }
   });
 });
+
+function update(){
+  for(const id in players){
+    const p=players[id];
+    p.vy+=gravity;
+    p.y+=p.vy;
+    if(p.y>=ground){p.y=ground;p.vy=0;}
+  }
+  checkTag();
+}
 
 function checkTag(){
   const itP=players[it];
   for(const id in players){
     if(id===it) continue;
     const p=players[id];
-    if(Math.hypot(p.x-itP.x,p.y-itP.y)<20){
-      players[it].score++;
+    if(Math.abs(p.x-itP.x)<20 && Math.abs(p.y-itP.y)<20){
+      itP.score++;
       it=id;
-      break;
+      if(itP.score>=3){
+        round++;
+        if(round>MAX_ROUNDS){
+          winner.style.display="flex";
+          winnerText.textContent=itP.name+" WINS!";
+        }else resetRound();
+      }
     }
   }
-  broadcast();
 }
 
-function broadcast(){
-  Object.values(players).forEach(p=>{
-    p.conn.send({type:"state",it,paused});
-  });
-}
-
-function togglePause(){
-  paused=!paused;
-  broadcast();
-}
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  scores.innerHTML="";
+function resetRound(){
   for(const id in players){
-    const p=players[id];
-    ctx.beginPath();
-    ctx.fillStyle=id===it?"red":"blue";
-    ctx.arc(p.x,p.y,10,0,Math.PI*2);
-    ctx.fill();
-    scores.innerHTML+=`Player ${id.slice(-4)}: ${p.score}<br>`;
+    players[id].x=100+Math.random()*500;
+    players[id].y=ground;
   }
-  requestAnimationFrame(draw);
+  roundSpan.textContent=round;
 }
-draw();
+
+function drawStickman(p,isIt){
+  ctx.strokeStyle=isIt?"red":"black";
+  ctx.beginPath();
+  ctx.arc(p.x,p.y-25,6,0,Math.PI*2);
+  ctx.moveTo(p.x,p.y-19);
+  ctx.lineTo(p.x,p.y);
+  ctx.stroke();
+  ctx.fillText(p.name,p.x-10,p.y-35);
+}
+
+function loop(){
+  ctx.clearRect(0,0,800,400);
+  ctx.fillRect(0,ground+5,800,2);
+  update();
+  for(const id in players) drawStickman(players[id],id===it);
+  requestAnimationFrame(loop);
+}
+loop();
 
 function exit(){
   sessionStorage.clear();
