@@ -1,46 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Controller</title>
+<title>Controller</title>
+<style>
+body{background:#111;color:#fff;font-family:Arial;text-align:center}
+button{font-size:20px;padding:20px;margin:10px;border:none;border-radius:10px}
+</style>
 </head>
 <body>
 
-<h2>Controller</h2>
-<p id="status">Connecting...</p>
+<h2 id="status">Connecting…</h2>
 
-<button onclick="sendTag()">TAG</button><br><br>
-<button onclick="exitParty()">Exit</button>
+<button onclick="move(-10)">⬅️</button>
+<button onclick="move(10)">➡️</button><br>
+<button onclick="tag()">TAG</button><br>
+<button onclick="location.href='index.html'">Exit</button>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const username = sessionStorage.getItem("username");
-const code = sessionStorage.getItem("code");
-if (!username || !code) location.href = "index.html";
+const name=sessionStorage.getItem("name");
+const code=sessionStorage.getItem("code");
+if(!name||!code)location.href="index.html";
 
-const peer = new Peer();
+const peer=new Peer();
 let conn;
 
-peer.on("open", () => {
-  conn = peer.connect(code);
-  conn.on("open", () => {
-    status.innerText = "Connected";
-    conn.send({ type: "join", name: username });
-  });
-
-  conn.on("data", data => {
-    if (data.type === "game") {
-      status.innerText = "Playing: " + data.game;
-    }
-  });
+peer.on("open",()=>{
+ conn=peer.connect(code);
+ conn.on("open",()=>{
+   status.textContent="Connected";
+   conn.send({type:"join",name});
+ });
+ conn.on("data",d=>{
+   if(d.type==="state"){
+     status.textContent=d.it===peer.id?"YOU ARE IT":"RUN";
+   }
+ });
 });
 
-function sendTag() {
-  if (conn) conn.send({ type: "tag" });
-}
-
-function exitParty() {
-  location.href = "index.html";
-}
+function move(dx){conn&&conn.send({type:"move",dx})}
+function tag(){conn&&conn.send({type:"tag"})}
 </script>
 
 </body>
