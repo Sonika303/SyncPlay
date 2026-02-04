@@ -1,74 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Controller</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #ffffff;
-      color: #000;
-      text-align: center;
-      padding-top: 40px;
-    }
-    button {
-      font-size: 20px;
-      padding: 20px;
-      margin: 10px;
-    }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controller</title>
+<style>
+body{
+  font-family:Arial;
+  background:#fff;
+  text-align:center;
+  padding-top:30px;
+}
+button{
+  font-size:22px;
+  padding:20px;
+  margin:10px;
+}
+</style>
 </head>
 <body>
 
-<h2 id="status">Connecting…</h2>
+<h3 id="status">Connecting…</h3>
 
-<button onclick="move(-10)">⬅️</button>
-<button onclick="move(10)">➡️</button>
+<div>
+  <button onclick="move(0,-15)">⬆️</button><br>
+  <button onclick="move(-15,0)">⬅️</button>
+  <button onclick="move(15,0)">➡️</button><br>
+  <button onclick="move(0,15)">⬇️</button>
+</div>
+
 <br>
-<button onclick="tag()">TAG</button>
-<br><br>
-<button onclick="exitParty()">Exit</button>
+<button onclick="location.href='index.html'">Exit</button>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const username = sessionStorage.getItem("username");
-const code = sessionStorage.getItem("partyCode");
+const u=sessionStorage.getItem("u");
+const c=sessionStorage.getItem("c");
+if(!u||!c) location.href="index.html";
 
-if (!username || !code) {
-  window.location.href = "index.html";
-}
+const peer=new Peer();
+let conn,myId;
 
-const peer = new Peer();
-let conn;
-let myId = null;
-
-peer.on("open", id => {
-  myId = id;
-  conn = peer.connect(code);
-
-  conn.on("open", () => {
-    conn.send({ type: "join", name: username });
-    status.textContent = "Connected";
-  });
-
-  conn.on("data", data => {
-    if (data.type === "state") {
-      status.textContent = data.it === myId ? "YOU ARE IT" : "RUN";
+peer.on("open",id=>{
+  myId=id;
+  conn=peer.connect(c);
+  conn.on("open",()=>status.textContent="Connected");
+  conn.on("data",d=>{
+    if(d.type==="state"){
+      status.textContent=d.it===myId?"YOU ARE IT":"CHASE / RUN";
     }
   });
 });
 
-function move(dx) {
-  if (conn) conn.send({ type: "move", dx });
-}
-
-function tag() {
-  if (conn) conn.send({ type: "tag" });
-}
-
-function exitParty() {
-  sessionStorage.clear();
-  window.location.href = "index.html";
+function move(dx,dy){
+  if(conn) conn.send({type:"move",dx,dy});
 }
 </script>
 
