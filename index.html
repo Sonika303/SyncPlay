@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SyncPlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #111;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    button, input {
+      font-size: 18px;
+      padding: 10px 15px;
+      margin: 5px;
+    }
+    #controller {
+      display: none;
+    }
+    #display {
+      display: none;
+      border: 2px dashed #555;
+      height: 300px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>SyncPlay</h1>
+
+  <div id="menu">
+    <button onclick="createParty()">Create Party</button><br>
+    <input id="partyCodeInput" placeholder="Enter Party Code">
+    <button onclick="joinParty()">Join Party</button>
+  </div>
+
+  <div id="display">
+    <h2>Display Screen</h2>
+    <p>Party Code: <span id="partyCode"></span></p>
+    <pre id="log"></pre>
+  </div>
+
+  <div id="controller">
+    <h2>Controller</h2>
+    <button onclick="send('left')">⬅️</button>
+    <button onclick="send('right')">➡️</button>
+    <button onclick="send('jump')">⬆️</button>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    let peer;
+    let conn;
+
+    const log = msg => {
+      document.getElementById("log").textContent += msg + "\n";
+    };
+
+    function createParty() {
+      peer = new Peer();
+      peer.on("open", id => {
+        document.getElementById("menu").style.display = "none";
+        document.getElementById("display").style.display = "block";
+        document.getElementById("partyCode").textContent = id;
+      });
+
+      peer.on("connection", c => {
+        log("Controller connected");
+        c.on("data", data => {
+          log("Input: " + data.action);
+          // GAME INPUT HANDLING GOES HERE
+        });
+      });
+    }
+
+    function joinParty() {
+      const code = document.getElementById("partyCodeInput").value;
+      peer = new Peer();
+      peer.on("open", () => {
+        conn = peer.connect(code);
+        document.getElementById("menu").style.display = "none";
+        document.getElementById("controller").style.display = "block";
+      });
+    }
+
+    function send(action) {
+      if (!conn) return;
+      conn.send({ action });
+    }
+  </script>
+
+</body>
+</html>
