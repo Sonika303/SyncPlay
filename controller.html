@@ -1,60 +1,46 @@
-<body>
-
 <h3 id="status">Lobby</h3>
 
 <div id="lobby">
   <button onclick="move(-1)">◀</button>
   <span id="game"></span>
   <button onclick="move(1)">▶</button>
+  <br><br>
+  <button id="readyBtn" onclick="toggleReady()">READY</button>
 </div>
 
-<div id="info"></div>
+<div id="countdown" style="display:none;font-size:48px;"></div>
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const u = sessionStorage.getItem("u");
-const c = sessionStorage.getItem("c");
-if(!u||!c) location.href="index.html";
-
-const peer = new Peer();
+const peer=new Peer();
 let conn;
-let selectedGame = 0;
-const games = ["Stickman Tag","Dot Chase"];
+let ready=false;
+const games=["Stickman Tag","Dot Chase"];
 
 peer.on("open",()=>{
-  conn = peer.connect(c);
+  conn=peer.connect(c);
   conn.on("data",d=>{
     if(d.type==="lobby"){
-      selectedGame = d.selectedGame;
-      game.textContent = games[selectedGame];
+      game.textContent=games[d.selectedGame];
+    }
+    if(d.type==="countdown"){
+      lobby.style.display="none";
+      countdown.style.display="block";
+      countdown.textContent=d.value;
     }
     if(d.type==="start"){
-      lobby.style.display="none";
+      countdown.style.display="none";
       status.textContent="Game Started";
-      info.textContent="Game: "+d.game;
     }
   });
 });
 
+function toggleReady(){
+  ready=!ready;
+  readyBtn.textContent=ready?"NOT READY":"READY";
+  conn.send({type:"ready",value:ready});
+}
+
 function move(dir){
-  // controllers can request browse
-  if(conn) conn.send({type:"browse",dir});
+  conn.send({type:"browse",dir});
 }
 </script>
-
-<style>
-body{
-  font-family:Arial;
-  background:#fff;
-  text-align:center;
-}
-#lobby{
-  margin-top:40px;
-}
-button{
-  padding:12px;
-  font-size:20px;
-}
-</style>
-
-</body>
