@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tag Game</title>
+  <style>
+    body { background:#111; color:#fff; font-family:sans-serif; }
+    .player { margin:5px; }
+    .it { color:red; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<h3>Tag Game</h3>
+<div id="players"></div>
+
+<script>
+window.addEventListener("message", e => {
+  if (e.data.type === "players") {
+    render(e.data.players);
+  }
+});
+
+function render(list) {
+  players.innerHTML = "";
+  list.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "player";
+    div.innerText = p.name;
+    players.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>
