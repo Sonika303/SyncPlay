@@ -1,46 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controller</title>
+<style>
+body{text-align:center;font-family:Arial;background:#fff}
+button{padding:20px;font-size:18px;margin:10px}
+</style>
+</head>
+<body>
+
 <h3 id="status">Lobby</h3>
 
 <div id="lobby">
-  <button onclick="move(-1)">◀</button>
-  <span id="game"></span>
-  <button onclick="move(1)">▶</button>
-  <br><br>
-  <button id="readyBtn" onclick="toggleReady()">READY</button>
+  <button onclick="toggleReady()">READY</button>
 </div>
 
-<div id="countdown" style="display:none;font-size:48px;"></div>
+<div id="countdown" style="display:none;font-size:60px"></div>
 
+<div id="controls" style="display:none">
+  <button onclick="send(-6,false)">◀</button>
+  <button onclick="send(6,false)">▶</button><br>
+  <button onclick="send(0,true)">JUMP</button>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
+const u=sessionStorage.getItem("u");
+const c=sessionStorage.getItem("c");
+if(!u||!c) location.href="index.html";
+
 const peer=new Peer();
-let conn;
-let ready=false;
-const games=["Stickman Tag","Dot Chase"];
+let conn,ready=false;
 
 peer.on("open",()=>{
   conn=peer.connect(c);
+  conn.on("open",()=>conn.send({type:"join",name:u}));
   conn.on("data",d=>{
-    if(d.type==="lobby"){
-      game.textContent=games[d.selectedGame];
-    }
     if(d.type==="countdown"){
       lobby.style.display="none";
       countdown.style.display="block";
       countdown.textContent=d.value;
     }
+    if(d.type==="lobby"){
+      status.textContent="Lobby";
+    }
     if(d.type==="start"){
       countdown.style.display="none";
-      status.textContent="Game Started";
+      controls.style.display="block";
     }
   });
 });
 
 function toggleReady(){
   ready=!ready;
-  readyBtn.textContent=ready?"NOT READY":"READY";
   conn.send({type:"ready",value:ready});
 }
 
-function move(dir){
-  conn.send({type:"browse",dir});
+function send(dx,jump){
+  conn.send({type:"move",dx,jump});
 }
 </script>
+
+</body>
+</html>
