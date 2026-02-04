@@ -4,27 +4,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Host</title>
 <style>
-body{margin:0;background:#fff}
+body{margin:0;background:#fff;font-family:Arial}
 #top{
-  padding:10px;
-  border-bottom:1px solid #ccc;
   display:flex;
   justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  border-bottom:1px solid #ccc;
+}
+#scores{
+  padding:10px;
+  font-size:14px;
 }
 canvas{
-  display:block;
   width:100vw;
-  height:calc(100vh - 50px);
+  height:60vh;
+  display:block;
 }
+button{padding:8px 12px}
 </style>
 </head>
 <body>
 
 <div id="top">
   <div>Code: <b id="code"></b></div>
-  <button onclick="location.href='index.html'">Exit</button>
+  <div>
+    <button onclick="togglePause()">Pause</button>
+    <button onclick="exit()">Exit</button>
+  </div>
 </div>
 
+<div id="scores"></div>
 <canvas id="c"></canvas>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -38,31 +48,28 @@ code.textContent=partyCode;
 const peer=new Peer(partyCode);
 const players={};
 let it=null;
+let paused=false;
 
-const canvas=c;
-const ctx=canvas.getContext("2d");
-
+const canvas=c,ctx=canvas.getContext("2d");
 function resize(){
   canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight-50;
+  canvas.height=window.innerHeight*0.6;
 }
-window.onresize=resize;
-resize();
+window.onresize=resize; resize();
 
 peer.on("connection",conn=>{
   players[conn.peer]={
-    id:conn.peer,
-    x:Math.random()*canvas.width,
+    id:conn.peer,x:Math.random()*canvas.width,
     y:Math.random()*canvas.height,
-    conn
+    score:0,conn
   };
   if(!it) it=conn.peer;
 
   conn.on("data",d=>{
+    if(paused) return;
     if(d.type==="move"){
       const p=players[conn.peer];
-      p.x+=d.dx;
-      p.y+=d.dy;
+      p.x+=d.dx; p.y+=d.dy;
       p.x=Math.max(10,Math.min(canvas.width-10,p.x));
       p.y=Math.max(10,Math.min(canvas.height-10,p.y));
       checkTag();
@@ -75,9 +82,8 @@ function checkTag(){
   for(const id in players){
     if(id===it) continue;
     const p=players[id];
-    const dx=p.x-itP.x;
-    const dy=p.y-itP.y;
-    if(Math.hypot(dx,dy)<20){
+    if(Math.hypot(p.x-itP.x,p.y-itP.y)<20){
+      players[it].score++;
       it=id;
       break;
     }
@@ -87,22 +93,34 @@ function checkTag(){
 
 function broadcast(){
   Object.values(players).forEach(p=>{
-    p.conn.send({type:"state",it});
+    p.conn.send({type:"state",it,paused});
   });
+}
+
+function togglePause(){
+  paused=!paused;
+  broadcast();
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  scores.innerHTML="";
   for(const id in players){
     const p=players[id];
     ctx.beginPath();
     ctx.fillStyle=id===it?"red":"blue";
     ctx.arc(p.x,p.y,10,0,Math.PI*2);
     ctx.fill();
+    scores.innerHTML+=`Player ${id.slice(-4)}: ${p.score}<br>`;
   }
   requestAnimationFrame(draw);
 }
 draw();
+
+function exit(){
+  sessionStorage.clear();
+  location.href="index.html";
+}
 </script>
 
 </body>
