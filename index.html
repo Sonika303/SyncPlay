@@ -4,9 +4,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SyncPlay</title>
 <style>
-body{margin:0;font-family:Arial;height:100vh;display:flex;justify-content:center;align-items:center;background:#fff}
-.box{width:280px;text-align:center}
-button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
+body{
+  margin:0;
+  font-family:Arial;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background: linear-gradient(135deg, #111, #333);
+  color:white;
+}
+.box{
+  width:320px;
+  text-align:center;
+  background:#1e1e1e;
+  padding:20px;
+  border-radius:12px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+input,button{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+  font-size:16px;
+  border-radius:6px;
+  border:none;
+}
+input{background:#333;color:white}
+button{background:#ff4081;color:white;cursor:pointer;font-weight:bold;}
+button:hover{background:#e73370}
+h2{margin-bottom:20px}
 </style>
 </head>
 <body>
@@ -23,63 +50,64 @@ button,input{width:100%;padding:12px;margin:6px 0;font-size:16px}
 </div>
 
 <script type="module">
-  // Firebase imports
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
-  import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 
-  // Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-    authDomain: "syncplay-17b6e.firebaseapp.com",
-    databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-    projectId: "syncplay-17b6e",
-    storageBucket: "syncplay-17b6e.firebasestorage.app",
-    messagingSenderId: "86016195929",
-    appId: "1:86016195929:web:40262a28786f2ead712048",
-    measurementId: "G-3NBT4GJ0FX"
-  };
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048",
+  measurementId: "G-3NBT4GJ0FX"
+};
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  const auth = getAuth(app);
-  const provider = new GoogleAuthProvider();
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
-  // Elements
-  const googleBtn = document.getElementById("googleSignIn");
-  const userInfo = document.getElementById("userInfo");
-  const usernameDisplay = document.getElementById("usernameDisplay");
+const googleBtn = document.getElementById("googleSignIn");
+const userInfo = document.getElementById("userInfo");
+const usernameDisplay = document.getElementById("usernameDisplay");
 
-  // Google Sign-In
-  googleBtn.onclick = async () => {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      // UID is unique for every Google login
-      const username = user.displayName || "Player";
-      const uid = user.uid;
-      sessionStorage.setItem("u", username);
-      sessionStorage.setItem("uid", uid);
-      usernameDisplay.textContent = `Hello, ${username}`;
-      googleBtn.style.display = "none";
-      userInfo.style.display = "block";
-    } catch(err) {
-      alert("Google Sign-In failed: "+err.message);
-    }
-  };
-
-  // Party actions
-  function createParty() {
-    location.href = "host.html";
+googleBtn.onclick = async () => {
+  try{
+    await signInWithPopup(auth, provider);
+  } catch(err){
+    alert("Sign-in failed: "+err.message);
   }
+};
 
-  function joinParty() {
-    const c = document.getElementById("code").value.trim();
-    if(c.length !== 5) return alert("Invalid Code");
-    sessionStorage.setItem("c", c);
-    location.href = "controller.html";
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    const username = user.displayName || "Player";
+    const uid = user.uid;
+    sessionStorage.setItem("u", username);
+    sessionStorage.setItem("uid", uid);
+    usernameDisplay.textContent = `Hello, ${username}`;
+    googleBtn.style.display = "none";
+    userInfo.style.display = "block";
+  } else {
+    googleBtn.style.display = "block";
+    userInfo.style.display = "none";
   }
+});
+
+function createParty() {
+  location.href="host.html";
+}
+
+function joinParty() {
+  const c = document.getElementById("code").value.trim();
+  if(c.length!==5) return alert("Invalid Code");
+  sessionStorage.setItem("c",c);
+  location.href="controller.html";
+}
 </script>
 
 </body>
