@@ -7,6 +7,7 @@
 body{margin:0;font-family:Arial;background:#fff}
 #top{padding:10px;display:flex;justify-content:space-between;border-bottom:1px solid #ddd}
 #lobby,#countdown,#gameOver{text-align:center}
+#players{margin-top:10px}
 #players div{padding:6px;border-bottom:1px solid #eee}
 canvas{display:none;margin:auto;border:1px solid #ccc}
 button{padding:8px 12px;margin:6px}
@@ -37,71 +38,82 @@ button{padding:8px 12px;margin:6px}
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const username=sessionStorage.getItem("u");
+const username = sessionStorage.getItem("u");
 if(!username) location.href="index.html";
 
-const partyCode=String(Math.floor(10000+Math.random()*90000));
-code.textContent=partyCode;
+const partyCode = String(Math.floor(10000+Math.random()*90000));
+code.textContent = partyCode;
 
-const peer=new Peer(partyCode);
-const players={};
-let phase="lobby";
-let selectedGame=null;
-let objects=[];
+const peer = new Peer(partyCode);
+const players = {}; // key=peerId, value={name, ready, conn, x, y, vy, alive}
+let phase = "lobby";
+let selectedGame = null;
+let objects = [];
 
-peer.on("connection",conn=>{
-  players[conn.peer]={id:conn.peer,name:"",ready:false,conn,x:400,y:350,vy:0};
-  conn.on("data",d=>{
-    if(d.type==="join") players[conn.peer].name=d.name;
-    if(d.type==="ready") players[conn.peer].ready=d.value;
-    if(d.type==="move"&&phase==="game"){
-      const p=players[conn.peer];
-      p.x+=d.dx;
-      if(d.jump&&p.y>=350){p.vy=-12;}
+peer.on("connection", conn => {
+  players[conn.peer] = {name:"", ready:false, conn, x:400, y:350, vy:0, alive:true};
+  
+  conn.on("data", d => {
+    if(d.type==="join") players[conn.peer].name = d.name;
+    if(d.type==="ready") players[conn.peer].ready = d.value;
+    if(d.type==="move" && phase==="game") {
+      const p = players[conn.peer];
+      p.x += d.dx;
+      if(d.jump && p.y>=350) p.vy=-12;
     }
-    syncLobby();
+    updateLobby();
   });
-  syncLobby();
+  updateLobby();
 });
 
-function syncLobby(){
-  playersDiv.innerHTML="<h3>Players:</h3>";
+function updateLobby(){
+  let html="<h3>Players:</h3>";
   Object.values(players).forEach(p=>{
-    playersDiv.innerHTML+=`<div>${p.name} ${p.ready?"✅":"❌"}</div>`;
-    p.conn.send({type:"lobby",players,code:partyCode});
+    html += `<div>${p.name} ${p.ready?"✅":"❌"}</div>`;
+  });
+  playersDiv.innerHTML = html;
+  
+  // broadcast to controllers
+  Object.values(players).forEach(p=>{
+    p.conn.send({type:"lobby",players:Object.values(players)});
   });
 }
 
 function selectGame(){
-  if(Object.keys(players).length<2) return alert("Min 2 players required!");
-  selectedGame="dodge";
-  lobby.style.display="none";
+  const aliveCount = Object.values(players).length;
+  if(aliveCount<2) return alert("Min 2 players required!");
+  selectedGame = "dodge";
   startCountdown(3);
 }
 
 function startCountdown(n){
+  phase = "countdown";
+  lobby.style.display="none";
   countdown.style.display="block";
-  countdown.textContent=n;
-  Object.values(players).forEach(p=>p.conn.send({type:"countdown",value:n}));
+  countdown.textContent = n;
+  
+  Object.values(players).forEach(p => p.conn.send({type:"countdown",value:n}));
   if(n>0) setTimeout(()=>startCountdown(n-1),1000);
   else beginGame();
 }
 
-const ctx=game.getContext("2d");
-const gravity=0.6;
+// GAME LOGIC
+const ctx = game.getContext("2d");
+const gravity = 0.6;
 
 function beginGame(){
-  phase="game";
+  phase = "game";
   countdown.style.display="none";
   game.style.display="block";
   objects=[];
+  Object.values(players).forEach(p=>{p.alive=true;});
   spawnObjects();
-  loop();
+  requestAnimationFrame(loop);
 }
 
 function spawnObjects(){
   if(phase!=="game") return;
-  const x=Math.random()*780+10;
+  const x = Math.random()*780+10;
   objects.push({x:x,y:-20,vy:2+Math.random()*3});
   setTimeout(spawnObjects,1000);
 }
@@ -111,36 +123,28 @@ function loop(){
   ctx.fillStyle="#ddd";
   ctx.fillRect(0,380,800,20); // ground
 
-  // Draw & update objects
   ctx.fillStyle="red";
-  objects.forEach(o=>{
-    o.y+=o.vy;
-    ctx.fillRect(o.x,o.y,20,20);
-  });
+  objects.forEach(o=>{ o.y+=o.vy; ctx.fillRect(o.x,o.y,20,20); });
 
-  // Draw players
-  let alivePlayers=[];
+  let alivePlayers = [];
   Object.values(players).forEach(p=>{
-    p.vy+=gravity;
-    p.y+=p.vy;
+    if(!p.alive) return;
+    p.vy += gravity;
+    p.y += p.vy;
     if(p.y>350){p.y=350;p.vy=0;}
     ctx.fillStyle="#000";
     ctx.beginPath();
-    ctx.arc(p.x,p.y-10,10,0,Math.PI*2);
-    ctx.fill();
+    ctx.arc(p.x,p.y-10,10,0,Math.PI*2); ctx.fill();
     ctx.fillText(p.name,p.x-15,p.y-25);
 
-    // Check collision
-    if(!objects.some(o=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20)){
-      alivePlayers.push(p.name);
-    }
+    // collision
+    if(objects.some(o=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20)){
+      p.alive=false;
+    } else alivePlayers.push(p.name);
   });
 
-  // Check winner
-  if(objects.some(o=>Object.values(players).some(p=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20))){
-    phase="over";
-    game.style.display="none";
-    gameOver.style.display="block";
+  if(Object.values(players).every(p=>!p.alive)){
+    phase="over"; game.style.display="none"; gameOver.style.display="block";
     winner.textContent = alivePlayers.length>0?"Winner: "+alivePlayers.join(", "):"No winner!";
     return;
   }
@@ -153,6 +157,5 @@ function exit(){
   location.href="index.html";
 }
 </script>
-
 </body>
 </html>
