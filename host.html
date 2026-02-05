@@ -8,34 +8,43 @@ body{margin:0;font-family:Arial;background:#f5f5f5;color:#222;display:flex;flex-
 #top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#e0e0e0;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
 #players{width:90%;margin:10px;background:#fff;padding:10px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,0.1);}
 #players div{padding:6px;border-bottom:1px solid #ddd;}
-canvas{border:1px solid #ccc;max-width:100%;height:auto;margin-top:10px;background:#fafafa;border-radius:8px;}
+canvas{border:1px solid #ccc;max-width:100%;height:auto;margin-top:10px;background:#fafafa;border-radius:8px;display:none}
 #countdownOverlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(250,250,250,0.9);color:#2196f3;font-size:80px;display:flex;justify-content:center;align-items:center;display:none;z-index:10}
 #gameOver{display:none;text-align:center;margin-top:20px}
 #winner{color:#f57c00;}
 button{background:#2196f3;color:white;padding:8px 12px;border:none;border-radius:6px;cursor:pointer;}
 button:hover{background:#1976d2}
+#gameMenu{display:flex;gap:10px;margin-top:10px;}
+.gameCard{background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,0.1);flex:1;cursor:pointer;transition:0.2s;text-align:center;}
+.gameCard:hover{background:#e0f7fa;}
 </style>
 </head>
 <body>
 
 <div id="top">
   <div>Party Code: <b id="code"></b></div>
-  <button onclick="exit()">Exit</button>
+  <button id="exitBtn">Exit</button>
 </div>
 
 <div id="players"><h3>Players:</h3></div>
+
+<div id="gameMenu">
+  <div class="gameCard" onclick="selectGame('dodge')">Dodge Falling Objects</div>
+  <!-- Add more games here -->
+</div>
+
 <canvas id="game" width="800" height="400"></canvas>
 <div id="countdownOverlay">3</div>
 <div id="gameOver">
   <h2>Game Over</h2>
   <h3 id="winner"></h3>
-  <button onclick="exit()">Exit</button>
+  <button id="exitGameBtn">Exit</button>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
-import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { getDatabase, ref, set, update, onValue, off } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -67,21 +76,31 @@ const ctx = gameCanvas.getContext("2d");
 const countdownOverlay = document.getElementById("countdownOverlay");
 const gameOverDiv = document.getElementById("gameOver");
 const winnerText = document.getElementById("winner");
+const exitBtn = document.getElementById("exitBtn");
+const exitGameBtn = document.getElementById("exitGameBtn");
 
 let gameState="lobby";
 let objects=[];
+let playersListener=null;
+let selectedGame=null;
 
-// Update players list in realtime
-onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
+// Listen for players
+playersListener = onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
   const playersData = snapshot.val() || {};
   playersDiv.innerHTML="<h3>Players:</h3>";
   Object.values(playersData).forEach(p=>{
     playersDiv.innerHTML+=`<div>${p.username}</div>`;
   });
-  if(Object.keys(playersData).length>=2 && gameState==="lobby"){
-    startCountdown();
-  }
 });
+
+// Game selection
+function selectGame(game){
+  selectedGame = game;
+  const playersData = playersDiv.querySelectorAll("div").length-1; // minus h3
+  if(playersData<2){alert("At least 2 players required"); return;}
+  document.getElementById("gameMenu").style.display="none";
+  startCountdown();
+}
 
 // Countdown
 async function startCountdown(){
@@ -95,16 +114,18 @@ async function startCountdown(){
   startGame();
 }
 
-// Game loop
+// Start game
 const gravity=0.6;
-
 function startGame(){
-  gameState="playing";
-  objects=[];
-  spawnObjects();
-  requestAnimationFrame(loop);
+  if(selectedGame==="dodge"){
+    gameState="playing";
+    gameCanvas.style.display="block";
+    spawnObjects();
+    requestAnimationFrame(loop);
+  }
 }
 
+// Spawn falling objects
 function spawnObjects(){
   if(gameState!=="playing") return;
   const x = Math.random()*780+10;
@@ -112,6 +133,7 @@ function spawnObjects(){
   setTimeout(spawnObjects,1000);
 }
 
+// Game loop
 function loop(){
   ctx.clearRect(0,0,800,400);
   ctx.fillStyle="#eee";
@@ -156,7 +178,11 @@ function loop(){
   if(gameState==="playing") requestAnimationFrame(loop);
 }
 
+// Exit handlers
+exitBtn.onclick = exit;
+exitGameBtn.onclick = exit;
 function exit(){
+  if(playersListener) off(ref(db,"parties/"+partyCode+"/players"),playersListener);
   sessionStorage.clear();
   location.href="index.html";
 }
