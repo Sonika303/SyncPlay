@@ -4,13 +4,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SyncPlay Host</title>
 <style>
-body{margin:0;font-family:Arial;background:#fff;display:flex;flex-direction:column;align-items:center}
-#top{width:100%;padding:10px;display:flex;justify-content:space-between;border-bottom:1px solid #ddd}
-#players{width:90%;margin:10px}
-#players div{padding:6px;border-bottom:1px solid #eee}
-canvas{border:1px solid #ccc;max-width:100%;height:auto;margin-top:10px}
-#countdownOverlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);color:white;font-size:80px;display:flex;justify-content:center;align-items:center;display:none;z-index:10}
+body{margin:0;font-family:Arial;background:#111;color:white;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#222;box-shadow:0 2px 6px black;}
+#players{width:90%;margin:10px;background:#222;padding:10px;border-radius:8px}
+#players div{padding:6px;border-bottom:1px solid #444;}
+canvas{border:1px solid #444;max-width:100%;height:auto;margin-top:10px;background:#000;border-radius:8px}
+#countdownOverlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);color:#ff4081;font-size:80px;display:flex;justify-content:center;align-items:center;display:none;z-index:10}
 #gameOver{display:none;text-align:center;margin-top:20px}
+#winner{color:#ff4081;}
+button{background:#ff4081;color:white;padding:8px 12px;border:none;border-radius:6px;cursor:pointer;}
+button:hover{background:#e73370}
 </style>
 </head>
 <body>
@@ -21,11 +24,8 @@ canvas{border:1px solid #ccc;max-width:100%;height:auto;margin-top:10px}
 </div>
 
 <div id="players"><h3>Players:</h3></div>
-
 <canvas id="game" width="800" height="400"></canvas>
-
 <div id="countdownOverlay">3</div>
-
 <div id="gameOver">
   <h2>Game Over</h2>
   <h3 id="winner"></h3>
@@ -37,7 +37,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebas
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
 import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -55,14 +54,20 @@ const db = getDatabase(app);
 
 const username = sessionStorage.getItem("u");
 if(!username) location.href="index.html";
+
 const partyCode = String(Math.floor(10000+Math.random()*90000));
 sessionStorage.setItem("partyCode", partyCode);
 document.getElementById("code").textContent = partyCode;
 
-const partyRef = ref(db, "parties/"+partyCode);
-set(partyRef, { gameState:"lobby", countdown:3, winner:"", players:{} });
+const partyRef = ref(db,"parties/"+partyCode);
+set(partyRef,{
+  gameState:"lobby",
+  countdown:3,
+  winner:"",
+  rules:{minPlayers:2,maxPlayers:4,gameTime:60},
+  players:{}
+});
 
-// Elements
 const playersDiv = document.getElementById("players");
 const gameCanvas = document.getElementById("game");
 const ctx = gameCanvas.getContext("2d");
@@ -70,22 +75,17 @@ const countdownOverlay = document.getElementById("countdownOverlay");
 const gameOverDiv = document.getElementById("gameOver");
 const winnerText = document.getElementById("winner");
 
-let gameState = "lobby"; // lobby / countdown / playing / over
-let objects = [];
+let gameState="lobby";
+let objects=[];
 
-// Listen for players joining
-onValue(ref(db, "parties/"+partyCode+"/players"), snapshot=>{
+// Update player list in lobby
+onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
   const playersData = snapshot.val() || {};
   playersDiv.innerHTML="<h3>Players:</h3>";
-  for(const uid in playersData){
-    const p = playersData[uid];
+  Object.values(playersData).forEach(p=>{
     playersDiv.innerHTML+=`<div>${p.username}</div>`;
-  }
-});
-
-// Start game automatically when 2+ players joined
-onValue(ref(db, "parties/"+partyCode+"/players"), snapshot=>{
-  const playersData = snapshot.val() || {};
+  });
+  // auto-start if enough players
   if(Object.keys(playersData).length>=2 && gameState==="lobby"){
     startCountdown();
   }
@@ -103,7 +103,7 @@ async function startCountdown(){
   startGame();
 }
 
-// Game
+// Game loop
 const gravity=0.6;
 
 function startGame(){
@@ -113,7 +113,6 @@ function startGame(){
   requestAnimationFrame(loop);
 }
 
-// Falling objects
 function spawnObjects(){
   if(gameState!=="playing") return;
   const x = Math.random()*780+10;
@@ -121,46 +120,44 @@ function spawnObjects(){
   setTimeout(spawnObjects,1000);
 }
 
-// Game loop
 function loop(){
   ctx.clearRect(0,0,800,400);
-  ctx.fillStyle="#ddd";
+  ctx.fillStyle="#222";
   ctx.fillRect(0,380,800,20);
 
   // Draw objects
-  ctx.fillStyle="red";
-  objects.forEach(o=>{ o.y+=o.vy; ctx.fillRect(o.x,o.y,20,20); });
+  ctx.fillStyle="#ff4081";
+  objects.forEach(o=>{o.y+=o.vy; ctx.fillRect(o.x,o.y,20,20);});
 
-  // Get players from DB
-  const playersRef = ref(db, "parties/"+partyCode+"/players");
-  onValue(playersRef, snapshot=>{
+  // Draw players
+  onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
     const players = snapshot.val() || {};
-    let alivePlayers = [];
+    let alivePlayers=[];
     for(const uid in players){
       const p = players[uid];
       if(p.alive===false) continue;
       p.vy = (p.vy||0)+gravity;
       p.y = (p.y||350)+p.vy;
-      if(p.y>350) { p.y=350; p.vy=0; }
-      ctx.fillStyle="#000";
+      if(p.y>350){p.y=350;p.vy=0;}
+      ctx.fillStyle="#fff";
       ctx.beginPath();
-      ctx.arc(p.x,p.y-10,10,0,Math.PI*2); ctx.fill();
-      ctx.fillText(p.username,p.x-15,p.y-25);
+      ctx.arc(p.x,p.y-10,10,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle="#ff4081";
+      ctx.fillText(p.username,p.x-20,p.y-25);
 
-      // Check collision
+      // Check collisions
       if(objects.some(o=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20)){
         p.alive=false;
       } else alivePlayers.push(p.username);
-
-      update(ref(db, `parties/${partyCode}/players/${uid}`), p);
+      update(ref(db,`parties/${partyCode}/players/${uid}`),p);
     }
 
-    // Game over
     if(Object.keys(players).every(uid=>players[uid].alive===false)){
       gameState="over";
       gameCanvas.style.display="none";
       gameOverDiv.style.display="block";
-      winnerText.textContent = alivePlayers.length>0?"Winner: "+alivePlayers.join(", "):"No winner!";
+      winnerText.textContent=alivePlayers.length>0?"Winner: "+alivePlayers.join(", "):"No winner!";
     }
   });
 
