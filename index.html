@@ -42,13 +42,11 @@ button:hover{background:#1976d2;}
 <div class="container">
   <h2>SyncPlay</h2>
   
-  <!-- Login Frame -->
   <div id="loginFrame">
     <input id="username" placeholder="Enter Username">
     <button id="googleSignIn">Sign in with Google</button>
   </div>
   
-  <!-- Party Frame -->
   <div id="partyFrame">
     <p id="usernameDisplay"></p>
     <button id="createPartyBtn">Create Party</button>
@@ -63,7 +61,6 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -81,7 +78,6 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-// Elements
 const loginFrame = document.getElementById("loginFrame");
 const partyFrame = document.getElementById("partyFrame");
 const googleBtn = document.getElementById("googleSignIn");
@@ -91,7 +87,6 @@ const createBtn = document.getElementById("createPartyBtn");
 const joinCodeInput = document.getElementById("joinCode");
 const joinBtn = document.getElementById("joinPartyBtn");
 
-// Sign-in
 googleBtn.onclick = async () => {
   const customUsername = usernameInput.value.trim();
   if(!customUsername) return alert("Enter a username first");
@@ -104,7 +99,6 @@ googleBtn.onclick = async () => {
   } catch(err){ alert(err.message); }
 };
 
-// Auth state listener
 onAuthStateChanged(auth, user=>{
   if(user && sessionStorage.getItem("u")){
     showPartyFrame();
@@ -118,7 +112,6 @@ function showPartyFrame(){
   usernameDisplay.textContent = `Hello, ${username}`;
 }
 
-// Create Party
 createBtn.onclick = ()=>{
   const partyCode = String(Math.floor(10000 + Math.random()*90000));
   sessionStorage.setItem("partyCode", partyCode);
@@ -140,7 +133,6 @@ createBtn.onclick = ()=>{
   location.href="host.html";
 };
 
-// Join Party
 joinBtn.onclick = ()=>{
   const code = joinCodeInput.value.trim();
   if(code.length!==5) return alert("Invalid code");
