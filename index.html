@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SyncPlay</title>
 <style>
-body{margin:0;font-family:Arial;background:#fff;height:100vh;display:flex;justify-content:center;align-items:center}
+body{margin:0;font-family:Arial;height:100vh;display:flex;justify-content:center;align-items:center;background:#fff}
 .box{width:280px;text-align:center}
 input,button{width:100%;padding:12px;margin:6px 0;font-size:16px}
 </style>
@@ -21,15 +21,15 @@ input,button{width:100%;padding:12px;margin:6px 0;font-size:16px}
 
 <script>
 function create(){
-  const u=username.value.trim();
+  const u = username.value.trim();
   if(!u) return alert("Username required");
   sessionStorage.setItem("u",u);
   location.href="host.html";
 }
 function join(){
-  const u=username.value.trim();
-  const c=code.value.trim();
-  if(!u||c.length!==5) return alert("Invalid");
+  const u = username.value.trim();
+  const c = code.value.trim();
+  if(!u || c.length!==5) return alert("Invalid");
   sessionStorage.setItem("u",u);
   sessionStorage.setItem("c",c);
   location.href="controller.html";
