@@ -4,10 +4,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SyncPlay Controller</title>
 <style>
-body{text-align:center;font-family:Arial;background:#fff;overflow:hidden}
-#joystick{position:absolute;bottom:50px;left:50px;width:120px;height:120px;background:#ccc;border-radius:50%}
-#stick{width:60px;height:60px;background:#888;border-radius:50%;position:absolute;top:30px;left:30px}
-button{padding:12px;font-size:18px;margin:10px}
+body{text-align:center;font-family:Arial;background:#111;color:white;overflow:hidden}
+#joystick{position:absolute;bottom:50px;left:50px;width:120px;height:120px;background:#333;border-radius:50%}
+#stick{width:60px;height:60px;background:#ff4081;border-radius:50%;position:absolute;top:30px;left:30px}
+button{padding:12px;font-size:18px;margin:10px;border:none;border-radius:6px;background:#ff4081;color:white;cursor:pointer}
+button:hover{background:#e73370}
 </style>
 </head>
 <body>
@@ -18,9 +19,8 @@ button{padding:12px;font-size:18px;margin:10px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -35,38 +35,38 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const partyCode = sessionStorage.getItem("c") || sessionStorage.getItem("partyCode");
+const partyCode = sessionStorage.getItem("c")||sessionStorage.getItem("partyCode");
 const uid = sessionStorage.getItem("uid");
 const username = sessionStorage.getItem("u");
 if(!uid||!partyCode) location.href="index.html";
 
-const playerRef = ref(db, `parties/${partyCode}/players/${uid}`);
-update(playerRef, {username, x:400, y:350, vx:0, vy:0, alive:true});
+const playerRef = ref(db,`parties/${partyCode}/players/${uid}`);
+update(playerRef,{username,x:400,y:350,vx:0,vy:0,alive:true});
 
 // Joystick
 const joystick = document.getElementById("joystick");
 const stick = document.getElementById("stick");
-let dx = 0, touching=false;
+let dx=0, touching=false;
 
-stick.addEventListener("touchstart",()=>{ touching=true; });
+stick.addEventListener("touchstart",()=>{touching=true;});
 stick.addEventListener("touchend",()=>{
   touching=false; dx=0;
   stick.style.left="30px"; stick.style.top="30px";
-  update(playerRef, {vx:dx});
+  update(playerRef,{vx:dx});
 });
 stick.addEventListener("touchmove",e=>{
   if(!touching) return;
   const t = e.touches[0];
   const rect = joystick.getBoundingClientRect();
-  let x = t.clientX - rect.left - 60;
-  if(x<-40) x=-40; if(x>40) x=40;
+  let x = t.clientX-rect.left-60;
+  if(x<-40)x=-40; if(x>40)x=40;
   stick.style.left=(x+30)+"px";
-  dx = x/10;
-  update(playerRef, {vx:dx});
+  dx=x/10;
+  update(playerRef,{vx:dx});
 });
 
 function sendJump(){
-  update(playerRef, {vy:-12});
+  update(playerRef,{vy:-12});
 }
 </script>
 </body>
