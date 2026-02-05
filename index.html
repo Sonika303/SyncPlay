@@ -6,40 +6,41 @@
 <style>
 body{
   margin:0;
-  font-family:Arial;
+  font-family: Arial, sans-serif;
   height:100vh;
   display:flex;
   justify-content:center;
   align-items:center;
-  background: linear-gradient(135deg, #111, #333);
-  color:white;
+  background:#222;
+  color:#eee;
 }
 .box{
   width:320px;
   text-align:center;
-  background:#1e1e1e;
-  padding:20px;
+  background:#2b2b2b;
+  padding:25px;
   border-radius:12px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  box-shadow:0 0 15px rgba(0,0,0,0.5);
 }
 input,button{
   width:100%;
   padding:12px;
   margin:8px 0;
   font-size:16px;
-  border-radius:6px;
+  border-radius:8px;
   border:none;
 }
-input{background:#333;color:white}
-button{background:#ff4081;color:white;cursor:pointer;font-weight:bold;}
-button:hover{background:#e73370}
-h2{margin-bottom:20px}
+input{background:#444;color:#eee;}
+button{background:#00bfa5;color:white;font-weight:bold;cursor:pointer;transition:0.2s;}
+button:hover{background:#009e8f;}
+h2{margin-bottom:20px;}
 </style>
 </head>
 <body>
 
 <div class="box">
   <h2>SyncPlay</h2>
+  <input id="username" placeholder="Enter Username">
   <button id="googleSignIn">Sign in with Google</button>
   <div id="userInfo" style="display:none">
     <p id="usernameDisplay"></p>
@@ -54,7 +55,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebas
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -74,41 +74,43 @@ const provider = new GoogleAuthProvider();
 const googleBtn = document.getElementById("googleSignIn");
 const userInfo = document.getElementById("userInfo");
 const usernameDisplay = document.getElementById("usernameDisplay");
+const usernameInput = document.getElementById("username");
 
 googleBtn.onclick = async () => {
+  const customUsername = usernameInput.value.trim();
+  if(!customUsername) return alert("Enter a username first");
+  sessionStorage.setItem("u", customUsername);
   try{
     await signInWithPopup(auth, provider);
-  } catch(err){
-    alert("Sign-in failed: "+err.message);
-  }
+  } catch(err){ alert(err.message); }
 };
 
-onAuthStateChanged(auth, (user)=>{
+onAuthStateChanged(auth, user=>{
   if(user){
-    const username = user.displayName || "Player";
-    const uid = user.uid;
+    const username = sessionStorage.getItem("u") || user.displayName || "Player";
     sessionStorage.setItem("u", username);
-    sessionStorage.setItem("uid", uid);
+    sessionStorage.setItem("uid", user.uid);
     usernameDisplay.textContent = `Hello, ${username}`;
     googleBtn.style.display = "none";
+    usernameInput.style.display = "none";
     userInfo.style.display = "block";
   } else {
     googleBtn.style.display = "block";
+    usernameInput.style.display = "block";
     userInfo.style.display = "none";
   }
 });
 
-function createParty() {
+function createParty(){
   location.href="host.html";
 }
 
-function joinParty() {
+function joinParty(){
   const c = document.getElementById("code").value.trim();
-  if(c.length!==5) return alert("Invalid Code");
+  if(c.length!==5) return alert("Invalid code");
   sessionStorage.setItem("c",c);
   location.href="controller.html";
 }
 </script>
-
 </body>
 </html>
