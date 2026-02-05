@@ -4,24 +4,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Controller</title>
 <style>
-body{text-align:center;font-family:Arial;background:#fff}
-button{padding:20px;font-size:18px;margin:10px}
+body{text-align:center;font-family:Arial;background:#fff;overflow:hidden}
+#joystick{position:absolute;bottom:50px;left:50px;width:120px;height:120px;background:#ccc;border-radius:50%}
+#stick{width:60px;height:60px;background:#888;border-radius:50%;position:absolute;top:30px;left:30px}
+button{padding:12px;font-size:18px;margin:10px}
 </style>
 </head>
 <body>
 
 <h3 id="status">Lobby</h3>
-
 <div id="lobby">
   <button onclick="toggleReady()">READY</button>
 </div>
 
 <div id="countdown" style="display:none;font-size:60px"></div>
-
 <div id="controls" style="display:none">
-  <button onclick="send(-6,false)">◀</button>
-  <button onclick="send(6,false)">▶</button><br>
-  <button onclick="send(0,true)">JUMP</button>
+  <div id="joystick"><div id="stick"></div></div>
+  <button onclick="sendJump()">JUMP</button>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -32,6 +31,7 @@ if(!u||!c) location.href="index.html";
 
 const peer=new Peer();
 let conn,ready=false;
+let dx=0,jump=false;
 
 peer.on("open",()=>{
   conn=peer.connect(c);
@@ -42,9 +42,7 @@ peer.on("open",()=>{
       countdown.style.display="block";
       countdown.textContent=d.value;
     }
-    if(d.type==="lobby"){
-      status.textContent="Lobby";
-    }
+    if(d.type==="lobby"){status.textContent="Lobby";}
     if(d.type==="start"){
       countdown.style.display="none";
       controls.style.display="block";
@@ -57,8 +55,29 @@ function toggleReady(){
   conn.send({type:"ready",value:ready});
 }
 
-function send(dx,jump){
-  conn.send({type:"move",dx,jump});
+function sendJump(){
+  conn.send({type:"move",dx:0,jump:true});
+}
+
+// Simple touch joystick
+const stick=document.getElementById("stick");
+const joystick=document.getElementById("joystick");
+let touching=false,center={x:60,y:60};
+stick.addEventListener("touchstart",e=>{touching=true});
+stick.addEventListener("touchend",e=>{touching=false;dx=0;stick.style.left="30px";stick.style.top="30px"; sendMove();});
+stick.addEventListener("touchmove",e=>{
+  if(!touching) return;
+  const t=e.touches[0];
+  const rect=joystick.getBoundingClientRect();
+  let x=t.clientX-rect.left-60;
+  if(x<-40) x=-40;if(x>40)x=40;
+  stick.style.left=(x+30)+"px";
+  dx=x/10;
+  sendMove();
+});
+
+function sendMove(){
+  conn.send({type:"move",dx, jump:false});
 }
 </script>
 
