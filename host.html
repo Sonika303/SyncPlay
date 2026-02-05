@@ -5,16 +5,12 @@
 <title>Host</title>
 <style>
 body{margin:0;font-family:Arial;background:#fff}
-#top{
-  padding:10px;
-  display:flex;
-  justify-content:space-between;
-  border-bottom:1px solid #ddd;
-}
+#top{padding:10px;display:flex;justify-content:space-between;border-bottom:1px solid #ddd}
 #lobby,#countdown,#gameOver{text-align:center}
 #players div{padding:6px;border-bottom:1px solid #eee}
 canvas{display:none;margin:auto;border:1px solid #ccc}
 button{padding:8px 12px;margin:6px}
+.card{border:1px solid #ccc;padding:16px;margin:20px auto;width:260px;border-radius:8px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -25,17 +21,18 @@ button{padding:8px 12px;margin:6px}
 </div>
 
 <div id="lobby">
-  <h2>Lobby</h2>
-  <div id="players"></div>
-  <button onclick="startGame()">Start</button>
+  <h2>Select Game</h2>
+  <div class="card" onclick="selectGame()">Dodge Falling Objects<br><small>Min 2 players</small><br><button>Play</button></div>
+  <div id="players"><h3>Players:</h3></div>
 </div>
 
 <div id="countdown" style="display:none;font-size:60px"></div>
-
 <canvas id="game" width="800" height="400"></canvas>
 
 <div id="gameOver" style="display:none">
   <h2>Game Over</h2>
+  <h3 id="winner"></h3>
+  <button onclick="exit()">Exit</button>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -49,16 +46,18 @@ code.textContent=partyCode;
 const peer=new Peer(partyCode);
 const players={};
 let phase="lobby";
+let selectedGame=null;
+let objects=[];
 
 peer.on("connection",conn=>{
-  players[conn.peer]={id:conn.peer,name:"",ready:false,conn,x:50,y:320,vy:0};
+  players[conn.peer]={id:conn.peer,name:"",ready:false,conn,x:400,y:350,vy:0};
   conn.on("data",d=>{
     if(d.type==="join") players[conn.peer].name=d.name;
     if(d.type==="ready") players[conn.peer].ready=d.value;
     if(d.type==="move"&&phase==="game"){
       const p=players[conn.peer];
       p.x+=d.dx;
-      if(d.jump&&p.y>=320){p.vy=-12;vibrate();}
+      if(d.jump&&p.y>=350){p.vy=-12;}
     }
     syncLobby();
   });
@@ -66,15 +65,16 @@ peer.on("connection",conn=>{
 });
 
 function syncLobby(){
-  playersDiv.innerHTML="";
+  playersDiv.innerHTML="<h3>Players:</h3>";
   Object.values(players).forEach(p=>{
     playersDiv.innerHTML+=`<div>${p.name} ${p.ready?"✅":"❌"}</div>`;
     p.conn.send({type:"lobby",players,code:partyCode});
   });
 }
 
-function startGame(){
-  if(!Object.values(players).every(p=>p.ready)) return alert("All must be ready");
+function selectGame(){
+  if(Object.keys(players).length<2) return alert("Min 2 players required!");
+  selectedGame="dodge";
   lobby.style.display="none";
   startCountdown(3);
 }
@@ -94,32 +94,59 @@ function beginGame(){
   phase="game";
   countdown.style.display="none";
   game.style.display="block";
+  objects=[];
+  spawnObjects();
   loop();
+}
+
+function spawnObjects(){
+  if(phase!=="game") return;
+  const x=Math.random()*780+10;
+  objects.push({x:x,y:-20,vy:2+Math.random()*3});
+  setTimeout(spawnObjects,1000);
 }
 
 function loop(){
   ctx.clearRect(0,0,800,400);
-  ctx.fillRect(0,350,800,2);
+  ctx.fillStyle="#ddd";
+  ctx.fillRect(0,380,800,20); // ground
+
+  // Draw & update objects
+  ctx.fillStyle="red";
+  objects.forEach(o=>{
+    o.y+=o.vy;
+    ctx.fillRect(o.x,o.y,20,20);
+  });
+
+  // Draw players
+  let alivePlayers=[];
   Object.values(players).forEach(p=>{
     p.vy+=gravity;
     p.y+=p.vy;
-    if(p.y>320){p.y=320;p.vy=0;}
-    drawStickman(p);
+    if(p.y>350){p.y=350;p.vy=0;}
+    ctx.fillStyle="#000";
+    ctx.beginPath();
+    ctx.arc(p.x,p.y-10,10,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillText(p.name,p.x-15,p.y-25);
+
+    // Check collision
+    if(!objects.some(o=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20)){
+      alivePlayers.push(p.name);
+    }
   });
+
+  // Check winner
+  if(objects.some(o=>Object.values(players).some(p=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20))){
+    phase="over";
+    game.style.display="none";
+    gameOver.style.display="block";
+    winner.textContent = alivePlayers.length>0?"Winner: "+alivePlayers.join(", "):"No winner!";
+    return;
+  }
+
   if(phase==="game") requestAnimationFrame(loop);
 }
-
-function drawStickman(p){
-  ctx.strokeStyle="#000";
-  ctx.beginPath();
-  ctx.arc(p.x,p.y-25,6,0,Math.PI*2);
-  ctx.moveTo(p.x,p.y-19);
-  ctx.lineTo(p.x,p.y);
-  ctx.stroke();
-  ctx.fillText(p.name,p.x-10,p.y-35);
-}
-
-function vibrate(){navigator.vibrate&&navigator.vibrate(50)}
 
 function exit(){
   sessionStorage.clear();
