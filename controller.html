@@ -13,10 +13,7 @@ button{padding:12px;font-size:18px;margin:10px}
 <body>
 
 <h3 id="status">Lobby</h3>
-<div id="lobby">
-  <button onclick="toggleReady()">READY</button>
-</div>
-
+<div id="lobby"><button onclick="toggleReady()">READY</button></div>
 <div id="countdown" style="display:none;font-size:60px"></div>
 <div id="controls" style="display:none">
   <div id="joystick"><div id="stick"></div></div>
@@ -25,61 +22,43 @@ button{padding:12px;font-size:18px;margin:10px}
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-const u=sessionStorage.getItem("u");
-const c=sessionStorage.getItem("c");
+const u = sessionStorage.getItem("u");
+const c = sessionStorage.getItem("c");
 if(!u||!c) location.href="index.html";
 
-const peer=new Peer();
-let conn,ready=false;
-let dx=0,jump=false;
+const peer = new Peer();
+let conn,ready=false,dx=0;
 
 peer.on("open",()=>{
-  conn=peer.connect(c);
+  conn = peer.connect(c);
   conn.on("open",()=>conn.send({type:"join",name:u}));
-  conn.on("data",d=>{
-    if(d.type==="countdown"){
-      lobby.style.display="none";
-      countdown.style.display="block";
-      countdown.textContent=d.value;
-    }
-    if(d.type==="lobby"){status.textContent="Lobby";}
-    if(d.type==="start"){
-      countdown.style.display="none";
-      controls.style.display="block";
-    }
+  conn.on("data", d => {
+    if(d.type==="lobby") { status.textContent="Lobby"; }
+    if(d.type==="countdown"){ lobby.style.display="none"; countdown.style.display="block"; countdown.textContent=d.value; }
   });
 });
 
-function toggleReady(){
-  ready=!ready;
-  conn.send({type:"ready",value:ready});
-}
+function toggleReady(){ ready=!ready; conn.send({type:"ready",value:ready}); }
 
-function sendJump(){
-  conn.send({type:"move",dx:0,jump:true});
-}
+function sendJump(){ conn.send({type:"move",dx:0,jump:true}); }
 
-// Simple touch joystick
-const stick=document.getElementById("stick");
-const joystick=document.getElementById("joystick");
-let touching=false,center={x:60,y:60};
-stick.addEventListener("touchstart",e=>{touching=true});
-stick.addEventListener("touchend",e=>{touching=false;dx=0;stick.style.left="30px";stick.style.top="30px"; sendMove();});
+const stick = document.getElementById("stick");
+const joystick = document.getElementById("joystick");
+let touching=false;
+
+stick.addEventListener("touchstart",()=>{ touching=true; });
+stick.addEventListener("touchend",()=>{
+  touching=false; dx=0; stick.style.left="30px"; stick.style.top="30px"; sendMove();
+});
 stick.addEventListener("touchmove",e=>{
   if(!touching) return;
   const t=e.touches[0];
   const rect=joystick.getBoundingClientRect();
-  let x=t.clientX-rect.left-60;
-  if(x<-40) x=-40;if(x>40)x=40;
-  stick.style.left=(x+30)+"px";
-  dx=x/10;
-  sendMove();
+  let x=t.clientX-rect.left-60; if(x<-40)x=-40;if(x>40)x=40;
+  stick.style.left=(x+30)+"px"; dx=x/10; sendMove();
 });
 
-function sendMove(){
-  conn.send({type:"move",dx, jump:false});
-}
+function sendMove(){ conn.send({type:"move",dx, jump:false}); }
 </script>
-
 </body>
 </html>
