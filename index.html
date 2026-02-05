@@ -11,42 +11,49 @@ body{
   display:flex;
   justify-content:center;
   align-items:center;
-  background:#222;
+  background:#1f1f1f;
   color:#eee;
 }
-.box{
-  width:320px;
-  text-align:center;
+.container{
+  width:360px;
   background:#2b2b2b;
-  padding:25px;
   border-radius:12px;
+  padding:25px;
   box-shadow:0 0 15px rgba(0,0,0,0.5);
+  text-align:center;
 }
+h2{margin-bottom:20px;}
 input,button{
   width:100%;
   padding:12px;
   margin:8px 0;
-  font-size:16px;
   border-radius:8px;
   border:none;
+  font-size:16px;
 }
 input{background:#444;color:#eee;}
 button{background:#00bfa5;color:white;font-weight:bold;cursor:pointer;transition:0.2s;}
 button:hover{background:#009e8f;}
-h2{margin-bottom:20px;}
+#partyFrame{display:none;}
 </style>
 </head>
 <body>
 
-<div class="box">
+<div class="container">
   <h2>SyncPlay</h2>
-  <input id="username" placeholder="Enter Username">
-  <button id="googleSignIn">Sign in with Google</button>
-  <div id="userInfo" style="display:none">
+  
+  <!-- Login Frame -->
+  <div id="loginFrame">
+    <input id="username" placeholder="Enter Username">
+    <button id="googleSignIn">Sign in with Google</button>
+  </div>
+  
+  <!-- Party Frame -->
+  <div id="partyFrame">
     <p id="usernameDisplay"></p>
-    <button onclick="createParty()">Create Party</button>
-    <input id="code" placeholder="Enter 5-digit Code">
-    <button onclick="joinParty()">Join Party</button>
+    <button id="createPartyBtn">Create Party</button>
+    <input id="joinCode" placeholder="Enter 5-digit Code">
+    <button id="joinPartyBtn">Join Party</button>
   </div>
 </div>
 
@@ -54,6 +61,7 @@ h2{margin-bottom:20px;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -69,48 +77,75 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
+const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
+// Elements
+const loginFrame = document.getElementById("loginFrame");
+const partyFrame = document.getElementById("partyFrame");
 const googleBtn = document.getElementById("googleSignIn");
-const userInfo = document.getElementById("userInfo");
-const usernameDisplay = document.getElementById("usernameDisplay");
 const usernameInput = document.getElementById("username");
+const usernameDisplay = document.getElementById("usernameDisplay");
+const createBtn = document.getElementById("createPartyBtn");
+const joinCodeInput = document.getElementById("joinCode");
+const joinBtn = document.getElementById("joinPartyBtn");
 
+// Sign-in
 googleBtn.onclick = async () => {
   const customUsername = usernameInput.value.trim();
   if(!customUsername) return alert("Enter a username first");
-  sessionStorage.setItem("u", customUsername);
   try{
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    sessionStorage.setItem("u", customUsername);
+    sessionStorage.setItem("uid", user.uid);
+    showPartyFrame();
   } catch(err){ alert(err.message); }
 };
 
+// Auth state listener
 onAuthStateChanged(auth, user=>{
-  if(user){
-    const username = sessionStorage.getItem("u") || user.displayName || "Player";
-    sessionStorage.setItem("u", username);
-    sessionStorage.setItem("uid", user.uid);
-    usernameDisplay.textContent = `Hello, ${username}`;
-    googleBtn.style.display = "none";
-    usernameInput.style.display = "none";
-    userInfo.style.display = "block";
-  } else {
-    googleBtn.style.display = "block";
-    usernameInput.style.display = "block";
-    userInfo.style.display = "none";
+  if(user && sessionStorage.getItem("u")){
+    showPartyFrame();
   }
 });
 
-function createParty(){
-  location.href="host.html";
+function showPartyFrame(){
+  loginFrame.style.display="none";
+  partyFrame.style.display="block";
+  const username = sessionStorage.getItem("u") || "Player";
+  usernameDisplay.textContent = `Hello, ${username}`;
 }
 
-function joinParty(){
-  const c = document.getElementById("code").value.trim();
-  if(c.length!==5) return alert("Invalid code");
-  sessionStorage.setItem("c",c);
+// Create Party
+createBtn.onclick = ()=>{
+  const partyCode = String(Math.floor(10000 + Math.random()*90000));
+  sessionStorage.setItem("partyCode", partyCode);
+  const uid = sessionStorage.getItem("uid");
+  const username = sessionStorage.getItem("u");
+  
+  const partyRef = ref(db, "parties/"+partyCode);
+  set(partyRef, {
+    gameState:"lobby",
+    countdown:3,
+    winner:"",
+    rules:{minPlayers:2,maxPlayers:4,gameTime:60},
+    players:{
+      [uid]: { username, x:400, y:350, vx:0, vy:0, alive:true }
+    }
+  });
+  
+  sessionStorage.setItem("c", partyCode);
+  location.href="host.html";
+};
+
+// Join Party
+joinBtn.onclick = ()=>{
+  const code = joinCodeInput.value.trim();
+  if(code.length!==5) return alert("Invalid code");
+  sessionStorage.setItem("c", code);
   location.href="controller.html";
-}
+};
 </script>
 </body>
 </html>
