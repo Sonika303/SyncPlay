@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Controller</title>
+<title>SyncPlay Controller</title>
 <style>
 body{text-align:center;font-family:Arial;background:#fff;overflow:hidden}
 #joystick{position:absolute;bottom:50px;left:50px;width:120px;height:120px;background:#ccc;border-radius:50%}
@@ -12,56 +12,62 @@ button{padding:12px;font-size:18px;margin:10px}
 </head>
 <body>
 
-<h3 id="status">Lobby</h3>
-<div id="lobby"><button onclick="toggleReady()">READY</button></div>
-<div id="countdown" style="display:none;font-size:60px"></div>
-<div id="controls" style="display:none">
-  <div id="joystick"><div id="stick"></div></div>
-  <button onclick="sendJump()">JUMP</button>
-</div>
+<h3>Controller</h3>
+<div id="joystick"><div id="stick"></div></div>
+<button onclick="sendJump()">JUMP</button>
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script>
-const u = sessionStorage.getItem("u");
-const c = sessionStorage.getItem("c");
-if(!u||!c) location.href="index.html";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-const peer = new Peer();
-let conn,ready=false,dx=0;
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048",
+  measurementId: "G-3NBT4GJ0FX"
+};
 
-peer.on("open",()=>{
-  conn = peer.connect(c);
-  conn.on("open",()=>conn.send({type:"join",name:u}));
-  conn.on("data", d => {
-    if(d.type==="lobby") { status.textContent="Lobby"; }
-    if(d.type==="countdown"){ lobby.style.display="none"; countdown.style.display="block"; countdown.textContent=d.value; controls.style.display="block"; }
-  });
-});
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-function toggleReady(){ ready=!ready; conn.send({type:"ready",value:ready}); }
+const partyCode = sessionStorage.getItem("c") || sessionStorage.getItem("partyCode");
+const uid = sessionStorage.getItem("uid");
+const username = sessionStorage.getItem("u");
+if(!uid||!partyCode) location.href="index.html";
 
-function sendJump(){ conn.send({type:"move",dx:0,jump:true}); }
+const playerRef = ref(db, `parties/${partyCode}/players/${uid}`);
+update(playerRef, {username, x:400, y:350, vx:0, vy:0, alive:true});
 
 // Joystick
-const stick = document.getElementById("stick");
 const joystick = document.getElementById("joystick");
-let touching=false;
+const stick = document.getElementById("stick");
+let dx = 0, touching=false;
 
 stick.addEventListener("touchstart",()=>{ touching=true; });
 stick.addEventListener("touchend",()=>{
-  touching=false; dx=0; stick.style.left="30px"; stick.style.top="30px"; sendMove();
+  touching=false; dx=0;
+  stick.style.left="30px"; stick.style.top="30px";
+  update(playerRef, {vx:dx});
 });
 stick.addEventListener("touchmove",e=>{
   if(!touching) return;
-  const t=e.touches[0];
-  const rect=joystick.getBoundingClientRect();
+  const t = e.touches[0];
+  const rect = joystick.getBoundingClientRect();
   let x = t.clientX - rect.left - 60;
   if(x<-40) x=-40; if(x>40) x=40;
-  stick.style.left = (x+30) + "px";
-  dx = x/10; sendMove();
+  stick.style.left=(x+30)+"px";
+  dx = x/10;
+  update(playerRef, {vx:dx});
 });
 
-function sendMove(){ conn.send({type:"move",dx, jump:false}); }
+function sendJump(){
+  update(playerRef, {vy:-12});
+}
 </script>
 </body>
 </html>
