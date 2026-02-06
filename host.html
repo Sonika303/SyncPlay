@@ -6,14 +6,12 @@
 
 <style>
 body{margin:0;font-family:Arial;background:#f0f0f0;display:flex;flex-direction:column;align-items:center}
-#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#fff}
 #players{width:90%;margin:10px;background:#fff;padding:10px;border-radius:8px}
 #players div{padding:6px;border-bottom:1px solid #ddd}
-canvas{border:1px solid #ccc;margin-top:10px;background:#fafafa;border-radius:8px;display:none}
-#countdown{font-size:80px;color:#00bfa5;display:none}
 .gameCard{background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.1);cursor:pointer;text-align:center}
-.gameCard:hover{background:#e0f7fa}
 .note{font-size:12px;color:#888;margin-top:4px}
+canvas{border:1px solid #ccc;margin-top:10px;display:none}
 </style>
 </head>
 
@@ -26,18 +24,19 @@ canvas{border:1px solid #ccc;margin-top:10px;background:#fafafa;border-radius:8p
 
 <div id="players"><h3>Players:</h3></div>
 
-<div class="gameCard" onclick="selectGame()">
+<div class="gameCard" id="gameBtn">
   Dodge Falling Objects
   <div class="note">Minimum 2 players required</div>
 </div>
 
 <canvas id="game" width="800" height="400"></canvas>
-<div id="countdown">3</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
+/* CONFIG */
 const app = initializeApp({
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -45,7 +44,9 @@ const app = initializeApp({
   projectId: "syncplay-17b6e"
 });
 
+const auth = getAuth(app);
 const db = getDatabase(app);
+
 const code = sessionStorage.getItem("c");
 if(!code) location.href="index.html";
 document.getElementById("code").textContent = code;
@@ -53,79 +54,56 @@ document.getElementById("code").textContent = code;
 const playersDiv = document.getElementById("players");
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const countdown = document.getElementById("countdown");
 
 let players = {};
-let objects = [];
 let gameRunning = false;
 
-/* LIVE PLAYERS */
-onValue(ref(db,`parties/${code}/players`), snap=>{
-  players = snap.val() || {};
-  playersDiv.innerHTML="<h3>Players:</h3>";
-  Object.values(players).forEach(p=>{
-    playersDiv.innerHTML += `<div>${p.username}</div>`;
+/* WAIT FOR AUTH */
+onAuthStateChanged(auth, user=>{
+  if(!user) return location.href="index.html";
+
+  /* LIVE PLAYERS */
+  onValue(ref(db,`parties/${code}/players`), snap=>{
+    players = snap.val() || {};
+    playersDiv.innerHTML="<h3>Players:</h3>";
+    Object.values(players).forEach(p=>{
+      playersDiv.innerHTML += `<div>${p.username}</div>`;
+    });
   });
 });
 
-/* GAME */
-function selectGame(){
+/* START GAME */
+document.getElementById("gameBtn").onclick = ()=>{
   if(Object.keys(players).length < 2){
     alert("At least 2 players required");
     return;
   }
-  startCountdown();
-}
-
-async function startCountdown(){
-  countdown.style.display="block";
-  for(let i=3;i>0;i--){
-    countdown.textContent=i;
-    await new Promise(r=>setTimeout(r,1000));
-  }
-  countdown.style.display="none";
   startGame();
-}
+};
 
 function startGame(){
-  gameRunning=true;
+  gameRunning = true;
   canvas.style.display="block";
-  spawn();
   requestAnimationFrame(loop);
 }
 
-function spawn(){
-  if(!gameRunning) return;
-  objects.push({x:Math.random()*780,y:-20,vy:3});
-  setTimeout(spawn,1000);
-}
-
 function loop(){
+  if(!gameRunning) return;
   ctx.clearRect(0,0,800,400);
 
-  ctx.fillStyle="#f57c00";
-  objects.forEach(o=>{
-    o.y+=o.vy;
-    ctx.fillRect(o.x,o.y,20,20);
-  });
-
-  let aliveCount=0;
+  let alive = 0;
   for(const uid in players){
     const p = players[uid];
     if(p.alive===false) continue;
-    aliveCount++;
+    alive++;
     ctx.fillStyle="#2196f3";
     ctx.beginPath();
     ctx.arc(p.x||400,p.y||350,10,0,Math.PI*2);
     ctx.fill();
-
-    if(objects.some(o=>Math.abs(o.x-(p.x||400))<20 && Math.abs(o.y-(p.y||350))<20)){
-      update(ref(db,`parties/${code}/players/${uid}`),{alive:false});
-    }
   }
 
-  if(aliveCount<=1){
-    gameRunning=false;
+  if(alive <= 1){
+    gameRunning = false;
     alert("Game Over");
     return;
   }
