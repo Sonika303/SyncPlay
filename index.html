@@ -12,21 +12,22 @@ body{
   display:flex;
   justify-content:center;
   align-items:center;
-  background:#f0f0f0;
+  background:linear-gradient(135deg,#00bfa5,#00796b);
 }
 .container{
-  width:400px;
+  width:420px;
   background:#fff;
-  border-radius:16px;
+  border-radius:18px;
   padding:40px;
-  box-shadow:0 0 25px rgba(0,0,0,.2);
+  box-shadow:0 25px 40px rgba(0,0,0,.25);
   text-align:center;
 }
+h2{margin-bottom:20px}
 input,button{
   width:100%;
   padding:14px;
   margin:8px 0;
-  border-radius:10px;
+  border-radius:12px;
   border:none;
   font-size:16px;
 }
@@ -42,9 +43,14 @@ button:hover{background:#009e88}
 #playerList{
   background:#f5f5f5;
   padding:10px;
-  border-radius:8px;
-  max-height:140px;
+  border-radius:10px;
+  max-height:150px;
   overflow:auto;
+  margin-top:10px;
+}
+.player{
+  padding:6px;
+  border-bottom:1px solid #ddd;
 }
 </style>
 </head>
@@ -53,16 +59,18 @@ button:hover{background:#009e88}
 <div class="container">
   <h2>SyncPlay</h2>
 
+  <!-- LOGIN -->
   <div id="loginFrame">
     <input id="username" placeholder="Enter Username">
-    <button id="googleSignIn">Sign in with Google</button>
+    <button id="googleSignIn" type="button">Sign in with Google</button>
   </div>
 
+  <!-- PARTY -->
   <div id="partyFrame">
     <p id="usernameDisplay"></p>
-    <button id="createPartyBtn">Create Party</button>
+    <button id="createPartyBtn" type="button">Create Party</button>
     <input id="joinCode" placeholder="5-digit Code">
-    <button id="joinPartyBtn">Join Party</button>
+    <button id="joinPartyBtn" type="button">Join Party</button>
     <div id="playerList"><b>Players:</b></div>
   </div>
 </div>
@@ -72,6 +80,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
+/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -85,16 +94,18 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
+/* ELEMENTS */
 const loginFrame = document.getElementById("loginFrame");
 const partyFrame = document.getElementById("partyFrame");
 const usernameInput = document.getElementById("username");
 const usernameDisplay = document.getElementById("usernameDisplay");
 const playerList = document.getElementById("playerList");
 
-const showParty = ()=>{
+/* UI SWITCH */
+function showParty(){
   loginFrame.style.display="none";
   partyFrame.style.display="block";
-  usernameDisplay.textContent = `Hello, ${sessionStorage.getItem("u")}`;
+  usernameDisplay.textContent = "Hello, " + sessionStorage.getItem("u");
 
   const code = sessionStorage.getItem("c");
   if(!code) return;
@@ -104,13 +115,14 @@ const showParty = ()=>{
     playerList.innerHTML="<b>Players:</b>";
     Object.values(players).forEach(p=>{
       const d=document.createElement("div");
+      d.className="player";
       d.textContent=p.username;
       playerList.appendChild(d);
     });
   });
-};
+}
 
-// Login
+/* LOGIN */
 document.getElementById("googleSignIn").onclick = async ()=>{
   const name = usernameInput.value.trim();
   if(!name) return alert("Enter username");
@@ -125,24 +137,32 @@ onAuthStateChanged(auth, u=>{
   if(u && sessionStorage.getItem("u")) showParty();
 });
 
-// Create Party
+/* CREATE PARTY (FIXED) */
 document.getElementById("createPartyBtn").onclick = async ()=>{
-  const code = String(Math.floor(10000 + Math.random()*90000));
-  const uid = sessionStorage.getItem("uid");
-  const username = sessionStorage.getItem("u");
+  try{
+    const uid = sessionStorage.getItem("uid");
+    const username = sessionStorage.getItem("u");
+    if(!uid || !username) return alert("Sign in first");
 
-  await set(ref(db, `parties/${code}`), {
-    gameState:"lobby",
-    players:{
-      [uid]:{ username, x:0, y:0, alive:true }
-    }
-  });
+    const code = Math.floor(10000 + Math.random()*90000).toString();
 
-  sessionStorage.setItem("c", code);
-  location.href="host.html";
+    await set(ref(db, `parties/${code}`),{
+      gameState:"lobby",
+      createdAt:Date.now(),
+      players:{
+        [uid]:{ username, x:0, y:0, alive:true }
+      }
+    });
+
+    sessionStorage.setItem("c", code);
+    setTimeout(()=>location.href="host.html",150);
+
+  }catch(e){
+    alert(e.message);
+  }
 };
 
-// Join Party
+/* JOIN PARTY */
 document.getElementById("joinPartyBtn").onclick = async ()=>{
   const code = document.getElementById("joinCode").value.trim();
   if(code.length!==5) return alert("Invalid code");
@@ -150,12 +170,12 @@ document.getElementById("joinPartyBtn").onclick = async ()=>{
   const uid = sessionStorage.getItem("uid");
   const username = sessionStorage.getItem("u");
 
-  await set(ref(db, `parties/${code}/players/${uid}`), {
+  await set(ref(db, `parties/${code}/players/${uid}`),{
     username, x:0, y:0, alive:true
   });
 
   sessionStorage.setItem("c", code);
-  location.href="controller.html";
+  setTimeout(()=>location.href="controller.html",150);
 };
 </script>
 </body>
