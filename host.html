@@ -3,184 +3,140 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SyncPlay Host</title>
+
 <style>
-body{margin:0;font-family:Arial;background:#f0f0f0;color:#222;display:flex;flex-direction:column;align-items:center;overflow:hidden}
-#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
-#players{width:90%;margin:10px;background:#fff;padding:10px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,0.1);}
-#players div{padding:6px;border-bottom:1px solid #ddd;}
-canvas{border:1px solid #ccc;max-width:100%;height:auto;margin-top:10px;background:#fafafa;border-radius:8px;display:none;}
-#countdownOverlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.95);color:#00bfa5;font-size:80px;display:flex;justify-content:center;align-items:center;display:none;z-index:10;transition:0.3s;}
-#gameOver{display:none;text-align:center;margin-top:20px}
-#winner{color:#f57c00;}
-button{background:#00bfa5;color:white;padding:8px 12px;border:none;border-radius:6px;cursor:pointer;transition:0.2s;}
-button:hover{background:#009e88;}
-#gameMenu{display:flex;gap:10px;margin-top:10px;justify-content:center;}
-.gameCard{background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,0.1);flex:1;cursor:pointer;transition:0.3s;text-align:center;}
-.gameCard:hover{background:#e0f7fa;transform:scale(1.05);}
+body{margin:0;font-family:Arial;background:#f0f0f0;display:flex;flex-direction:column;align-items:center}
+#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+#players{width:90%;margin:10px;background:#fff;padding:10px;border-radius:8px}
+#players div{padding:6px;border-bottom:1px solid #ddd}
+canvas{border:1px solid #ccc;margin-top:10px;background:#fafafa;border-radius:8px;display:none}
+#countdown{font-size:80px;color:#00bfa5;display:none}
+.gameCard{background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.1);cursor:pointer;text-align:center}
+.gameCard:hover{background:#e0f7fa}
+.note{font-size:12px;color:#888;margin-top:4px}
 </style>
 </head>
+
 <body>
 
 <div id="top">
   <div>Party Code: <b id="code"></b></div>
-  <button id="exitBtn">Exit</button>
+  <button onclick="exit()">Exit</button>
 </div>
 
 <div id="players"><h3>Players:</h3></div>
 
-<div id="gameMenu">
-  <div class="gameCard" onclick="selectGame('dodge')">Dodge Falling Objects</div>
+<div class="gameCard" onclick="selectGame()">
+  Dodge Falling Objects
+  <div class="note">Minimum 2 players required</div>
 </div>
 
 <canvas id="game" width="800" height="400"></canvas>
-<div id="countdownOverlay">3</div>
-<div id="gameOver">
-  <h2>Game Over</h2>
-  <h3 id="winner"></h3>
-  <button id="exitGameBtn">Exit</button>
-</div>
+<div id="countdown">3</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-analytics.js";
-import { getDatabase, ref, set, update, onValue, off } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-const firebaseConfig = {
+const app = initializeApp({
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048",
-  measurementId: "G-3NBT4GJ0FX"
-};
+  projectId: "syncplay-17b6e"
+});
 
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 const db = getDatabase(app);
+const code = sessionStorage.getItem("c");
+if(!code) location.href="index.html";
+document.getElementById("code").textContent = code;
 
-const username = sessionStorage.getItem("u");
-if(!username) location.href="index.html";
-const partyCode = sessionStorage.getItem("c") || sessionStorage.getItem("partyCode");
-if(!partyCode) location.href="index.html";
-
-document.getElementById("code").textContent = partyCode;
-
-const partyRef = ref(db,"parties/"+partyCode);
 const playersDiv = document.getElementById("players");
-const gameCanvas = document.getElementById("game");
-const ctx = gameCanvas.getContext("2d");
-const countdownOverlay = document.getElementById("countdownOverlay");
-const gameOverDiv = document.getElementById("gameOver");
-const winnerText = document.getElementById("winner");
-const exitBtn = document.getElementById("exitBtn");
-const exitGameBtn = document.getElementById("exitGameBtn");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const countdown = document.getElementById("countdown");
 
-let gameState="lobby";
-let objects=[];
-let selectedGame=null;
-let playersListener = null;
+let players = {};
+let objects = [];
+let gameRunning = false;
 
-// Live players list
-playersListener = onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
-  const playersData = snapshot.val() || {};
+/* LIVE PLAYERS */
+onValue(ref(db,`parties/${code}/players`), snap=>{
+  players = snap.val() || {};
   playersDiv.innerHTML="<h3>Players:</h3>";
-  Object.values(playersData).forEach(p=>{
-    playersDiv.innerHTML+=`<div>${p.username}</div>`;
+  Object.values(players).forEach(p=>{
+    playersDiv.innerHTML += `<div>${p.username}</div>`;
   });
 });
 
-// Game selection
-function selectGame(game){
-  selectedGame = game;
-  const playersCount = playersDiv.querySelectorAll("div").length-1; 
-  if(playersCount<2){alert("At least 2 players required"); return;}
-  document.getElementById("gameMenu").style.display="none";
+/* GAME */
+function selectGame(){
+  if(Object.keys(players).length < 2){
+    alert("At least 2 players required");
+    return;
+  }
   startCountdown();
 }
 
-// Countdown
 async function startCountdown(){
-  gameState="countdown";
-  for(let i=3;i>=0;i--){
-    countdownOverlay.style.display="flex";
-    countdownOverlay.textContent=i>0?i:"GO!";
+  countdown.style.display="block";
+  for(let i=3;i>0;i--){
+    countdown.textContent=i;
     await new Promise(r=>setTimeout(r,1000));
   }
-  countdownOverlay.style.display="none";
+  countdown.style.display="none";
   startGame();
 }
 
-// Game loop
-const gravity=0.6;
 function startGame(){
-  if(selectedGame==="dodge"){
-    gameState="playing";
-    gameCanvas.style.display="block";
-    spawnObjects();
-    requestAnimationFrame(loop);
-  }
+  gameRunning=true;
+  canvas.style.display="block";
+  spawn();
+  requestAnimationFrame(loop);
 }
 
-function spawnObjects(){
-  if(gameState!=="playing") return;
-  const x = Math.random()*780+10;
-  objects.push({x:x,y:-20,vy:2+Math.random()*3});
-  setTimeout(spawnObjects,1000);
+function spawn(){
+  if(!gameRunning) return;
+  objects.push({x:Math.random()*780,y:-20,vy:3});
+  setTimeout(spawn,1000);
 }
 
 function loop(){
   ctx.clearRect(0,0,800,400);
-  ctx.fillStyle="#eee";
-  ctx.fillRect(0,380,800,20);
 
-  // Draw objects
   ctx.fillStyle="#f57c00";
-  objects.forEach(o=>{o.y+=o.vy; ctx.fillRect(o.x,o.y,20,20);});
-
-  // Draw players
-  onValue(ref(db,"parties/"+partyCode+"/players"),snapshot=>{
-    const players = snapshot.val() || {};
-    let alivePlayers=[];
-    for(const uid in players){
-      const p = players[uid];
-      if(p.alive===false) continue;
-      p.vy = (p.vy||0)+gravity;
-      p.y = (p.y||350)+p.vy;
-      if(p.y>350){p.y=350;p.vy=0;}
-      ctx.fillStyle="#2196f3";
-      ctx.beginPath();
-      ctx.arc(p.x,p.y-10,10,0,Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle="#222";
-      ctx.fillText(p.username,p.x-20,p.y-25);
-
-      if(objects.some(o=>Math.abs(o.x-p.x)<20 && Math.abs(o.y-(p.y-10))<20)){
-        p.alive=false;
-      } else alivePlayers.push(p.username);
-      update(ref(db,`parties/${partyCode}/players/${uid}`),p);
-    }
-
-    if(Object.keys(players).every(uid=>players[uid].alive===false)){
-      gameState="over";
-      gameCanvas.style.display="none";
-      gameOverDiv.style.display="block";
-      winnerText.textContent=alivePlayers.length>0?"Winner: "+alivePlayers.join(", "):"No winner!";
-    }
+  objects.forEach(o=>{
+    o.y+=o.vy;
+    ctx.fillRect(o.x,o.y,20,20);
   });
 
-  if(gameState==="playing") requestAnimationFrame(loop);
+  let aliveCount=0;
+  for(const uid in players){
+    const p = players[uid];
+    if(p.alive===false) continue;
+    aliveCount++;
+    ctx.fillStyle="#2196f3";
+    ctx.beginPath();
+    ctx.arc(p.x||400,p.y||350,10,0,Math.PI*2);
+    ctx.fill();
+
+    if(objects.some(o=>Math.abs(o.x-(p.x||400))<20 && Math.abs(o.y-(p.y||350))<20)){
+      update(ref(db,`parties/${code}/players/${uid}`),{alive:false});
+    }
+  }
+
+  if(aliveCount<=1){
+    gameRunning=false;
+    alert("Game Over");
+    return;
+  }
+
+  requestAnimationFrame(loop);
 }
 
-// Exit
-exitBtn.onclick = exit;
-exitGameBtn.onclick = exit;
-function exit(){
-  if(playersListener) off(ref(db,"parties/"+partyCode+"/players"),playersListener);
+window.exit = ()=>{
   sessionStorage.clear();
   location.href="index.html";
-}
+};
 </script>
 </body>
 </html>
