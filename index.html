@@ -1,111 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SyncPlay</title>
-
-<style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family:Arial, Helvetica, sans-serif;
-}
-
-body{
-  min-height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:linear-gradient(135deg,#1d2671,#c33764);
-  color:white;
-}
-
-.card{
-  background:rgba(255,255,255,0.1);
-  backdrop-filter:blur(20px);
-  padding:40px;
-  border-radius:20px;
-  width:95%;
-  max-width:420px;
-  text-align:center;
-  transition:0.3s;
-}
-
-h1{
-  margin-bottom:20px;
-}
-
-button{
-  width:100%;
-  padding:14px;
-  margin-top:12px;
-  border:none;
-  border-radius:10px;
-  font-size:16px;
-  font-weight:bold;
-  cursor:pointer;
-  background:#00eaff;
-  color:black;
-  transition:0.2s;
-}
-
-button:hover{
-  opacity:0.85;
-}
-
-.hidden{
-  display:none;
-}
-
-.profile{
-  margin-bottom:15px;
-}
-
-.profile img{
-  width:70px;
-  height:70px;
-  border-radius:50%;
-  margin-bottom:10px;
-}
-
-.username{
-  font-size:18px;
-  font-weight:bold;
-}
-
-@media(max-width:500px){
-  .card{
-    padding:25px;
-  }
-}
-</style>
-</head>
-<body>
-
-<div class="card">
-
-  <!-- LOGIN VIEW -->
-  <div id="loginView">
-    <h1>SyncPlay</h1>
-    <button id="googleLogin">Sign in with Google</button>
-  </div>
-
-  <!-- LOBBY VIEW -->
-  <div id="lobbyView" class="hidden">
-    <div class="profile">
-      <img id="userPic">
-      <div class="username" id="userName"></div>
-    </div>
-
-    <button id="createParty">Create Party</button>
-    <button id="joinParty">Join Party</button>
-    <button id="logoutBtn" style="background:#ff4d4d;color:white;">Logout</button>
-  </div>
-
-</div>
-
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -117,6 +9,13 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+import { 
+  getDatabase, 
+  ref, 
+  set, 
+  get 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -124,12 +23,12 @@ const firebaseConfig = {
   projectId: "syncplay-17b6e",
   storageBucket: "syncplay-17b6e.firebasestorage.app",
   messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048",
-  measurementId: "G-3NBT4GJ0FX"
+  appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
 const loginView = document.getElementById("loginView");
@@ -137,49 +36,66 @@ const lobbyView = document.getElementById("lobbyView");
 const userName = document.getElementById("userName");
 const userPic = document.getElementById("userPic");
 
+function randomCode(){
+  return Math.random().toString(36).substring(2,7).toUpperCase();
+}
+
 function showLobby(user){
   loginView.classList.add("hidden");
   lobbyView.classList.remove("hidden");
-
   userName.textContent = user.displayName;
   userPic.src = user.photoURL;
-
-  localStorage.setItem("syncplay_user", user.displayName);
-}
-
-function showLogin(){
-  loginView.classList.remove("hidden");
-  lobbyView.classList.add("hidden");
-  localStorage.clear();
 }
 
 onAuthStateChanged(auth, (user) => {
   if(user){
     showLobby(user);
-  } else {
-    showLogin();
   }
 });
 
-document.getElementById("googleLogin").addEventListener("click", () => {
-  signInWithPopup(auth, provider).catch(error => {
-    alert(error.message);
-  });
-});
+document.getElementById("googleLogin").onclick=()=>{
+  signInWithPopup(auth, provider);
+};
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn").onclick=()=>{
   signOut(auth);
-});
+};
 
-document.getElementById("createParty").addEventListener("click", () => {
-  alert("Create Party clicked (we connect this next)");
-});
+document.getElementById("createParty").onclick=async()=>{
+  const user=auth.currentUser;
+  const code=randomCode();
 
-document.getElementById("joinParty").addEventListener("click", () => {
-  alert("Join Party clicked (we connect this next)");
-});
+  await set(ref(db,"parties/"+code),{
+    host:user.uid,
+    gameState:"waiting",
+    players:{}
+  });
+
+  localStorage.setItem("party",code);
+  localStorage.setItem("uid",user.uid);
+  window.location.href="host.html";
+};
+
+document.getElementById("joinParty").onclick=async()=>{
+  const code=prompt("Enter Party Code:");
+  if(!code) return;
+
+  const snap=await get(ref(db,"parties/"+code));
+  if(!snap.exists()){
+    alert("Party not found");
+    return;
+  }
+
+  const user=auth.currentUser;
+
+  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
+    name:user.displayName,
+    score:0
+  });
+
+  localStorage.setItem("party",code);
+  localStorage.setItem("uid",user.uid);
+  window.location.href="games/Quiz/controller.html";
+};
 
 </script>
-
-</body>
-</html>
