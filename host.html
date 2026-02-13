@@ -14,7 +14,7 @@
 }
 
 body{
-  background: linear-gradient(135deg,#141e30,#243b55);
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
   color:white;
   min-height:100vh;
   display:flex;
@@ -31,18 +31,18 @@ header{
 }
 
 button{
-  padding:10px 16px;
+  padding:12px 18px;
   border:none;
   border-radius:8px;
   cursor:pointer;
   font-weight:bold;
-  background:#00c6ff;
+  background:#00e0ff;
   color:black;
   transition:0.2s;
 }
 
 button:hover{
-  opacity:0.8;
+  opacity:0.85;
 }
 
 #main{
@@ -60,13 +60,13 @@ button:hover{
   width:100%;
   max-width:500px;
   text-align:center;
-  backdrop-filter:blur(15px);
+  backdrop-filter:blur(20px);
 }
 
 input{
   width:100%;
-  padding:12px;
-  margin:10px 0;
+  padding:14px;
+  margin:15px 0;
   border-radius:8px;
   border:none;
   font-size:16px;
@@ -87,7 +87,7 @@ input{
 
 <header>
   <h2>SyncPlay Host</h2>
-  <button onclick="openSettings()">⚙</button>
+  <button id="settingsBtn" class="hidden">⚙</button>
 </header>
 
 <div id="main">
@@ -96,7 +96,7 @@ input{
   <div class="card" id="loginCard">
     <h3>Sign In</h3>
     <input type="text" id="usernameInput" placeholder="Enter username">
-    <button onclick="signIn()">Sign In</button>
+    <button id="signinBtn">Sign In</button>
   </div>
 
   <!-- HOST PANEL -->
@@ -110,59 +110,77 @@ input{
 </div>
 
 <script>
-let currentUser = localStorage.getItem("syncplay_user");
+document.addEventListener("DOMContentLoaded", function(){
 
-window.onload = () => {
+  const loginCard = document.getElementById("loginCard");
+  const hostCard = document.getElementById("hostCard");
+  const usernameInput = document.getElementById("usernameInput");
+  const signinBtn = document.getElementById("signinBtn");
+  const displayName = document.getElementById("displayName");
+  const settingsBtn = document.getElementById("settingsBtn");
+
+  let currentUser = localStorage.getItem("syncplay_user");
+
+  function showHost(){
+    loginCard.classList.add("hidden");
+    hostCard.classList.remove("hidden");
+    settingsBtn.classList.remove("hidden");
+    displayName.textContent = currentUser;
+  }
+
+  function signIn(){
+    const username = usernameInput.value.trim();
+    if(username.length < 2){
+      alert("Username must be at least 2 characters.");
+      return;
+    }
+    localStorage.setItem("syncplay_user", username);
+    currentUser = username;
+    showHost();
+  }
+
+  signinBtn.addEventListener("click", signIn);
+
+  usernameInput.addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+      signIn();
+    }
+  });
+
+  settingsBtn.addEventListener("click", function(){
+    const newName = prompt("Change username:", currentUser);
+    if(newName && newName.trim().length >= 2){
+      localStorage.setItem("syncplay_user", newName.trim());
+      currentUser = newName.trim();
+      displayName.textContent = currentUser;
+    }
+  });
+
   if(currentUser){
     showHost();
   }
-};
 
-function signIn(){
-  const username = document.getElementById("usernameInput").value.trim();
-  if(username.length < 2){
-    alert("Enter valid username");
-    return;
-  }
-  localStorage.setItem("syncplay_user", username);
-  currentUser = username;
-  showHost();
-}
+  window.loadGame = function(gameName){
+    const container = document.getElementById("gameContainer");
+    container.innerHTML = "Loading...";
 
-function showHost(){
-  document.getElementById("loginCard").classList.add("hidden");
-  document.getElementById("hostCard").classList.remove("hidden");
-  document.getElementById("displayName").innerText = currentUser;
-}
+    const script = document.createElement("script");
+    script.src = `/games/${gameName}/game.js`;
 
-function openSettings(){
-  const newName = prompt("Change username:", currentUser);
-  if(newName && newName.trim().length >= 2){
-    localStorage.setItem("syncplay_user", newName.trim());
-    currentUser = newName.trim();
-    document.getElementById("displayName").innerText = currentUser;
-  }
-}
+    script.onload = function(){
+      if(typeof startGame === "function"){
+        startGame(container);
+      }
+    };
 
-function loadGame(gameName){
-  const container = document.getElementById("gameContainer");
-  container.innerHTML = "Loading...";
+    script.onerror = function(){
+      container.innerHTML = "Game failed to load.";
+    };
 
-  const script = document.createElement("script");
-  script.src = `/games/${gameName}/game.js`;
-
-  script.onload = () => {
-    if(typeof startGame === "function"){
-      startGame(container);
-    }
+    document.body.appendChild(script);
   };
 
-  script.onerror = () => {
-    container.innerHTML = "Game failed to load.";
-  };
-
-  document.body.appendChild(script);
-}
+});
 </script>
 
 </body>
