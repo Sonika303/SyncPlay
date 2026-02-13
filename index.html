@@ -1,94 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SyncPlay</title>
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(135deg,#1e3c72,#2a5298);
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.card{
+  width:420px;
+  background:#ffffff;
+  padding:35px;
+  border-radius:18px;
+  box-shadow:0 20px 40px rgba(0,0,0,.3);
+  text-align:center;
+}
+input,button{
+  width:100%;
+  padding:14px;
+  margin:8px 0;
+  border-radius:10px;
+  border:none;
+  font-size:16px;
+}
+input{background:#f1f1f1}
+button{
+  background:#2a5298;
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:hover{background:#1e3c72}
+#partyFrame{display:none}
+.player{
+  background:#f5f5f5;
+  padding:8px;
+  margin:5px 0;
+  border-radius:6px;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>SyncPlay Trivia</h2>
+
+<div id="loginFrame">
+<input id="username" placeholder="Enter Username">
+<button id="googleSignIn">Sign in with Google</button>
+</div>
+
+<div id="partyFrame">
+<p id="welcome"></p>
+<button id="createPartyBtn">Create Party</button>
+<input id="joinCode" placeholder="Enter Code">
+<button id="joinPartyBtn">Join Party</button>
+<div id="players"></div>
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-/* FIREBASE */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  appId: "1:86016195929:web:40262a28786f2ead712048"
+  apiKey:"YOUR_API_KEY",
+  authDomain:"syncplay-17b6e.firebaseapp.com",
+  databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId:"syncplay-17b6e"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
-const provider = new GoogleAuthProvider();
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+const db=getDatabase(app);
+const provider=new GoogleAuthProvider();
 
-const loginFrame = document.getElementById("loginFrame");
-const partyFrame = document.getElementById("partyFrame");
-const usernameInput = document.getElementById("username");
-const usernameDisplay = document.getElementById("usernameDisplay");
-const playerList = document.getElementById("playerList");
+const loginFrame=document.getElementById("loginFrame");
+const partyFrame=document.getElementById("partyFrame");
+const playersDiv=document.getElementById("players");
 
-function showParty(){
+document.getElementById("googleSignIn").onclick=async()=>{
+  const name=document.getElementById("username").value.trim();
+  if(!name) return alert("Enter username");
+  const res=await signInWithPopup(auth,provider);
+  sessionStorage.setItem("uid",res.user.uid);
+  sessionStorage.setItem("u",name);
   loginFrame.style.display="none";
   partyFrame.style.display="block";
-  usernameDisplay.textContent = "Hello, " + sessionStorage.getItem("u");
-
-  const code = sessionStorage.getItem("c");
-  if(!code) return;
-
-  onValue(ref(db, `parties/${code}/players`), snap=>{
-    const players = snap.val() || {};
-    playerList.innerHTML="<b>Players:</b>";
-    Object.values(players).forEach(p=>{
-      const d=document.createElement("div");
-      d.className="player";
-      d.textContent=p.username + " (Score: " + (p.score||0) + ")";
-      playerList.appendChild(d);
-    });
-  });
-}
-
-document.getElementById("googleSignIn").onclick = async ()=>{
-  const name = usernameInput.value.trim();
-  if(!name) return alert("Enter username");
-
-  const res = await signInWithPopup(auth, provider);
-  sessionStorage.setItem("u", name);
-  sessionStorage.setItem("uid", res.user.uid);
-  showParty();
+  document.getElementById("welcome").textContent="Hello "+name;
 };
 
-onAuthStateChanged(auth, u=>{
-  if(u && sessionStorage.getItem("u")) showParty();
-});
+document.getElementById("createPartyBtn").onclick=async()=>{
+  const uid=sessionStorage.getItem("uid");
+  const username=sessionStorage.getItem("u");
+  const code=Math.floor(10000+Math.random()*90000).toString();
 
-/* CREATE PARTY */
-document.getElementById("createPartyBtn").onclick = async ()=>{
-  const uid = sessionStorage.getItem("uid");
-  const username = sessionStorage.getItem("u");
-
-  const code = Math.floor(10000 + Math.random()*90000).toString();
-
-  await set(ref(db, `parties/${code}`),{
-    game:"trivia",
+  await set(ref(db,"parties/"+code),{
     gameState:"lobby",
     currentQuestion:0,
+    answered:false,
     players:{
-      [uid]:{ username, score:0 }
+      [uid]:{username,score:0}
     }
   });
 
-  sessionStorage.setItem("c", code);
-  setTimeout(()=>location.href="host.html",150);
+  sessionStorage.setItem("c",code);
+  location.href="host.html";
 };
 
-/* JOIN */
-document.getElementById("joinPartyBtn").onclick = async ()=>{
-  const code = document.getElementById("joinCode").value.trim();
-  const uid = sessionStorage.getItem("uid");
-  const username = sessionStorage.getItem("u");
+document.getElementById("joinPartyBtn").onclick=async()=>{
+  const code=document.getElementById("joinCode").value.trim();
+  const uid=sessionStorage.getItem("uid");
+  const username=sessionStorage.getItem("u");
 
-  await set(ref(db, `parties/${code}/players/${uid}`),{
-    username,
-    score:0
+  await update(ref(db,"parties/"+code+"/players"),{
+    [uid]:{username,score:0}
   });
 
-  sessionStorage.setItem("c", code);
-  setTimeout(()=>location.href="controller.html",150);
+  sessionStorage.setItem("c",code);
+  location.href="controller.html";
 };
 </script>
+</body>
+</html>
