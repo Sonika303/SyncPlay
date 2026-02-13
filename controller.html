@@ -2,69 +2,65 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SyncPlay Controller</title>
+<title>Trivia Controller</title>
 <style>
-body{text-align:center;font-family:Arial;background:#f0f0f0;color:#222;overflow:hidden}
-#joystick{position:absolute;bottom:50px;left:50px;width:120px;height:120px;background:#ddd;border-radius:50%;}
-#stick{width:60px;height:60px;background:#00bfa5;border-radius:50%;position:absolute;top:30px;left:30px;transition:0.1s;}
-button{padding:12px;font-size:18px;margin:10px;border:none;border-radius:6px;background:#00bfa5;color:white;cursor:pointer;transition:0.2s;}
-button:hover{background:#009e88;}
+body{text-align:center;font-family:Arial;background:#f0f0f0;padding:20px}
+button{display:block;width:100%;padding:15px;margin:8px 0;font-size:18px;border:none;border-radius:8px;background:#00bfa5;color:white}
 </style>
 </head>
 <body>
 
-<h3>Controller</h3>
-<div id="joystick"><div id="stick"></div></div>
-<button onclick="sendJump()">JUMP</button>
+<h2>Trivia</h2>
+<h3 id="question"></h3>
+<div id="answers"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048",
-  measurementId: "G-3NBT4GJ0FX"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-const partyCode = sessionStorage.getItem("c")||sessionStorage.getItem("partyCode");
-const uid = sessionStorage.getItem("uid");
-const username = sessionStorage.getItem("u");
-if(!uid||!partyCode) location.href="index.html";
-
-const playerRef = ref(db,`parties/${partyCode}/players/${uid}`);
-update(playerRef,{username,x:400,y:350,vx:0,vy:0,alive:true});
-
-// Joystick
-const joystick = document.getElementById("joystick");
-const stick = document.getElementById("stick");
-let dx=0, touching=false;
-
-stick.addEventListener("touchstart",()=>{touching=true;});
-stick.addEventListener("touchend",()=>{
-  touching=false; dx=0;
-  stick.style.left="30px"; stick.style.top="30px";
-  update(playerRef,{vx:dx});
+const app = initializeApp({
+  apiKey:"YOUR_API_KEY",
+  authDomain:"syncplay-17b6e.firebaseapp.com",
+  databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId:"syncplay-17b6e"
 });
-stick.addEventListener("touchmove",(e)=>{
-  const touch = e.touches[0];
-  const rect = joystick.getBoundingClientRect();
-  const x = touch.clientX - rect.left - 60;
-  dx = Math.max(-1,Math.min(1, x/60))*6;
-  stick.style.left = (30+dx*10)+"px";
-  update(playerRef,{vx:dx});
+const db=getDatabase(app);
+
+const code=sessionStorage.getItem("c");
+const uid=sessionStorage.getItem("uid");
+
+onValue(ref(db,`parties/${code}`), snap=>{
+  const data=snap.val();
+  if(!data||data.gameState!=="question") return;
+
+  const questions=[
+  {q:"Capital of France?",a:["Berlin","Paris","Rome","Madrid"]},
+  {q:"5 + 7 = ?",a:["10","12","14","15"]},
+  {q:"Largest planet?",a:["Earth","Mars","Jupiter","Saturn"]}
+  ];
+
+  const q=questions[data.currentQuestion];
+  document.getElementById("question").textContent=q.q;
+
+  const ansDiv=document.getElementById("answers");
+  ansDiv.innerHTML="";
+  q.a.forEach((ans,i)=>{
+    const btn=document.createElement("button");
+    btn.textContent=ans;
+    btn.onclick=()=>submit(i);
+    ansDiv.appendChild(btn);
+  });
 });
 
-function sendJump(){
-  update(playerRef,{vy:-12});
+function submit(choice){
+  const partyRef=ref(db,`parties/${code}`);
+  onValue(partyRef,snap=>{
+    const data=snap.val();
+    if(choice===data.correct){
+      const scoreRef=ref(db,`parties/${code}/players/${uid}`);
+      update(scoreRef,{score:(data.players[uid].score||0)+1});
+    }
+  },{onlyOnce:true});
 }
 </script>
 </body>
