@@ -4,10 +4,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trivia Host</title>
 <style>
-body{font-family:Arial;background:#f4f4f4;padding:20px}
-button{padding:10px;margin:5px;border:none;background:#00bfa5;color:white;border-radius:6px;cursor:pointer}
-#players div{padding:5px;border-bottom:1px solid #ccc}
-#questionBox{background:#fff;padding:15px;border-radius:8px;margin-top:10px}
+body{margin:0;font-family:Arial;background:linear-gradient(135deg,#141e30,#243b55);color:white;padding:20px}
+.panel{background:white;color:#222;padding:15px;border-radius:12px;margin-bottom:15px}
+button{padding:10px 15px;border:none;border-radius:6px;background:#243b55;color:white;cursor:pointer}
+button:hover{background:#141e30}
 </style>
 </head>
 <body>
@@ -16,46 +16,48 @@ button{padding:10px;margin:5px;border:none;background:#00bfa5;color:white;border
 Party Code: <b id="code"></b>
 <button onclick="exit()">Exit</button>
 
+<div class="panel">
 <h3>Players</h3>
 <div id="players"></div>
-
-<div id="questionBox" style="display:none">
-  <h3 id="question"></h3>
-  <div id="answers"></div>
 </div>
 
-<button id="startBtn">Start Trivia</button>
+<div class="panel" id="questionBox" style="display:none">
+<h3 id="question"></h3>
+<div id="answers"></div>
+</div>
+
+<button id="startBtn">Start Game</button>
 <button id="nextBtn" style="display:none">Next Question</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-const app = initializeApp({
-  apiKey:"YOUR_API_KEY",
-  authDomain:"syncplay-17b6e.firebaseapp.com",
-  databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId:"syncplay-17b6e"
+const app=initializeApp({
+apiKey:"YOUR_API_KEY",
+authDomain:"syncplay-17b6e.firebaseapp.com",
+databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
+projectId:"syncplay-17b6e"
 });
-const db = getDatabase(app);
+const db=getDatabase(app);
 
-const code = sessionStorage.getItem("c");
+const code=sessionStorage.getItem("c");
 document.getElementById("code").textContent=code;
 
 const questions=[
-{q:"Capital of France?",a:["Berlin","Paris","Rome","Madrid"],c:1},
-{q:"5 + 7 = ?",a:["10","12","14","15"],c:1},
-{q:"Largest planet?",a:["Earth","Mars","Jupiter","Saturn"],c:2}
+{q:"Capital of Japan?",a:["Seoul","Tokyo","Bangkok","Beijing"],c:1},
+{q:"2+8?",a:["8","9","10","11"],c:2},
+{q:"Fastest land animal?",a:["Tiger","Cheetah","Lion","Horse"],c:1}
 ];
 
 let current=0;
 
-onValue(ref(db,`parties/${code}/players`), snap=>{
+onValue(ref(db,"parties/"+code+"/players"),snap=>{
   const players=snap.val()||{};
   const div=document.getElementById("players");
   div.innerHTML="";
   Object.values(players).forEach(p=>{
-    div.innerHTML+=`<div>${p.username} - ${p.score||0}</div>`;
+    div.innerHTML+=`<div>${p.username} - ${p.score}</div>`;
   });
 });
 
@@ -67,10 +69,7 @@ document.getElementById("startBtn").onclick=()=>{
 
 document.getElementById("nextBtn").onclick=()=>{
   current++;
-  if(current>=questions.length){
-    alert("Game Finished");
-    return;
-  }
+  if(current>=questions.length){alert("Game Finished");return;}
   showQuestion();
 };
 
@@ -79,22 +78,17 @@ function showQuestion(){
   document.getElementById("questionBox").style.display="block";
   document.getElementById("question").textContent=q.q;
 
-  const ansDiv=document.getElementById("answers");
-  ansDiv.innerHTML="";
-  q.a.forEach((ans,i)=>{
-    ansDiv.innerHTML+=`<div>${i+1}. ${ans}</div>`;
-  });
-
-  update(ref(db,`parties/${code}`),{
+  update(ref(db,"parties/"+code),{
     gameState:"question",
     currentQuestion:current,
-    correct:q.c
+    correct:q.c,
+    answered:false
   });
 }
 
 window.exit=()=>{
-  sessionStorage.clear();
-  location.href="index.html";
+sessionStorage.clear();
+location.href="index.html";
 };
 </script>
 </body>
