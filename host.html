@@ -2,116 +2,97 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SyncPlay Host</title>
-
+<title>Trivia Host</title>
 <style>
-body{margin:0;font-family:Arial;background:#f0f0f0;display:flex;flex-direction:column;align-items:center}
-#top{width:100%;padding:10px;display:flex;justify-content:space-between;background:#fff}
-#players{width:90%;margin:10px;background:#fff;padding:10px;border-radius:8px}
-#players div{padding:6px;border-bottom:1px solid #ddd}
-.gameCard{background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.1);cursor:pointer;text-align:center}
-.note{font-size:12px;color:#888;margin-top:4px}
-canvas{border:1px solid #ccc;margin-top:10px;display:none}
+body{font-family:Arial;background:#f4f4f4;padding:20px}
+button{padding:10px;margin:5px;border:none;background:#00bfa5;color:white;border-radius:6px;cursor:pointer}
+#players div{padding:5px;border-bottom:1px solid #ccc}
+#questionBox{background:#fff;padding:15px;border-radius:8px;margin-top:10px}
 </style>
 </head>
-
 <body>
 
-<div id="top">
-  <div>Party Code: <b id="code"></b></div>
-  <button onclick="exit()">Exit</button>
+<h2>Trivia Host</h2>
+Party Code: <b id="code"></b>
+<button onclick="exit()">Exit</button>
+
+<h3>Players</h3>
+<div id="players"></div>
+
+<div id="questionBox" style="display:none">
+  <h3 id="question"></h3>
+  <div id="answers"></div>
 </div>
 
-<div id="players"><h3>Players:</h3></div>
-
-<div class="gameCard" id="gameBtn">
-  Dodge Falling Objects
-  <div class="note">Minimum 2 players required</div>
-</div>
-
-<canvas id="game" width="800" height="400"></canvas>
+<button id="startBtn">Start Trivia</button>
+<button id="nextBtn" style="display:none">Next Question</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
 
-/* CONFIG */
 const app = initializeApp({
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e"
+  apiKey:"YOUR_API_KEY",
+  authDomain:"syncplay-17b6e.firebaseapp.com",
+  databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId:"syncplay-17b6e"
 });
-
-const auth = getAuth(app);
 const db = getDatabase(app);
 
 const code = sessionStorage.getItem("c");
-if(!code) location.href="index.html";
-document.getElementById("code").textContent = code;
+document.getElementById("code").textContent=code;
 
-const playersDiv = document.getElementById("players");
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const questions=[
+{q:"Capital of France?",a:["Berlin","Paris","Rome","Madrid"],c:1},
+{q:"5 + 7 = ?",a:["10","12","14","15"],c:1},
+{q:"Largest planet?",a:["Earth","Mars","Jupiter","Saturn"],c:2}
+];
 
-let players = {};
-let gameRunning = false;
+let current=0;
 
-/* WAIT FOR AUTH */
-onAuthStateChanged(auth, user=>{
-  if(!user) return location.href="index.html";
-
-  /* LIVE PLAYERS */
-  onValue(ref(db,`parties/${code}/players`), snap=>{
-    players = snap.val() || {};
-    playersDiv.innerHTML="<h3>Players:</h3>";
-    Object.values(players).forEach(p=>{
-      playersDiv.innerHTML += `<div>${p.username}</div>`;
-    });
+onValue(ref(db,`parties/${code}/players`), snap=>{
+  const players=snap.val()||{};
+  const div=document.getElementById("players");
+  div.innerHTML="";
+  Object.values(players).forEach(p=>{
+    div.innerHTML+=`<div>${p.username} - ${p.score||0}</div>`;
   });
 });
 
-/* START GAME */
-document.getElementById("gameBtn").onclick = ()=>{
-  if(Object.keys(players).length < 2){
-    alert("At least 2 players required");
-    return;
-  }
-  startGame();
+document.getElementById("startBtn").onclick=()=>{
+  document.getElementById("startBtn").style.display="none";
+  document.getElementById("nextBtn").style.display="inline-block";
+  showQuestion();
 };
 
-function startGame(){
-  gameRunning = true;
-  canvas.style.display="block";
-  requestAnimationFrame(loop);
-}
-
-function loop(){
-  if(!gameRunning) return;
-  ctx.clearRect(0,0,800,400);
-
-  let alive = 0;
-  for(const uid in players){
-    const p = players[uid];
-    if(p.alive===false) continue;
-    alive++;
-    ctx.fillStyle="#2196f3";
-    ctx.beginPath();
-    ctx.arc(p.x||400,p.y||350,10,0,Math.PI*2);
-    ctx.fill();
-  }
-
-  if(alive <= 1){
-    gameRunning = false;
-    alert("Game Over");
+document.getElementById("nextBtn").onclick=()=>{
+  current++;
+  if(current>=questions.length){
+    alert("Game Finished");
     return;
   }
+  showQuestion();
+};
 
-  requestAnimationFrame(loop);
+function showQuestion(){
+  const q=questions[current];
+  document.getElementById("questionBox").style.display="block";
+  document.getElementById("question").textContent=q.q;
+
+  const ansDiv=document.getElementById("answers");
+  ansDiv.innerHTML="";
+  q.a.forEach((ans,i)=>{
+    ansDiv.innerHTML+=`<div>${i+1}. ${ans}</div>`;
+  });
+
+  update(ref(db,`parties/${code}`),{
+    gameState:"question",
+    currentQuestion:current,
+    correct:q.c
+  });
 }
 
-window.exit = ()=>{
+window.exit=()=>{
   sessionStorage.clear();
   location.href="index.html";
 };
