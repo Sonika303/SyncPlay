@@ -1,95 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Trivia Host</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncPlay Host</title>
+
 <style>
-body{margin:0;font-family:Arial;background:linear-gradient(135deg,#141e30,#243b55);color:white;padding:20px}
-.panel{background:white;color:#222;padding:15px;border-radius:12px;margin-bottom:15px}
-button{padding:10px 15px;border:none;border-radius:6px;background:#243b55;color:white;cursor:pointer}
-button:hover{background:#141e30}
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+  background: linear-gradient(135deg,#141e30,#243b55);
+  color:white;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+header{
+  padding:15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:rgba(0,0,0,0.4);
+  backdrop-filter:blur(10px);
+}
+
+button{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+  background:#00c6ff;
+  color:black;
+  transition:0.2s;
+}
+
+button:hover{
+  opacity:0.8;
+}
+
+#main{
+  flex:1;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:20px;
+}
+
+.card{
+  background:rgba(255,255,255,0.1);
+  padding:30px;
+  border-radius:15px;
+  width:100%;
+  max-width:500px;
+  text-align:center;
+  backdrop-filter:blur(15px);
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin:10px 0;
+  border-radius:8px;
+  border:none;
+  font-size:16px;
+}
+
+.hidden{
+  display:none;
+}
+
+@media(max-width:600px){
+  .card{
+    padding:20px;
+  }
+}
 </style>
 </head>
 <body>
 
-<h2>Trivia Host</h2>
-Party Code: <b id="code"></b>
-<button onclick="exit()">Exit</button>
+<header>
+  <h2>SyncPlay Host</h2>
+  <button onclick="openSettings()">⚙</button>
+</header>
 
-<div class="panel">
-<h3>Players</h3>
-<div id="players"></div>
+<div id="main">
+
+  <!-- LOGIN -->
+  <div class="card" id="loginCard">
+    <h3>Sign In</h3>
+    <input type="text" id="usernameInput" placeholder="Enter username">
+    <button onclick="signIn()">Sign In</button>
+  </div>
+
+  <!-- HOST PANEL -->
+  <div class="card hidden" id="hostCard">
+    <h3>Welcome, <span id="displayName"></span></h3>
+    <p>Select Game:</p>
+    <button onclick="loadGame('Quiz')">Start Quiz</button>
+    <div id="gameContainer" style="margin-top:20px;"></div>
+  </div>
+
 </div>
 
-<div class="panel" id="questionBox" style="display:none">
-<h3 id="question"></h3>
-<div id="answers"></div>
-</div>
+<script>
+let currentUser = localStorage.getItem("syncplay_user");
 
-<button id="startBtn">Start Game</button>
-<button id="nextBtn" style="display:none">Next Question</button>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
-
-const app=initializeApp({
-apiKey:"YOUR_API_KEY",
-authDomain:"syncplay-17b6e.firebaseapp.com",
-databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
-projectId:"syncplay-17b6e"
-});
-const db=getDatabase(app);
-
-const code=sessionStorage.getItem("c");
-document.getElementById("code").textContent=code;
-
-const questions=[
-{q:"Capital of Japan?",a:["Seoul","Tokyo","Bangkok","Beijing"],c:1},
-{q:"2+8?",a:["8","9","10","11"],c:2},
-{q:"Fastest land animal?",a:["Tiger","Cheetah","Lion","Horse"],c:1}
-];
-
-let current=0;
-
-onValue(ref(db,"parties/"+code+"/players"),snap=>{
-  const players=snap.val()||{};
-  const div=document.getElementById("players");
-  div.innerHTML="";
-  Object.values(players).forEach(p=>{
-    div.innerHTML+=`<div>${p.username} - ${p.score}</div>`;
-  });
-});
-
-document.getElementById("startBtn").onclick=()=>{
-  document.getElementById("startBtn").style.display="none";
-  document.getElementById("nextBtn").style.display="inline-block";
-  showQuestion();
+window.onload = () => {
+  if(currentUser){
+    showHost();
+  }
 };
 
-document.getElementById("nextBtn").onclick=()=>{
-  current++;
-  if(current>=questions.length){alert("Game Finished");return;}
-  showQuestion();
-};
-
-function showQuestion(){
-  const q=questions[current];
-  document.getElementById("questionBox").style.display="block";
-  document.getElementById("question").textContent=q.q;
-
-  update(ref(db,"parties/"+code),{
-    gameState:"question",
-    currentQuestion:current,
-    correct:q.c,
-    answered:false
-  });
+function signIn(){
+  const username = document.getElementById("usernameInput").value.trim();
+  if(username.length < 2){
+    alert("Enter valid username");
+    return;
+  }
+  localStorage.setItem("syncplay_user", username);
+  currentUser = username;
+  showHost();
 }
 
-window.exit=()=>{
-sessionStorage.clear();
-location.href="index.html";
-};
+function showHost(){
+  document.getElementById("loginCard").classList.add("hidden");
+  document.getElementById("hostCard").classList.remove("hidden");
+  document.getElementById("displayName").innerText = currentUser;
+}
+
+function openSettings(){
+  const newName = prompt("Change username:", currentUser);
+  if(newName && newName.trim().length >= 2){
+    localStorage.setItem("syncplay_user", newName.trim());
+    currentUser = newName.trim();
+    document.getElementById("displayName").innerText = currentUser;
+  }
+}
+
+function loadGame(gameName){
+  const container = document.getElementById("gameContainer");
+  container.innerHTML = "Loading...";
+
+  const script = document.createElement("script");
+  script.src = `/games/${gameName}/game.js`;
+
+  script.onload = () => {
+    if(typeof startGame === "function"){
+      startGame(container);
+    }
+  };
+
+  script.onerror = () => {
+    container.innerHTML = "Game failed to load.";
+  };
+
+  document.body.appendChild(script);
+}
 </script>
+
 </body>
 </html>
