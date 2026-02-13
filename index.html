@@ -14,11 +14,11 @@
 }
 
 body{
-  height:100vh;
+  min-height:100vh;
   display:flex;
   justify-content:center;
   align-items:center;
-  background: linear-gradient(135deg,#1d2671,#c33764);
+  background:linear-gradient(135deg,#1d2671,#c33764);
   color:white;
 }
 
@@ -27,18 +27,20 @@ body{
   backdrop-filter:blur(20px);
   padding:40px;
   border-radius:20px;
-  text-align:center;
-  width:90%;
+  width:95%;
   max-width:420px;
+  text-align:center;
+  transition:0.3s;
 }
 
 h1{
-  margin-bottom:25px;
+  margin-bottom:20px;
 }
 
 button{
   width:100%;
   padding:14px;
+  margin-top:12px;
   border:none;
   border-radius:10px;
   font-size:16px;
@@ -53,6 +55,26 @@ button:hover{
   opacity:0.85;
 }
 
+.hidden{
+  display:none;
+}
+
+.profile{
+  margin-bottom:15px;
+}
+
+.profile img{
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  margin-bottom:10px;
+}
+
+.username{
+  font-size:18px;
+  font-weight:bold;
+}
+
 @media(max-width:500px){
   .card{
     padding:25px;
@@ -63,8 +85,25 @@ button:hover{
 <body>
 
 <div class="card">
-  <h1>SyncPlay</h1>
-  <button id="googleLogin">Sign in with Google</button>
+
+  <!-- LOGIN VIEW -->
+  <div id="loginView">
+    <h1>SyncPlay</h1>
+    <button id="googleLogin">Sign in with Google</button>
+  </div>
+
+  <!-- LOBBY VIEW -->
+  <div id="lobbyView" class="hidden">
+    <div class="profile">
+      <img id="userPic">
+      <div class="username" id="userName"></div>
+    </div>
+
+    <button id="createParty">Create Party</button>
+    <button id="joinParty">Join Party</button>
+    <button id="logoutBtn" style="background:#ff4d4d;color:white;">Logout</button>
+  </div>
+
 </div>
 
 <script type="module">
@@ -74,10 +113,10 @@ import {
   getAuth, 
   signInWithPopup, 
   GoogleAuthProvider, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -93,29 +132,51 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// Auto-login if already signed in
+const loginView = document.getElementById("loginView");
+const lobbyView = document.getElementById("lobbyView");
+const userName = document.getElementById("userName");
+const userPic = document.getElementById("userPic");
+
+function showLobby(user){
+  loginView.classList.add("hidden");
+  lobbyView.classList.remove("hidden");
+
+  userName.textContent = user.displayName;
+  userPic.src = user.photoURL;
+
+  localStorage.setItem("syncplay_user", user.displayName);
+}
+
+function showLogin(){
+  loginView.classList.remove("hidden");
+  lobbyView.classList.add("hidden");
+  localStorage.clear();
+}
+
 onAuthStateChanged(auth, (user) => {
-  if (user) {
-    localStorage.setItem("syncplay_user", user.displayName);
-    localStorage.setItem("syncplay_email", user.email);
-    localStorage.setItem("syncplay_picture", user.photoURL);
-    window.location.href = "host.html";
+  if(user){
+    showLobby(user);
+  } else {
+    showLogin();
   }
 });
 
 document.getElementById("googleLogin").addEventListener("click", () => {
-  signInWithPopup(auth, provider)
-    .then((result) => {
-      const user = result.user;
-      localStorage.setItem("syncplay_user", user.displayName);
-      localStorage.setItem("syncplay_email", user.email);
-      localStorage.setItem("syncplay_picture", user.photoURL);
-      window.location.href = "host.html";
-    })
-    .catch((error) => {
-      alert(error.message);
-      console.error(error);
-    });
+  signInWithPopup(auth, provider).catch(error => {
+    alert(error.message);
+  });
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  signOut(auth);
+});
+
+document.getElementById("createParty").addEventListener("click", () => {
+  alert("Create Party clicked (we connect this next)");
+});
+
+document.getElementById("joinParty").addEventListener("click", () => {
+  alert("Join Party clicked (we connect this next)");
 });
 
 </script>
