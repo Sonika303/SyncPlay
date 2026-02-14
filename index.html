@@ -1,177 +1,186 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>SyncPlay</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #111;
-      color: white;
-      text-align: center;
-      padding-top: 60px;
-    }
+<meta charset="UTF-8">
+<title>SyncPlay</title>
 
-    input, button {
-      padding: 10px;
-      margin: 5px;
-      border-radius: 6px;
-      border: none;
-    }
+<style>
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:linear-gradient(135deg,#141e30,#243b55);
+  color:white;
+  text-align:center;
+  padding-top:60px;
+}
 
-    button {
-      cursor: pointer;
-      background: #4CAF50;
-      color: white;
-    }
+.card{
+  background:#1e1e1e;
+  padding:30px;
+  border-radius:12px;
+  width:350px;
+  margin:auto;
+  box-shadow:0 0 25px rgba(0,0,0,0.4);
+}
 
-    #app { display: none; }
+input{
+  width:90%;
+  padding:10px;
+  margin:6px;
+  border-radius:6px;
+  border:none;
+}
 
-    .danger { background: red; }
-  </style>
+button{
+  padding:10px 15px;
+  margin:6px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+.primary{ background:#4CAF50; color:white; }
+.danger{ background:#e53935; color:white; }
+.secondary{ background:#1976d2; color:white; }
+
+#app{ display:none; }
+</style>
 </head>
 <body>
 
-  <h1>SyncPlay</h1>
+<div class="card">
 
-  <!-- LOGIN -->
-  <div id="loginBox">
-    <button id="googleLogin">Sign In with Google</button>
-  </div>
+<h2>SyncPlay</h2>
 
-  <!-- APP -->
-  <div id="app">
-    <h3 id="emailDisplay"></h3>
+<div id="loginBox">
+  <button id="googleLogin" class="primary">Sign In with Google</button>
+</div>
 
-    <h3>Username</h3>
-    <input id="usernameInput" placeholder="Enter username">
-    <button id="saveUsername">Save Username</button>
+<div id="app">
+  <p id="emailDisplay"></p>
 
-    <hr>
+  <input id="usernameInput" placeholder="Enter username">
+  <button id="saveUsername" class="secondary">Save Username</button>
 
-    <button id="createParty">Create Party</button>
-    <br>
-    <input id="joinCodeInput" placeholder="Enter Party Code">
-    <button id="joinParty">Join Party</button>
+  <hr>
 
-    <br><br>
-    <button id="logoutBtn" class="danger">Logout</button>
+  <button id="createParty" class="primary">Create Party</button>
 
-    <h3 id="status"></h3>
-  </div>
+  <br>
 
-  <script type="module">
+  <input id="joinCodeInput" placeholder="Enter Party Code">
+  <button id="joinParty" class="secondary">Join Party</button>
 
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getDatabase, ref, set, get }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  <br><br>
 
-    // YOUR ORIGINAL CONFIG
-    const firebaseConfig = {
-      apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-      authDomain: "syncplay-17b6e.firebaseapp.com",
-      databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-      projectId: "syncplay-17b6e",
-      storageBucket: "syncplay-17b6e.firebasestorage.app",
-      messagingSenderId: "86016195929",
-      appId: "1:86016195929:web:40262a28786f2ead712048"
-    };
+  <button id="logoutBtn" class="danger">Logout</button>
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
-    const provider = new GoogleAuthProvider();
+  <p id="status"></p>
+</div>
 
-    const loginBox = document.getElementById("loginBox");
-    const appBox = document.getElementById("app");
-    const googleLogin = document.getElementById("googleLogin");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const emailDisplay = document.getElementById("emailDisplay");
-    const usernameInput = document.getElementById("usernameInput");
-    const saveUsername = document.getElementById("saveUsername");
-    const createParty = document.getElementById("createParty");
-    const joinParty = document.getElementById("joinParty");
-    const joinCodeInput = document.getElementById("joinCodeInput");
-    const statusText = document.getElementById("status");
+</div>
 
-    let currentUser = null;
+<script type="module">
 
-    // LOGIN
-    googleLogin.onclick = async () => {
-      await signInWithPopup(auth, provider);
-    };
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    logoutBtn.onclick = async () => {
-      await signOut(auth);
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048"
+};
 
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        loginBox.style.display = "none";
-        appBox.style.display = "block";
-        emailDisplay.innerText = "Logged in as: " + user.email;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+const provider = new GoogleAuthProvider();
 
-        const snap = await get(ref(db, "users/" + user.uid));
-        if (snap.exists()) {
-          usernameInput.value = snap.val().username;
-        }
+const loginBox = document.getElementById("loginBox");
+const appBox = document.getElementById("app");
+const emailDisplay = document.getElementById("emailDisplay");
+const usernameInput = document.getElementById("usernameInput");
+const statusText = document.getElementById("status");
 
-      } else {
-        loginBox.style.display = "block";
-        appBox.style.display = "none";
-      }
-    });
+let currentUser = null;
 
-    // SAVE USERNAME
-    saveUsername.onclick = async () => {
-      if (!currentUser) return;
+document.getElementById("googleLogin").onclick = async () => {
+  await signInWithPopup(auth, provider);
+};
 
-      const name = usernameInput.value.trim();
-      if (!name) return alert("Enter username");
+document.getElementById("logoutBtn").onclick = async () => {
+  await signOut(auth);
+};
 
-      await set(ref(db, "users/" + currentUser.uid), {
-        username: name,
-        email: currentUser.email
-      });
+onAuthStateChanged(auth, async (user)=>{
+  if(user){
+    currentUser = user;
+    loginBox.style.display="none";
+    appBox.style.display="block";
+    emailDisplay.innerText="Logged in as: "+user.email;
 
-      alert("Username saved");
-    };
+    const snap = await get(ref(db,"users/"+user.uid));
+    if(snap.exists()){
+      usernameInput.value = snap.val().username;
+    }
 
-    // CREATE PARTY
-    createParty.onclick = async () => {
-      if (!currentUser) return;
+  }else{
+    loginBox.style.display="block";
+    appBox.style.display="none";
+  }
+});
 
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+document.getElementById("saveUsername").onclick = async ()=>{
+  if(!currentUser) return;
 
-      await set(ref(db, "parties/" + code), {
-        host: currentUser.uid,
-        createdAt: Date.now()
-      });
+  const name = usernameInput.value.trim();
+  if(!name) return alert("Enter username");
 
-      window.location.href = "host.html?code=" + code;
-    };
+  await set(ref(db,"users/"+currentUser.uid),{
+    username:name,
+    email:currentUser.email
+  });
 
-    // JOIN PARTY
-    joinParty.onclick = async () => {
-      if (!currentUser) return;
+  alert("Saved");
+};
 
-      const code = joinCodeInput.value.trim().toUpperCase();
-      if (!code) return alert("Enter code");
+document.getElementById("createParty").onclick = async ()=>{
+  if(!currentUser) return;
 
-      const snap = await get(ref(db, "parties/" + code));
+  const code = Math.random().toString(36).substring(2,8).toUpperCase();
 
-      if (!snap.exists()) {
-        statusText.innerText = "Party not found";
-        return;
-      }
+  await set(ref(db,"parties/"+code),{
+    host:currentUser.uid,
+    createdAt:Date.now()
+  });
 
-      window.location.href = "host.html?code=" + code;
-    };
+  window.location="host.html?code="+code;
+};
 
-  </script>
+document.getElementById("joinParty").onclick = async ()=>{
+  if(!currentUser) return;
+
+  const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
+  if(!code) return;
+
+  const snap = await get(ref(db,"parties/"+code));
+  if(!snap.exists()){
+    statusText.innerText="Party not found";
+    return;
+  }
+
+  window.location="host.html?code="+code;
+};
+
+</script>
 
 </body>
 </html>
