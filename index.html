@@ -7,41 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter;}
-body{
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:linear-gradient(135deg,#141e30,#243b55);
-  color:white;
-}
-.card{
-  width:95%;
-  max-width:500px;
-  background:rgba(255,255,255,0.05);
-  backdrop-filter:blur(15px);
-  padding:40px;
-  border-radius:20px;
-  text-align:center;
-}
-button{
-  width:100%;
-  padding:14px;
-  margin-top:12px;
-  border:none;
-  border-radius:12px;
-  font-weight:600;
-  cursor:pointer;
-  background:#6366f1;
-  color:white;
-}
-input{
-  width:100%;
-  padding:12px;
-  margin-top:12px;
-  border:none;
-  border-radius:10px;
-}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#141e30,#243b55);color:white;}
+.card{width:95%;max-width:500px;background:rgba(255,255,255,0.05);backdrop-filter:blur(15px);padding:40px;border-radius:20px;text-align:center;}
+button{width:100%;padding:14px;margin-top:12px;border:none;border-radius:12px;font-weight:600;cursor:pointer;background:#6366f1;color:white;}
+input{width:100%;padding:12px;margin-top:12px;border:none;border-radius:10px;}
 .hidden{display:none;}
 .status{margin-top:15px;font-weight:600;}
 </style>
@@ -49,26 +18,19 @@ input{
 <body>
 
 <div class="card">
-
 <h2>SyncPlay</h2>
 
 <div id="loginSection">
-  <button id="googleLogin">Sign in with Google</button>
+<button id="googleLogin">Sign in with Google</button>
 </div>
 
 <div id="appSection" class="hidden">
-
-  <p>Username: <b id="displayName"></b></p>
-
-  <button id="createParty">Create Party</button>
-
-  <input id="joinCode" placeholder="Enter Party Code">
-  <button id="joinParty">Join Party</button>
-
-  <div class="status" id="statusText"></div>
-
+<p>Username: <b id="displayName"></b></p>
+<button id="createParty">Create Party</button>
+<input id="joinCode" placeholder="Enter Party Code">
+<button id="joinParty">Join Party</button>
+<div class="status" id="statusText"></div>
 </div>
-
 </div>
 
 <script type="module">
@@ -76,14 +38,17 @@ input{
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, onValue }
+import { getDatabase, ref, set, get, onValue, onDisconnect }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e"
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -92,10 +57,10 @@ const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
 let username = "";
-let currentPartyRef = null;
 
-document.getElementById("googleLogin").onclick =
-  () => signInWithPopup(auth, provider);
+document.getElementById("googleLogin").onclick = async () => {
+  await signInWithPopup(auth, provider);
+};
 
 onAuthStateChanged(auth, async (user) => {
 
@@ -104,14 +69,14 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById("loginSection").classList.add("hidden");
   document.getElementById("appSection").classList.remove("hidden");
 
-  const userRef = ref(db, "users/" + user.uid);
+  const userRef = ref(db,"users/"+user.uid);
   const snap = await get(userRef);
 
   if (snap.exists()) {
     username = snap.val().username;
   } else {
     username = user.displayName || "Player";
-    await set(userRef, { username });
+    await set(userRef,{username});
   }
 
   document.getElementById("displayName").textContent = username;
@@ -126,57 +91,53 @@ document.getElementById("createParty").onclick = async () => {
   const user = auth.currentUser;
   const code = generateCode();
 
-  localStorage.setItem("party", code);
+  const partyRef = ref(db,"parties/"+code);
 
-  await set(ref(db, "parties/" + code), {
-    host: user.uid,
-    started: false,
-    game: null
+  await set(partyRef,{
+    host:user.uid,
+    started:false,
+    game:null
   });
 
-  await set(ref(db, "parties/" + code + "/players/" + user.uid), {
-    username: username,
-    score: 0
+  const playerRef = ref(db,"parties/"+code+"/players/"+user.uid);
+
+  await set(playerRef,{
+    username,
+    score:0
   });
 
-  window.location.href = "host.html?code=" + code;
+  onDisconnect(partyRef).remove(); // auto cleanup if host leaves
+
+  window.location.href="host.html?code="+code;
 };
 
 document.getElementById("joinParty").onclick = async () => {
 
   const user = auth.currentUser;
   const code = document.getElementById("joinCode").value.trim().toUpperCase();
-  if (!code) return alert("Enter code");
 
-  const partyRef = ref(db, "parties/" + code);
+  const partyRef = ref(db,"parties/"+code);
   const snap = await get(partyRef);
 
   if (!snap.exists()) return alert("Party not found");
 
-  localStorage.setItem("party", code);
+  const playerRef = ref(db,"parties/"+code+"/players/"+user.uid);
 
-  await set(ref(db, "parties/" + code + "/players/" + user.uid), {
-    username: username,
-    score: 0
+  await set(playerRef,{
+    username,
+    score:0
   });
 
-  document.getElementById("statusText").textContent = "Joined. Waiting for host...";
+  onDisconnect(playerRef).remove(); // auto remove player on leave
 
-  currentPartyRef = partyRef;
+  document.getElementById("statusText").textContent="Waiting for host...";
 
-  onValue(partyRef, (snapshot) => {
-
-    if (!snapshot.exists()) return;
-
-    const data = snapshot.val();
-
-    if (data.started === true && data.game) {
-      window.location.href =
-        "games/" + data.game + "/controller.html";
+  onValue(partyRef,(snapshot)=>{
+    const data=snapshot.val();
+    if(data && data.started && data.game){
+      window.location.href="games/"+data.game+"/controller.html";
     }
-
   });
-
 };
 
 </script>
