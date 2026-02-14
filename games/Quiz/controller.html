@@ -14,11 +14,11 @@ button{width:100%;padding:14px;margin:8px 0;border:none;border-radius:8px;backgr
 <div id="answers"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig={
-apiKey:"YOUR_API_KEY",
+apiKey:"AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
 authDomain:"syncplay-17b6e.firebaseapp.com",
 databaseURL:"https://syncplay-17b6e-default-rtdb.firebaseio.com",
 projectId:"syncplay-17b6e"
@@ -36,33 +36,32 @@ const questions=[
 ];
 
 onValue(ref(db,"parties/"+code),snap=>{
-  const data=snap.val();
-  if(!data||data.gameState!=="question") return;
+const data=snap.val();
+if(!data||data.gameState!=="question") return;
 
-  const q=questions[data.currentQuestion];
-  document.getElementById("question").textContent=q.q;
+const q=questions[data.currentQuestion];
+document.getElementById("question").textContent=q.q;
 
-  const div=document.getElementById("answers");
-  div.innerHTML="";
-  q.a.forEach((ans,i)=>{
-    const btn=document.createElement("button");
-    btn.textContent=ans;
-    btn.onclick=()=>submit(i,data);
-    div.appendChild(btn);
-  });
+const div=document.getElementById("answers");
+div.innerHTML="";
+q.a.forEach((ans,i)=>{
+const btn=document.createElement("button");
+btn.textContent=ans;
+btn.onclick=()=>submit(i,data);
+div.appendChild(btn);
+});
 });
 
 function submit(choice,data){
-  if(data.answered) return;
+if(data.answered) return;
 
-  if(choice===data.correct){
-    update(ref(db,"parties/"+code+"/players/"+uid),{
-      score:(data.players[uid].score||0)+1
-    });
-  }
-  update(ref(db,"parties/"+code),{answered:true});
+if(choice===data.correct){
+update(ref(db,"parties/"+code+"/players/"+uid),{
+score:(data.players[uid].score||0)+1
+});
+}
+update(ref(db,"parties/"+code),{answered:true});
 }
 </script>
 </body>
 </html>
-
