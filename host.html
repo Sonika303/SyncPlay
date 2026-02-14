@@ -18,9 +18,13 @@ body{
   margin:auto;
   padding:30px;
   border-radius:12px;
-  box-shadow:0 0 30px rgba(0,0,0,0.5);
 }
-.player{padding:8px;background:#333;margin:5px;border-radius:6px;}
+.player{
+  padding:8px;
+  background:#333;
+  margin:5px;
+  border-radius:6px;
+}
 .host{background:#4CAF50;}
 button{
   padding:10px 15px;
@@ -30,15 +34,12 @@ button{
   margin:6px;
 }
 .primary{background:#4CAF50;color:white;}
-.secondary{background:#1976d2;color:white;}
 .danger{background:#e53935;color:white;}
-select{padding:8px;border-radius:6px;margin:10px;}
 </style>
 </head>
 <body>
 
 <div class="card">
-
 <h2 id="partyCode"></h2>
 
 <h3>Players</h3>
@@ -46,17 +47,11 @@ select{padding:8px;border-radius:6px;margin:10px;}
 
 <hr>
 
-<div id="gameMenu" style="display:none">
-<h3>Game Menu</h3>
-<select id="gameSelect">
-<option value="quiz">Quiz</option>
-</select>
-<br>
-<button id="startGameBtn" class="primary">Start Game</button>
+<div id="hostControls" style="display:none">
+<button id="startGameBtn" class="primary">Start Quiz (Min 2 Players)</button>
 </div>
 
 <button id="leaveBtn" class="danger">Leave Party</button>
-
 </div>
 
 <script type="module">
@@ -80,22 +75,19 @@ const db=getDatabase(app);
 
 const params=new URLSearchParams(window.location.search);
 const code=params.get("code");
-if(!code) window.location="index.html";
+if(!code) window.location="/SyncPlay/index.html";
 
 localStorage.setItem("party",code);
-
 document.getElementById("partyCode").innerText="Party Code: "+code;
 
-const playerListDiv=document.getElementById("playerList");
-
 onAuthStateChanged(auth, async(user)=>{
-if(!user) return window.location="index.html";
+if(!user) return window.location="/SyncPlay/index.html";
 
 localStorage.setItem("uid",user.uid);
 
 const partyRef=ref(db,"parties/"+code);
 const partySnap=await get(partyRef);
-if(!partySnap.exists()) return window.location="index.html";
+if(!partySnap.exists()) return window.location="/SyncPlay/index.html";
 
 const hostId=partySnap.val().host;
 
@@ -103,40 +95,43 @@ const userSnap=await get(ref(db,"users/"+user.uid));
 const username=userSnap.exists()?userSnap.val().username:user.email;
 
 const playerRef=ref(db,"parties/"+code+"/players/"+user.uid);
-
 await set(playerRef,{username:username,score:0});
 onDisconnect(playerRef).remove();
 
 if(user.uid===hostId){
-document.getElementById("gameMenu").style.display="block";
+document.getElementById("hostControls").style.display="block";
 }
 
 onValue(ref(db,"parties/"+code+"/players"),snap=>{
-playerListDiv.innerHTML="";
+const list=document.getElementById("playerList");
+list.innerHTML="";
+let count=0;
 snap.forEach(child=>{
+count++;
 const div=document.createElement("div");
 div.className="player";
 if(child.key===hostId) div.classList.add("host");
 div.innerText=child.val().username+" ("+(child.val().score||0)+")";
-playerListDiv.appendChild(div);
+list.appendChild(div);
 });
+document.getElementById("startGameBtn").dataset.count=count;
 });
 
-onValue(ref(db,"parties/"+code+"/selectedGame"),snap=>{
-if(!snap.exists()) return;
-const game=snap.val();
-if(user.uid===hostId){
-window.location="/games/Quiz/game.html";
-}else{
-window.location="/games/Quiz/controller.html";
+onValue(ref(db,"parties/"+code+"/gameState"),snap=>{
+if(snap.val()==="question"){
+window.location="/SyncPlay/games/Quiz/game.html";
 }
 });
 
 document.getElementById("startGameBtn").onclick=async()=>{
-const game=document.getElementById("gameSelect").value;
+const count=parseInt(document.getElementById("startGameBtn").dataset.count||"0");
+if(count<2){
+alert("Minimum 2 players required");
+return;
+}
 await update(ref(db,"parties/"+code),{
-selectedGame:game,
-gameState:"lobby"
+gameState:"question",
+currentQuestion:0
 });
 };
 
@@ -146,7 +141,7 @@ await remove(partyRef);
 }else{
 await remove(playerRef);
 }
-window.location="index.html";
+window.location="/SyncPlay/index.html";
 };
 
 });
