@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SyncPlay</title>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter;}
 body{
@@ -45,10 +43,7 @@ input{
   border-radius:10px;
 }
 .hidden{display:none;}
-.status{
-  margin-top:15px;
-  font-weight:600;
-}
+.status{margin-top:15px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -65,9 +60,6 @@ input{
 
   <p>Username: <b id="displayName"></b></p>
 
-  <input id="usernameInput" placeholder="Change username">
-  <button id="saveUsername">Save Username</button>
-
   <button id="createParty">Create Party</button>
 
   <input id="joinCode" placeholder="Enter Party Code">
@@ -82,19 +74,16 @@ input{
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } 
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, onValue } 
+import { getDatabase, ref, set, get, onValue }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048"
+  projectId: "syncplay-17b6e"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -102,85 +91,73 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-let currentUsername = "";
-let currentParty = null;
+let username="";
 
-document.getElementById("googleLogin").onclick = async () => {
-  await signInWithPopup(auth, provider);
-};
+document.getElementById("googleLogin").onclick=()=>signInWithPopup(auth,provider);
 
-onAuthStateChanged(auth, async (user)=>{
+onAuthStateChanged(auth, async(user)=>{
   if(!user) return;
+
+  localStorage.setItem("uid",user.uid);
 
   document.getElementById("loginSection").classList.add("hidden");
   document.getElementById("appSection").classList.remove("hidden");
 
-  const userRef = ref(db, "users/"+user.uid);
-  const snap = await get(userRef);
-
+  const snap = await get(ref(db,"users/"+user.uid));
   if(snap.exists()){
-    currentUsername = snap.val().username;
-  } else {
-    currentUsername = user.displayName || "Player";
-    await set(userRef,{username:currentUsername});
+    username=snap.val().username;
+  }else{
+    username=user.displayName||"Player";
+    await set(ref(db,"users/"+user.uid),{username});
   }
 
-  document.getElementById("displayName").textContent = currentUsername;
+  document.getElementById("displayName").textContent=username;
 });
-
-document.getElementById("saveUsername").onclick = async ()=>{
-  const user = auth.currentUser;
-  const newName = document.getElementById("usernameInput").value.trim();
-  if(newName.length < 2) return alert("Username too short");
-
-  await set(ref(db,"users/"+user.uid),{username:newName});
-  currentUsername = newName;
-  document.getElementById("displayName").textContent = newName;
-  document.getElementById("usernameInput").value="";
-};
 
 function generateCode(){
   return Math.random().toString(36).substring(2,7).toUpperCase();
 }
 
-document.getElementById("createParty").onclick = async ()=>{
-  const user = auth.currentUser;
-  const code = generateCode();
-  currentParty = code;
+document.getElementById("createParty").onclick=async()=>{
+  const user=auth.currentUser;
+  const code=generateCode();
+
+  localStorage.setItem("party",code);
 
   await set(ref(db,"parties/"+code),{
     host:user.uid,
-    started:false
+    started:false,
+    game:null
   });
 
   await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username:currentUsername
+    username,
+    score:0
   });
 
-  window.location.href = "host.html?code=" + code;
+  window.location.href="host.html?code="+code;
 };
 
-document.getElementById("joinParty").onclick = async ()=>{
-  const user = auth.currentUser;
-  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+document.getElementById("joinParty").onclick=async()=>{
+  const user=auth.currentUser;
+  const code=document.getElementById("joinCode").value.trim().toUpperCase();
   if(!code) return alert("Enter code");
 
-  const snap = await get(ref(db,"parties/"+code));
+  const snap=await get(ref(db,"parties/"+code));
   if(!snap.exists()) return alert("Party not found");
 
-  currentParty = code;
+  localStorage.setItem("party",code);
 
   await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username:currentUsername
+    username,
+    score:0
   });
 
-  document.getElementById("statusText").textContent = "Joined party. Waiting for host...";
+  document.getElementById("statusText").textContent="Joined. Waiting...";
 
-  const startedRef = ref(db,"parties/"+code+"/started");
-
-  onValue(startedRef,(snapshot)=>{
-    if(snapshot.exists() && snapshot.val() === true){
-      document.getElementById("statusText").textContent = "Party Started!";
+  onValue(ref(db,"parties/"+code+"/started"),(s)=>{
+    if(s.val()===true){
+      window.location.href="games/"+(snap.val().game||"Quiz")+"/controller.html";
     }
   });
 };
