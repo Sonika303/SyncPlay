@@ -41,13 +41,14 @@ button{
 }
 #startBtn{background:#00e0ff;}
 #quizBtn{background:#6366f1;}
+.selected{outline:3px solid white;}
 </style>
 </head>
 <body>
 
 <div class="sidebar">
 <h3>Players</h3>
-<div id="playersList"></div>
+<div id="playersList">Waiting...</div>
 </div>
 
 <div class="main">
@@ -68,7 +69,7 @@ import { getDatabase, ref, onValue, update }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  apiKey: "YOUR_KEY",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
   projectId: "syncplay-17b6e"
@@ -78,51 +79,66 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const code = new URLSearchParams(window.location.search).get("code");
-const partyRef = ref(db,"parties/"+code);
-const playersRef = ref(db,"parties/"+code+"/players");
 
-document.getElementById("partyCodeText").textContent="Party Code: "+code;
+if (!code) {
+  alert("No party code");
+}
 
-let playerCount=0;
-let selectedGame="Quiz";
+document.getElementById("partyCodeText").textContent =
+  "Party Code: " + code;
+
+const partyRef = ref(db, "parties/" + code);
+const playersRef = ref(db, "parties/" + code + "/players");
+
+let playerCount = 0;
+let selectedGame = "Quiz";
 
 /* REALTIME PLAYER LIST */
-onValue(playersRef,(snapshot)=>{
-  const list=document.getElementById("playersList");
-  list.innerHTML="";
-  playerCount=0;
+onValue(playersRef, (snapshot) => {
 
-  if(!snapshot.exists()){
-    list.innerHTML="No players yet.";
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+  playerCount = 0;
+
+  if (!snapshot.exists()) {
+    list.innerHTML = "No players yet.";
     return;
   }
 
-  snapshot.forEach(child=>{
+  snapshot.forEach(child => {
+
     playerCount++;
-    const div=document.createElement("div");
-    div.className="player";
-    div.textContent=child.val().username;
+
+    const div = document.createElement("div");
+    div.className = "player";
+    div.textContent = child.val().username || "Player";
+
     list.appendChild(div);
   });
+
 });
 
 /* SELECT GAME */
-document.getElementById("quizBtn").onclick=()=>{
-  selectedGame="Quiz";
-  alert("Quiz Selected");
+document.getElementById("quizBtn").onclick = () => {
+
+  selectedGame = "Quiz";
+
+  document.getElementById("quizBtn")
+    .classList.add("selected");
+
 };
 
 /* START PARTY */
-document.getElementById("startBtn").onclick=async()=>{
+document.getElementById("startBtn").onclick = async () => {
 
-  if(playerCount<2){
+  if (playerCount < 2) {
     alert("Minimum 2 players required");
     return;
   }
 
-  await update(partyRef,{
-    started:true,
-    game:selectedGame
+  await update(partyRef, {
+    started: true,
+    game: selectedGame
   });
 
 };
