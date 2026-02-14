@@ -4,64 +4,67 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Host Panel</title>
-
 <style>
 body{
   margin:0;
   font-family:Arial;
-  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  background:#0f2027;
   color:white;
   display:flex;
-  justify-content:center;
-  align-items:center;
-  min-height:100vh;
+  height:100vh;
 }
-.card{
-  width:95%;
-  max-width:600px;
-  background:rgba(255,255,255,0.08);
+.sidebar{
+  width:30%;
+  background:#1b2a33;
+  padding:20px;
+  overflow-y:auto;
+}
+.main{
+  flex:1;
   padding:40px;
-  border-radius:20px;
   text-align:center;
 }
 .player{
-  background:rgba(255,255,255,0.1);
-  padding:12px;
-  margin-top:10px;
-  border-radius:8px;
-  font-weight:bold;
+  background:#243b55;
+  padding:10px;
+  margin-top:8px;
+  border-radius:6px;
 }
 button{
-  margin-top:15px;
   width:100%;
   padding:14px;
+  margin-top:12px;
   border:none;
-  border-radius:10px;
+  border-radius:8px;
   font-weight:bold;
   cursor:pointer;
 }
-#startBtn{ background:#00e0ff; }
-#endBtn{ background:#ff4d4d; }
+#startBtn{background:#00e0ff;}
+#quizBtn{background:#6366f1;}
 </style>
 </head>
 <body>
 
-<div class="card">
+<div class="sidebar">
+<h3>Players</h3>
+<div id="playersList"></div>
+</div>
 
+<div class="main">
 <h2>Host Panel</h2>
 <h3 id="partyCodeText"></h3>
 
-<div id="playersList">Loading...</div>
+<h3>Select Game</h3>
+<button id="quizBtn">Quiz</button>
 
 <button id="startBtn">Start Party</button>
-<button id="endBtn">End Party</button>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove }
+import { getDatabase, ref, onValue, update }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -75,78 +78,55 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const code = new URLSearchParams(window.location.search).get("code");
-
-if(!code){
-  document.body.innerHTML = "No party code provided.";
-  throw new Error("Missing code");
-}
-
 const partyRef = ref(db,"parties/"+code);
 const playersRef = ref(db,"parties/"+code+"/players");
 
-document.getElementById("partyCodeText").textContent = "Party Code: " + code;
+document.getElementById("partyCodeText").textContent="Party Code: "+code;
 
-const playersList = document.getElementById("playersList");
-const startBtn = document.getElementById("startBtn");
-const endBtn = document.getElementById("endBtn");
+let playerCount=0;
+let selectedGame="Quiz";
 
-/* ================= REALTIME PLAYER + SCORE LIST ================= */
-
+/* REALTIME PLAYER LIST */
 onValue(playersRef,(snapshot)=>{
-
-  playersList.innerHTML="";
+  const list=document.getElementById("playersList");
+  list.innerHTML="";
+  playerCount=0;
 
   if(!snapshot.exists()){
-    playersList.innerHTML="No players joined yet.";
+    list.innerHTML="No players yet.";
     return;
   }
 
-  const players=[];
-
   snapshot.forEach(child=>{
-    const data = child.val();
-    players.push({
-      username:data.username,
-      score:data.score || 0
-    });
-  });
-
-  players.sort((a,b)=>b.score-a.score);
-
-  players.forEach(p=>{
+    playerCount++;
     const div=document.createElement("div");
     div.className="player";
-    div.textContent = p.username + " | Score: " + p.score;
-    playersList.appendChild(div);
+    div.textContent=child.val().username;
+    list.appendChild(div);
   });
-
 });
 
-/* ================= START PARTY ================= */
+/* SELECT GAME */
+document.getElementById("quizBtn").onclick=()=>{
+  selectedGame="Quiz";
+  alert("Quiz Selected");
+};
 
-startBtn.onclick = async ()=>{
+/* START PARTY */
+document.getElementById("startBtn").onclick=async()=>{
+
+  if(playerCount<2){
+    alert("Minimum 2 players required");
+    return;
+  }
 
   await update(partyRef,{
     started:true,
-    gameState:"waiting"
+    game:selectedGame
   });
-
-  startBtn.textContent="Party Started";
-  startBtn.disabled=true;
-
-};
-
-/* ================= END PARTY ================= */
-
-endBtn.onclick = async ()=>{
-
-  await remove(partyRef);
-
-  window.location.href="index.html";
 
 };
 
 </script>
-
 </body>
 </html>
