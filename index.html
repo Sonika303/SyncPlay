@@ -1,154 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>SyncPlay</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncPlay</title>
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
-    }
-
-    body {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #1e1e2f, #111827);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-    }
-
-    .card {
-      width: 95%;
-      max-width: 500px;
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(15px);
-      border-radius: 20px;
-      padding: 40px;
-      text-align: center;
-      box-shadow: 0 0 30px rgba(0,0,0,0.4);
-    }
-
-    h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-
-    p {
-      opacity: 0.7;
-      margin-bottom: 30px;
-    }
-
-    button {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      margin-top: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .primary {
-      background: #6366f1;
-      color: white;
-    }
-
-    .primary:hover {
-      background: #4f46e5;
-    }
-
-    .danger {
-      background: #ef4444;
-      color: white;
-    }
-
-    .danger:hover {
-      background: #dc2626;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      margin-top: 10px;
-      font-size: 15px;
-    }
-
-    .party-code {
-      margin-top: 20px;
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      background: rgba(255,255,255,0.1);
-      padding: 10px;
-      border-radius: 12px;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .user-info {
-      margin-bottom: 20px;
-      font-weight: 600;
-    }
-
-  </style>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter;}
+body{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,#141e30,#243b55);
+  color:white;
+}
+.card{
+  width:95%;
+  max-width:500px;
+  background:rgba(255,255,255,0.05);
+  backdrop-filter:blur(15px);
+  padding:40px;
+  border-radius:20px;
+  text-align:center;
+}
+button{
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  border:none;
+  border-radius:12px;
+  font-weight:600;
+  cursor:pointer;
+  background:#6366f1;
+  color:white;
+}
+input{
+  width:100%;
+  padding:12px;
+  margin-top:12px;
+  border:none;
+  border-radius:10px;
+}
+.partyCode{
+  margin-top:15px;
+  font-size:20px;
+  font-weight:800;
+}
+.hidden{display:none;}
+</style>
 </head>
 <body>
 
 <div class="card">
 
-  <h1>SyncPlay</h1>
-  <p>Host & Play Games Together</p>
+  <h2>SyncPlay</h2>
 
-  <!-- SIGN IN SECTION -->
   <div id="loginSection">
-    <button id="googleLogin" class="primary">Sign in with Google</button>
+    <button id="googleLogin">Sign in with Google</button>
   </div>
 
-  <!-- MAIN APP -->
   <div id="appSection" class="hidden">
 
-    <div class="user-info">
-      Logged in as: <span id="displayName"></span>
-    </div>
+    <p>Username: <b id="displayName"></b></p>
 
-    <input id="usernameInput" placeholder="Change Username">
-    <button id="saveUsername" class="primary">Save Username</button>
+    <input id="usernameInput" placeholder="Change username">
+    <button id="saveUsername">Save Username</button>
 
-    <button id="createParty" class="primary">Create Party</button>
+    <button id="createParty">Create Party</button>
 
-    <input id="joinCodeInput" placeholder="Enter Party Code">
-    <button id="joinParty" class="primary">Join Party</button>
+    <input id="joinCode" placeholder="Enter Party Code">
+    <button id="joinParty">Join Party</button>
 
-    <div id="partyCodeDisplay" class="party-code hidden"></div>
-
-    <button id="logoutBtn" class="danger">Logout</button>
+    <div id="partyCodeDisplay" class="partyCode hidden"></div>
 
   </div>
 
 </div>
 
 
-<!-- Firebase -->
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } 
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } 
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, child } 
+import { getDatabase, ref, set, get, child, onValue } 
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -169,97 +107,80 @@ const provider = new GoogleAuthProvider();
 const loginSection = document.getElementById("loginSection");
 const appSection = document.getElementById("appSection");
 const displayName = document.getElementById("displayName");
-const usernameInput = document.getElementById("usernameInput");
-const partyCodeDisplay = document.getElementById("partyCodeDisplay");
 
+let currentParty = null;
 
-// Sign In
 document.getElementById("googleLogin").onclick = async () => {
   await signInWithPopup(auth, provider);
 };
 
-
-// Auth state listener (NO REDIRECT)
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
+onAuthStateChanged(auth, async (user)=>{
+  if(user){
     loginSection.classList.add("hidden");
     appSection.classList.remove("hidden");
 
-    const snapshot = await get(child(ref(db), `users/${user.uid}`));
-
-    if (snapshot.exists()) {
-      displayName.textContent = snapshot.val().username;
-    } else {
-      await set(ref(db, `users/${user.uid}`), {
-        username: user.displayName
+    const snap = await get(child(ref(db), "users/"+user.uid));
+    if(snap.exists()){
+      displayName.textContent = snap.val().username;
+    }else{
+      await set(ref(db,"users/"+user.uid),{
+        username:user.displayName
       });
       displayName.textContent = user.displayName;
     }
-  } else {
-    loginSection.classList.remove("hidden");
-    appSection.classList.add("hidden");
   }
 });
 
-
-// Save Username
-document.getElementById("saveUsername").onclick = async () => {
+document.getElementById("saveUsername").onclick = async ()=>{
   const user = auth.currentUser;
-  const newName = usernameInput.value.trim();
+  const name = document.getElementById("usernameInput").value.trim();
+  if(!name) return;
 
-  if (!newName) return;
-
-  await set(ref(db, `users/${user.uid}`), {
-    username: newName
-  });
-
-  displayName.textContent = newName;
-  usernameInput.value = "";
+  await set(ref(db,"users/"+user.uid),{username:name});
+  displayName.textContent = name;
+  document.getElementById("usernameInput").value="";
 };
 
-
-// Generate Party Code
-function generateCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+function generateCode(){
+  return Math.random().toString(36).substring(2,7).toUpperCase();
 }
 
-
-// Create Party
-document.getElementById("createParty").onclick = async () => {
+document.getElementById("createParty").onclick = async ()=>{
   const user = auth.currentUser;
   const code = generateCode();
+  currentParty = code;
 
-  await set(ref(db, `parties/${code}`), {
-    host: user.uid,
-    createdAt: Date.now()
+  await set(ref(db,"parties/"+code),{
+    host:user.uid,
+    started:false
   });
 
-  partyCodeDisplay.textContent = "Party Code: " + code;
-  partyCodeDisplay.classList.remove("hidden");
+  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
+    username:displayName.textContent
+  });
+
+  document.getElementById("partyCodeDisplay").textContent="Party Code: "+code;
+  document.getElementById("partyCodeDisplay").classList.remove("hidden");
 };
 
+document.getElementById("joinParty").onclick = async ()=>{
+  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+  if(!code) return;
 
-// Join Party
-document.getElementById("joinParty").onclick = async () => {
-  const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
-  if (!code) return;
-
-  const snapshot = await get(child(ref(db), `parties/${code}`));
-
-  if (snapshot.exists()) {
-    alert("Joined Party: " + code);
-  } else {
+  const snap = await get(child(ref(db),"parties/"+code));
+  if(!snap.exists()){
     alert("Party not found");
+    return;
   }
-};
 
+  const user = auth.currentUser;
+  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
+    username:displayName.textContent
+  });
 
-// Logout
-document.getElementById("logoutBtn").onclick = async () => {
-  await signOut(auth);
+  alert("Joined party!");
 };
 
 </script>
-
 </body>
 </html>
