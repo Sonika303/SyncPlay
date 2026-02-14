@@ -26,9 +26,10 @@ body{
 }
 .player{
   background:rgba(255,255,255,0.1);
-  padding:10px;
-  margin-top:8px;
+  padding:12px;
+  margin-top:10px;
   border-radius:8px;
+  font-weight:bold;
 }
 button{
   margin-top:20px;
@@ -40,6 +41,9 @@ button{
   font-weight:bold;
   cursor:pointer;
 }
+.endBtn{
+  background:#ff4d4d;
+}
 </style>
 </head>
 <body>
@@ -49,16 +53,17 @@ button{
 <h2>Host Panel</h2>
 <h3 id="partyCodeText"></h3>
 
-<div id="playersList"></div>
+<div id="playersList">Loading players...</div>
 
-<button id="startBtn">Has everyone joined? Start Party</button>
+<button id="startBtn">Start Party</button>
+<button id="endBtn" class="endBtn">End Party</button>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update } 
+import { getDatabase, ref, onValue, update, remove, get }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -74,41 +79,94 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const params = new URLSearchParams(window.location.search);
-const code = params.get("code");
+const code = new URLSearchParams(window.location.search).get("code");
 
 if(!code){
   document.body.innerHTML = "No party code provided.";
-  throw new Error("No party code");
+  throw new Error("Missing code");
 }
+
+const partyRef = ref(db,"parties/"+code);
+const playersRef = ref(db,"parties/"+code+"/players");
 
 document.getElementById("partyCodeText").textContent = "Party Code: " + code;
 
-const playersRef = ref(db,"parties/"+code+"/players");
+const playersList = document.getElementById("playersList");
+const startBtn = document.getElementById("startBtn");
+const endBtn = document.getElementById("endBtn");
 
-onValue(playersRef,(snapshot)=>{
-  const list = document.getElementById("playersList");
-  list.innerHTML = "";
-
-  if(!snapshot.exists()){
-    list.innerHTML = "No players yet.";
+/* ================= CLEAN OLD PARTY IF NEEDED ================= */
+(async ()=>{
+  const snap = await get(partyRef);
+  if(!snap.exists()){
+    playersList.innerHTML="Party does not exist.";
     return;
   }
 
+  const data = snap.val();
+
+  if(data.started === true && data.gameState === "finished"){
+    await remove(partyRef);
+    location.reload();
+  }
+})();
+
+/* ================= REALTIME SCOREBOARD ================= */
+onValue(playersRef,(snapshot)=>{
+
+  playersList.innerHTML="";
+
+  if(!snapshot.exists()){
+    playersList.innerHTML="No players yet.";
+    return;
+  }
+
+  const players=[];
+
   snapshot.forEach(child=>{
-    const div = document.createElement("div");
-    div.className = "player";
-    div.textContent = child.val().username;
-    list.appendChild(div);
+    players.push({
+      username: child.val().username,
+      score: child.val().score || 0
+    });
   });
+
+  players.sort((a,b)=>b.score-a.score);
+
+  players.forEach(p=>{
+    const div=document.createElement("div");
+    div.className="player";
+    div.textContent = p.username + " | Score: " + p.score;
+    playersList.appendChild(div);
+  });
+
 });
 
-document.getElementById("startBtn").onclick = ()=>{
-  update(ref(db,"parties/"+code),{
-    started:true
+/* ================= START PARTY ================= */
+startBtn.onclick = async ()=>{
+
+  await update(partyRef,{
+    started:true,
+    gameState:"waiting"
   });
+
+  startBtn.textContent="Party Started";
+  startBtn.disabled=true;
+
+};
+
+/* ================= END PARTY ================= */
+endBtn.onclick = async ()=>{
+
+  await update(partyRef,{
+    gameState:"finished"
+  });
+
+  await remove(partyRef);
+
+  window.location.href="index.html";
 };
 
 </script>
+
 </body>
 </html>
