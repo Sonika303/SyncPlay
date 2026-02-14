@@ -1,139 +1,177 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SyncPlay</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Inter;}
-body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#141e30,#243b55);color:white;}
-.card{width:95%;max-width:500px;background:rgba(255,255,255,0.05);backdrop-filter:blur(15px);padding:40px;border-radius:20px;text-align:center;}
-button{width:100%;padding:14px;margin-top:12px;border:none;border-radius:12px;font-weight:600;cursor:pointer;background:#6366f1;color:white;}
-input{width:100%;padding:12px;margin-top:12px;border:none;border-radius:10px;}
-.hidden{display:none;}
-.status{margin-top:15px;font-weight:600;}
-</style>
+  <meta charset="UTF-8">
+  <title>SyncPlay</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+      text-align: center;
+      padding-top: 60px;
+    }
+
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    button {
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+    }
+
+    #app { display: none; }
+
+    .danger { background: red; }
+  </style>
 </head>
 <body>
 
-<div class="card">
-<h2>SyncPlay</h2>
+  <h1>SyncPlay</h1>
 
-<div id="loginSection">
-  <button id="googleLogin">Sign in with Google</button>
-</div>
+  <!-- LOGIN -->
+  <div id="loginBox">
+    <button id="googleLogin">Sign In with Google</button>
+  </div>
 
-<div id="appSection" class="hidden">
-  <p>Username: <b id="displayName"></b></p>
-  <button id="createParty">Create Party</button>
-  <input id="joinCode" placeholder="Enter Party Code">
-  <button id="joinParty">Join Party</button>
-  <div class="status" id="statusText"></div>
-</div>
-</div>
+  <!-- APP -->
+  <div id="app">
+    <h3 id="emailDisplay"></h3>
 
-<script type="module">
+    <h3>Username</h3>
+    <input id="usernameInput" placeholder="Enter username">
+    <button id="saveUsername">Save Username</button>
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, onValue, onDisconnect }
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    <hr>
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048"
-};
+    <button id="createParty">Create Party</button>
+    <br>
+    <input id="joinCodeInput" placeholder="Enter Party Code">
+    <button id="joinParty">Join Party</button>
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
-const provider = new GoogleAuthProvider();
+    <br><br>
+    <button id="logoutBtn" class="danger">Logout</button>
 
-let username = "";
+    <h3 id="status"></h3>
+  </div>
 
-document.getElementById("googleLogin").onclick = async () => {
-  await signInWithPopup(auth, provider);
-};
+  <script type="module">
 
-onAuthStateChanged(auth, async (user) => {
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getDatabase, ref, set, get }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  if (!user) return;
+    // YOUR ORIGINAL CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+      authDomain: "syncplay-17b6e.firebaseapp.com",
+      databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+      projectId: "syncplay-17b6e",
+      storageBucket: "syncplay-17b6e.firebasestorage.app",
+      messagingSenderId: "86016195929",
+      appId: "1:86016195929:web:40262a28786f2ead712048"
+    };
 
-  document.getElementById("loginSection").classList.add("hidden");
-  document.getElementById("appSection").classList.remove("hidden");
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const provider = new GoogleAuthProvider();
 
-  const userRef = ref(db, "users/" + user.uid);
-  const snap = await get(userRef);
+    const loginBox = document.getElementById("loginBox");
+    const appBox = document.getElementById("app");
+    const googleLogin = document.getElementById("googleLogin");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const emailDisplay = document.getElementById("emailDisplay");
+    const usernameInput = document.getElementById("usernameInput");
+    const saveUsername = document.getElementById("saveUsername");
+    const createParty = document.getElementById("createParty");
+    const joinParty = document.getElementById("joinParty");
+    const joinCodeInput = document.getElementById("joinCodeInput");
+    const statusText = document.getElementById("status");
 
-  if (snap.exists()) {
-    username = snap.val().username;
-  } else {
-    username = user.displayName || "Player";
-    await set(userRef, { username });
-  }
+    let currentUser = null;
 
-  document.getElementById("displayName").textContent = username;
-});
+    // LOGIN
+    googleLogin.onclick = async () => {
+      await signInWithPopup(auth, provider);
+    };
 
-function generateCode(){
-  return Math.random().toString(36).substring(2,7).toUpperCase();
-}
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+    };
 
-document.getElementById("createParty").onclick = async () => {
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        loginBox.style.display = "none";
+        appBox.style.display = "block";
+        emailDisplay.innerText = "Logged in as: " + user.email;
 
-  const user = auth.currentUser;
-  const code = generateCode();
+        const snap = await get(ref(db, "users/" + user.uid));
+        if (snap.exists()) {
+          usernameInput.value = snap.val().username;
+        }
 
-  await set(ref(db,"parties/"+code),{
-    host:user.uid,
-    started:false,
-    game:null
-  });
+      } else {
+        loginBox.style.display = "block";
+        appBox.style.display = "none";
+      }
+    });
 
-  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username,
-    score:0
-  });
+    // SAVE USERNAME
+    saveUsername.onclick = async () => {
+      if (!currentUser) return;
 
-  window.location.href="host.html?code="+code;
-};
+      const name = usernameInput.value.trim();
+      if (!name) return alert("Enter username");
 
-document.getElementById("joinParty").onclick = async () => {
+      await set(ref(db, "users/" + currentUser.uid), {
+        username: name,
+        email: currentUser.email
+      });
 
-  const user = auth.currentUser;
-  const code = document.getElementById("joinCode").value.trim().toUpperCase();
-  if (!code) return alert("Enter code");
+      alert("Username saved");
+    };
 
-  const partyRef = ref(db,"parties/"+code);
-  const snap = await get(partyRef);
-  if (!snap.exists()) return alert("Party not found");
+    // CREATE PARTY
+    createParty.onclick = async () => {
+      if (!currentUser) return;
 
-  const playerRef = ref(db,"parties/"+code+"/players/"+user.uid);
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-  await set(playerRef,{
-    username,
-    score:0
-  });
+      await set(ref(db, "parties/" + code), {
+        host: currentUser.uid,
+        createdAt: Date.now()
+      });
 
-  onDisconnect(playerRef).remove();
+      window.location.href = "host.html?code=" + code;
+    };
 
-  document.getElementById("statusText").textContent="Waiting for host...";
+    // JOIN PARTY
+    joinParty.onclick = async () => {
+      if (!currentUser) return;
 
-  onValue(ref(db,"parties/"+code+"/started"), async (snapshot)=>{
-    if(snapshot.val()===true){
-      const gameSnap = await get(ref(db,"parties/"+code+"/game"));
-      window.location.href="games/"+gameSnap.val()+"/controller.html";
-    }
-  });
-};
+      const code = joinCodeInput.value.trim().toUpperCase();
+      if (!code) return alert("Enter code");
 
-</script>
+      const snap = await get(ref(db, "parties/" + code));
+
+      if (!snap.exists()) {
+        statusText.innerText = "Party not found";
+        return;
+      }
+
+      window.location.href = "host.html?code=" + code;
+    };
+
+  </script>
+
 </body>
 </html>
