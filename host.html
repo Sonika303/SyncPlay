@@ -1,48 +1,138 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Party</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #111;
-      color: white;
-      text-align: center;
-      padding-top: 60px;
-    }
+<meta charset="UTF-8">
+<title>Party Room</title>
 
-    button {
-      padding: 10px;
-      border-radius: 6px;
-      border: none;
-      background: red;
-      color: white;
-      cursor: pointer;
-    }
-  </style>
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:white;
+  text-align:center;
+  padding-top:40px;
+}
+
+.card{
+  background:#1e1e1e;
+  width:400px;
+  margin:auto;
+  padding:30px;
+  border-radius:12px;
+  box-shadow:0 0 30px rgba(0,0,0,0.5);
+}
+
+.player{
+  padding:8px;
+  background:#333;
+  margin:5px;
+  border-radius:6px;
+}
+
+.host{
+  background:#4CAF50;
+}
+
+button{
+  padding:10px 15px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  margin-top:10px;
+}
+
+.leave{ background:#e53935; color:white; }
+</style>
 </head>
 <body>
 
-  <h1>Party Room</h1>
-  <h2 id="partyCode"></h2>
+<div class="card">
 
-  <button id="leaveBtn">Leave Party</button>
+<h2 id="partyCode"></h2>
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
+<h3>Players</h3>
+<div id="playerList"></div>
 
-    if (!code) {
-      window.location.href = "index.html";
+<button id="leaveBtn" class="leave">Leave Party</button>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get, onValue, remove, onDisconnect }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
+
+if(!code) window.location="index.html";
+
+document.getElementById("partyCode").innerText="Party Code: "+code;
+
+const playerListDiv = document.getElementById("playerList");
+
+onAuthStateChanged(auth, async(user)=>{
+  if(!user) return window.location="index.html";
+
+  const partyRef = ref(db,"parties/"+code);
+  const partySnap = await get(partyRef);
+
+  if(!partySnap.exists()) return window.location="index.html";
+
+  const hostId = partySnap.val().host;
+
+  const userSnap = await get(ref(db,"users/"+user.uid));
+  const username = userSnap.exists() ? userSnap.val().username : user.email;
+
+  const playerRef = ref(db,"parties/"+code+"/players/"+user.uid);
+
+  await set(playerRef,{
+    username:username
+  });
+
+  onDisconnect(playerRef).remove();
+
+  onValue(ref(db,"parties/"+code+"/players"),(snapshot)=>{
+    playerListDiv.innerHTML="";
+    snapshot.forEach(child=>{
+      const div=document.createElement("div");
+      div.className="player";
+      if(child.key===hostId) div.classList.add("host");
+      div.innerText=child.val().username;
+      playerListDiv.appendChild(div);
+    });
+  });
+
+  document.getElementById("leaveBtn").onclick=async()=>{
+    if(user.uid===hostId){
+      await remove(partyRef);
+    }else{
+      await remove(playerRef);
     }
+    window.location="index.html";
+  };
 
-    document.getElementById("partyCode").innerText = "Party Code: " + code;
+});
 
-    document.getElementById("leaveBtn").onclick = () => {
-      window.location.href = "index.html";
-    };
-  </script>
+</script>
 
 </body>
 </html>
