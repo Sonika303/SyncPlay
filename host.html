@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,173 +14,131 @@
 }
 
 body{
-  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color:white;
   min-height:100vh;
-  display:flex;
-  flex-direction:column;
-}
-
-header{
-  padding:15px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  background:rgba(0,0,0,0.4);
-  backdrop-filter:blur(10px);
-}
-
-button{
-  padding:12px 18px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  font-weight:bold;
-  background:#00e0ff;
-  color:black;
-  transition:0.2s;
-}
-
-button:hover{
-  opacity:0.85;
-}
-
-#main{
-  flex:1;
   display:flex;
   justify-content:center;
   align-items:center;
-  padding:20px;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:white;
 }
 
 .card{
-  background:rgba(255,255,255,0.1);
-  padding:30px;
-  border-radius:15px;
-  width:100%;
-  max-width:500px;
+  width:95%;
+  max-width:600px;
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(15px);
+  padding:40px;
+  border-radius:20px;
   text-align:center;
-  backdrop-filter:blur(20px);
 }
 
-input{
-  width:100%;
-  padding:14px;
-  margin:15px 0;
+h2{
+  margin-bottom:10px;
+}
+
+.partyCode{
+  font-size:22px;
+  font-weight:bold;
+  margin-bottom:20px;
+}
+
+.players{
+  text-align:left;
+  margin-top:20px;
+}
+
+.player{
+  padding:10px;
+  margin-top:8px;
+  background:rgba(255,255,255,0.1);
   border-radius:8px;
+}
+
+button{
+  margin-top:25px;
+  padding:14px;
+  width:100%;
   border:none;
-  font-size:16px;
-}
-
-.hidden{
-  display:none;
-}
-
-@media(max-width:600px){
-  .card{
-    padding:20px;
-  }
+  border-radius:10px;
+  font-weight:bold;
+  cursor:pointer;
+  background:#00e0ff;
+  color:black;
 }
 </style>
 </head>
 <body>
 
-<header>
-  <h2>SyncPlay Host</h2>
-  <button id="settingsBtn" class="hidden">⚙</button>
-</header>
+<div class="card">
 
-<div id="main">
+  <h2>Host Panel</h2>
 
-  <!-- LOGIN -->
-  <div class="card" id="loginCard">
-    <h3>Sign In</h3>
-    <input type="text" id="usernameInput" placeholder="Enter username">
-    <button id="signinBtn">Sign In</button>
-  </div>
+  <div id="partyCode" class="partyCode"></div>
 
-  <!-- HOST PANEL -->
-  <div class="card hidden" id="hostCard">
-    <h3>Welcome, <span id="displayName"></span></h3>
-    <p>Select Game:</p>
-    <button onclick="loadGame('Quiz')">Start Quiz</button>
-    <div id="gameContainer" style="margin-top:20px;"></div>
-  </div>
+  <h3>Players Joined:</h3>
+  <div id="playersList" class="players"></div>
+
+  <button id="startBtn">Has everyone joined? Start Party</button>
 
 </div>
 
-<script>
-document.addEventListener("DOMContentLoaded", function(){
+<script type="module">
 
-  const loginCard = document.getElementById("loginCard");
-  const hostCard = document.getElementById("hostCard");
-  const usernameInput = document.getElementById("usernameInput");
-  const signinBtn = document.getElementById("signinBtn");
-  const displayName = document.getElementById("displayName");
-  const settingsBtn = document.getElementById("settingsBtn");
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, update } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  let currentUser = localStorage.getItem("syncplay_user");
+const firebaseConfig = {
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048"
+};
 
-  function showHost(){
-    loginCard.classList.add("hidden");
-    hostCard.classList.remove("hidden");
-    settingsBtn.classList.remove("hidden");
-    displayName.textContent = currentUser;
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+/* GET PARTY CODE FROM URL */
+const urlParams = new URLSearchParams(window.location.search);
+const partyCode = urlParams.get("code");
+
+if(!partyCode){
+  document.getElementById("partyCode").textContent = "No Party Code Found.";
+  throw new Error("No party code in URL");
+}
+
+document.getElementById("partyCode").textContent = "Party Code: " + partyCode;
+
+/* REALTIME PLAYER LIST */
+const playersRef = ref(db, "parties/" + partyCode + "/players");
+
+onValue(playersRef, (snapshot)=>{
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+
+  if(!snapshot.exists()){
+    list.innerHTML = "<p>No players yet.</p>";
+    return;
   }
 
-  function signIn(){
-    const username = usernameInput.value.trim();
-    if(username.length < 2){
-      alert("Username must be at least 2 characters.");
-      return;
-    }
-    localStorage.setItem("syncplay_user", username);
-    currentUser = username;
-    showHost();
-  }
-
-  signinBtn.addEventListener("click", signIn);
-
-  usernameInput.addEventListener("keypress", function(e){
-    if(e.key === "Enter"){
-      signIn();
-    }
+  snapshot.forEach(child=>{
+    const div = document.createElement("div");
+    div.className = "player";
+    div.textContent = child.val().username;
+    list.appendChild(div);
   });
-
-  settingsBtn.addEventListener("click", function(){
-    const newName = prompt("Change username:", currentUser);
-    if(newName && newName.trim().length >= 2){
-      localStorage.setItem("syncplay_user", newName.trim());
-      currentUser = newName.trim();
-      displayName.textContent = currentUser;
-    }
-  });
-
-  if(currentUser){
-    showHost();
-  }
-
-  window.loadGame = function(gameName){
-    const container = document.getElementById("gameContainer");
-    container.innerHTML = "Loading...";
-
-    const script = document.createElement("script");
-    script.src = `/games/${gameName}/game.js`;
-
-    script.onload = function(){
-      if(typeof startGame === "function"){
-        startGame(container);
-      }
-    };
-
-    script.onerror = function(){
-      container.innerHTML = "Game failed to load.";
-    };
-
-    document.body.appendChild(script);
-  };
-
 });
+
+/* START PARTY */
+document.getElementById("startBtn").onclick = ()=>{
+  update(ref(db,"parties/" + partyCode),{
+    started:true
+  });
+};
+
 </script>
 
 </body>
