@@ -2,46 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Host Panel</title>
 <style>
-body{
-  margin:0;
-  font-family:Arial;
-  background:#0f2027;
-  color:white;
-  display:flex;
-  height:100vh;
-}
-.sidebar{
-  width:30%;
-  background:#1b2a33;
-  padding:20px;
-  overflow-y:auto;
-}
-.main{
-  flex:1;
-  padding:40px;
-  text-align:center;
-}
-.player{
-  background:#243b55;
-  padding:10px;
-  margin-top:8px;
-  border-radius:6px;
-}
-button{
-  width:100%;
-  padding:14px;
-  margin-top:12px;
-  border:none;
-  border-radius:8px;
-  font-weight:bold;
-  cursor:pointer;
-}
+body{margin:0;font-family:Arial;background:#0f2027;color:white;display:flex;height:100vh;}
+.sidebar{width:30%;background:#1b2a33;padding:20px;overflow-y:auto;}
+.main{flex:1;padding:40px;text-align:center;}
+.player{background:#243b55;padding:10px;margin-top:8px;border-radius:6px;}
+button{width:100%;padding:14px;margin-top:12px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;}
 #startBtn{background:#00e0ff;}
-#quizBtn{background:#6366f1;}
-.selected{outline:3px solid white;}
 </style>
 </head>
 <body>
@@ -54,12 +22,7 @@ button{
 <div class="main">
 <h2>Host Panel</h2>
 <h3 id="partyCodeText"></h3>
-
-<h3>Select Game</h3>
-<button id="quizBtn">Quiz</button>
-
-<button id="startBtn">Start Party</button>
-
+<button id="startBtn">Start Quiz</button>
 </div>
 
 <script type="module">
@@ -69,78 +32,55 @@ import { getDatabase, ref, onValue, update }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e"
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const code = new URLSearchParams(window.location.search).get("code");
+document.getElementById("partyCodeText").textContent="Party Code: "+code;
 
-if (!code) {
-  alert("No party code");
-}
+const partyRef = ref(db,"parties/"+code);
+const playersRef = ref(db,"parties/"+code+"/players");
 
-document.getElementById("partyCodeText").textContent =
-  "Party Code: " + code;
+let playerCount=0;
 
-const partyRef = ref(db, "parties/" + code);
-const playersRef = ref(db, "parties/" + code + "/players");
+onValue(playersRef,(snapshot)=>{
+  const list=document.getElementById("playersList");
+  list.innerHTML="";
+  playerCount=0;
 
-let playerCount = 0;
-let selectedGame = "Quiz";
-
-/* REALTIME PLAYER LIST */
-onValue(playersRef, (snapshot) => {
-
-  const list = document.getElementById("playersList");
-  list.innerHTML = "";
-  playerCount = 0;
-
-  if (!snapshot.exists()) {
-    list.innerHTML = "No players yet.";
+  if(!snapshot.exists()){
+    list.innerHTML="No players yet.";
     return;
   }
 
-  snapshot.forEach(child => {
-
+  snapshot.forEach(child=>{
     playerCount++;
-
-    const div = document.createElement("div");
-    div.className = "player";
-    div.textContent = child.val().username || "Player";
-
+    const div=document.createElement("div");
+    div.className="player";
+    div.textContent=child.val().username;
     list.appendChild(div);
   });
-
 });
 
-/* SELECT GAME */
-document.getElementById("quizBtn").onclick = () => {
-
-  selectedGame = "Quiz";
-
-  document.getElementById("quizBtn")
-    .classList.add("selected");
-
-};
-
-/* START PARTY */
-document.getElementById("startBtn").onclick = async () => {
-
-  if (playerCount < 2) {
+document.getElementById("startBtn").onclick=async()=>{
+  if(playerCount<2){
     alert("Minimum 2 players required");
     return;
   }
 
-  await update(partyRef, {
-    started: true,
-    game: selectedGame
+  await update(partyRef,{
+    started:true,
+    game:"Quiz"
   });
-
 };
 
 </script>
