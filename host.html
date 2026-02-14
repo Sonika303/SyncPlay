@@ -27,7 +27,7 @@ button{width:100%;padding:14px;margin-top:12px;border:none;border-radius:8px;fon
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update }
+import { getDatabase, ref, onValue, update, onDisconnect }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -49,10 +49,11 @@ document.getElementById("partyCodeText").textContent="Party Code: "+code;
 const partyRef = ref(db,"parties/"+code);
 const playersRef = ref(db,"parties/"+code+"/players");
 
+onDisconnect(partyRef).remove(); // delete party when host closes tab
+
 let playerCount=0;
 
 onValue(playersRef,(snapshot)=>{
-
   const list=document.getElementById("playersList");
   list.innerHTML="";
   playerCount=0;
@@ -69,11 +70,9 @@ onValue(playersRef,(snapshot)=>{
     div.textContent=child.val().username;
     list.appendChild(div);
   });
-
 });
 
 document.getElementById("startBtn").onclick=async()=>{
-
   if(playerCount<2){
     alert("Minimum 2 players required");
     return;
@@ -83,7 +82,6 @@ document.getElementById("startBtn").onclick=async()=>{
     started:true,
     game:"Quiz"
   });
-
 };
 
 </script>
