@@ -80,7 +80,7 @@ import { getDatabase, ref, set, get, onValue }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  apiKey: "YOUR_KEY",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
   projectId: "syncplay-17b6e"
@@ -91,75 +91,92 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-let username="";
+let username = "";
+let currentPartyRef = null;
 
-document.getElementById("googleLogin").onclick=()=>signInWithPopup(auth,provider);
+document.getElementById("googleLogin").onclick =
+  () => signInWithPopup(auth, provider);
 
-onAuthStateChanged(auth, async(user)=>{
-  if(!user) return;
+onAuthStateChanged(auth, async (user) => {
 
-  localStorage.setItem("uid",user.uid);
+  if (!user) return;
 
   document.getElementById("loginSection").classList.add("hidden");
   document.getElementById("appSection").classList.remove("hidden");
 
-  const snap = await get(ref(db,"users/"+user.uid));
-  if(snap.exists()){
-    username=snap.val().username;
-  }else{
-    username=user.displayName||"Player";
-    await set(ref(db,"users/"+user.uid),{username});
+  const userRef = ref(db, "users/" + user.uid);
+  const snap = await get(userRef);
+
+  if (snap.exists()) {
+    username = snap.val().username;
+  } else {
+    username = user.displayName || "Player";
+    await set(userRef, { username });
   }
 
-  document.getElementById("displayName").textContent=username;
+  document.getElementById("displayName").textContent = username;
 });
 
 function generateCode(){
   return Math.random().toString(36).substring(2,7).toUpperCase();
 }
 
-document.getElementById("createParty").onclick=async()=>{
-  const user=auth.currentUser;
-  const code=generateCode();
+document.getElementById("createParty").onclick = async () => {
 
-  localStorage.setItem("party",code);
+  const user = auth.currentUser;
+  const code = generateCode();
 
-  await set(ref(db,"parties/"+code),{
-    host:user.uid,
-    started:false,
-    game:null
+  localStorage.setItem("party", code);
+
+  await set(ref(db, "parties/" + code), {
+    host: user.uid,
+    started: false,
+    game: null
   });
 
-  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username,
-    score:0
+  await set(ref(db, "parties/" + code + "/players/" + user.uid), {
+    username: username,
+    score: 0
   });
 
-  window.location.href="host.html?code="+code;
+  window.location.href = "host.html?code=" + code;
 };
 
-document.getElementById("joinParty").onclick=async()=>{
-  const user=auth.currentUser;
-  const code=document.getElementById("joinCode").value.trim().toUpperCase();
-  if(!code) return alert("Enter code");
+document.getElementById("joinParty").onclick = async () => {
 
-  const snap=await get(ref(db,"parties/"+code));
-  if(!snap.exists()) return alert("Party not found");
+  const user = auth.currentUser;
+  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+  if (!code) return alert("Enter code");
 
-  localStorage.setItem("party",code);
+  const partyRef = ref(db, "parties/" + code);
+  const snap = await get(partyRef);
 
-  await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username,
-    score:0
+  if (!snap.exists()) return alert("Party not found");
+
+  localStorage.setItem("party", code);
+
+  await set(ref(db, "parties/" + code + "/players/" + user.uid), {
+    username: username,
+    score: 0
   });
 
-  document.getElementById("statusText").textContent="Joined. Waiting...";
+  document.getElementById("statusText").textContent = "Joined. Waiting for host...";
 
-  onValue(ref(db,"parties/"+code+"/started"),(s)=>{
-    if(s.val()===true){
-      window.location.href="games/"+(snap.val().game||"Quiz")+"/controller.html";
+  currentPartyRef = partyRef;
+
+  onValue(partyRef, (snapshot) => {
+
+    if (!snapshot.exists()) return;
+
+    const data = snapshot.val();
+
+    if (data.started === true && data.game) {
+      window.location.href =
+        "games/" + data.game + "/controller.html";
     }
+
   });
+
 };
 
 </script>
