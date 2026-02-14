@@ -15,7 +15,8 @@ button{width:100%;padding:14px;margin:8px 0;border:none;border-radius:8px;backgr
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, update }
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig={
 apiKey:"AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -31,8 +32,8 @@ const code=localStorage.getItem("party");
 const uid=localStorage.getItem("uid");
 
 const questions=[
-{q:"Capital of Italy?",a:["Rome","Paris","Berlin","Madrid"]},
-{q:"3+5?",a:["6","7","8","9"]}
+{q:"Capital of Italy?",a:["Rome","Paris","Berlin","Madrid"],c:0},
+{q:"3+5?",a:["6","7","8","9"],c:2}
 ];
 
 onValue(ref(db,"parties/"+code),snap=>{
@@ -55,7 +56,7 @@ div.appendChild(btn);
 function submit(choice,data){
 if(data.answered) return;
 
-if(choice===data.correct){
+if(choice===questions[data.currentQuestion].c){
 update(ref(db,"parties/"+code+"/players/"+uid),{
 score:(data.players[uid].score||0)+1
 });
