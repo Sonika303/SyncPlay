@@ -1,105 +1,155 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SyncPlay</title>
+  <meta charset="UTF-8">
+  <title>SyncPlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family:Arial, Helvetica, sans-serif;
-}
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
-body{
-  min-height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:linear-gradient(135deg,#1d2671,#c33764);
-  color:white;
-}
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
 
-.card{
-  background:rgba(255,255,255,0.1);
-  backdrop-filter:blur(20px);
-  padding:40px;
-  border-radius:20px;
-  width:95%;
-  max-width:420px;
-  text-align:center;
-}
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e1e2f, #111827);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
 
-button{
-  width:100%;
-  padding:14px;
-  margin-top:12px;
-  border:none;
-  border-radius:10px;
-  font-size:16px;
-  font-weight:bold;
-  cursor:pointer;
-  background:#00eaff;
-  color:black;
-}
+    .card {
+      width: 95%;
+      max-width: 500px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(15px);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0,0,0,0.4);
+    }
 
-button:hover{
-  opacity:0.85;
-}
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
 
-.hidden{display:none;}
+    p {
+      opacity: 0.7;
+      margin-bottom: 30px;
+    }
 
-.profile img{
-  width:70px;
-  height:70px;
-  border-radius:50%;
-  margin-bottom:10px;
-}
-</style>
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      margin-top: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .primary {
+      background: #6366f1;
+      color: white;
+    }
+
+    .primary:hover {
+      background: #4f46e5;
+    }
+
+    .danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .danger:hover {
+      background: #dc2626;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+
+    .party-code {
+      margin-top: 20px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 12px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .user-info {
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+  </style>
 </head>
 <body>
 
 <div class="card">
 
-  <!-- LOGIN -->
-  <div id="loginView">
-    <h2>SyncPlay</h2>
-    <button id="googleLogin">Sign in with Google</button>
+  <h1>SyncPlay</h1>
+  <p>Host & Play Games Together</p>
+
+  <!-- SIGN IN SECTION -->
+  <div id="loginSection">
+    <button id="googleLogin" class="primary">Sign in with Google</button>
   </div>
 
-  <!-- LOBBY -->
-  <div id="lobbyView" class="hidden">
-    <div class="profile">
-      <img id="userPic">
-      <div id="userName"></div>
+  <!-- MAIN APP -->
+  <div id="appSection" class="hidden">
+
+    <div class="user-info">
+      Logged in as: <span id="displayName"></span>
     </div>
 
-    <button id="createParty">Create Party</button>
-    <button id="joinParty">Join Party</button>
-    <button id="logoutBtn" style="background:#ff4d4d;color:white;">Logout</button>
+    <input id="usernameInput" placeholder="Change Username">
+    <button id="saveUsername" class="primary">Save Username</button>
+
+    <button id="createParty" class="primary">Create Party</button>
+
+    <input id="joinCodeInput" placeholder="Enter Party Code">
+    <button id="joinParty" class="primary">Join Party</button>
+
+    <div id="partyCodeDisplay" class="party-code hidden"></div>
+
+    <button id="logoutBtn" class="danger">Logout</button>
+
   </div>
 
 </div>
 
+
+<!-- Firebase -->
 <script type="module">
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-import { 
-  getDatabase, 
-  ref, 
-  set, 
-  get 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get, child } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -116,85 +166,97 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-const loginView = document.getElementById("loginView");
-const lobbyView = document.getElementById("lobbyView");
-const userName = document.getElementById("userName");
-const userPic = document.getElementById("userPic");
+const loginSection = document.getElementById("loginSection");
+const appSection = document.getElementById("appSection");
+const displayName = document.getElementById("displayName");
+const usernameInput = document.getElementById("usernameInput");
+const partyCodeDisplay = document.getElementById("partyCodeDisplay");
 
-function generateCode(){
-  return Math.random().toString(36).substring(2,7).toUpperCase();
-}
 
-function showLobby(user){
-  loginView.classList.add("hidden");
-  lobbyView.classList.remove("hidden");
-  userName.textContent = user.displayName;
-  userPic.src = user.photoURL;
-}
+// Sign In
+document.getElementById("googleLogin").onclick = async () => {
+  await signInWithPopup(auth, provider);
+};
 
-function showLogin(){
-  loginView.classList.remove("hidden");
-  lobbyView.classList.add("hidden");
-}
 
-onAuthStateChanged(auth, (user) => {
-  if(user){
-    showLobby(user);
+// Auth state listener (NO REDIRECT)
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    loginSection.classList.add("hidden");
+    appSection.classList.remove("hidden");
+
+    const snapshot = await get(child(ref(db), `users/${user.uid}`));
+
+    if (snapshot.exists()) {
+      displayName.textContent = snapshot.val().username;
+    } else {
+      await set(ref(db, `users/${user.uid}`), {
+        username: user.displayName
+      });
+      displayName.textContent = user.displayName;
+    }
   } else {
-    showLogin();
+    loginSection.classList.remove("hidden");
+    appSection.classList.add("hidden");
   }
 });
 
-document.getElementById("googleLogin").onclick = () => {
-  signInWithPopup(auth, provider);
+
+// Save Username
+document.getElementById("saveUsername").onclick = async () => {
+  const user = auth.currentUser;
+  const newName = usernameInput.value.trim();
+
+  if (!newName) return;
+
+  await set(ref(db, `users/${user.uid}`), {
+    username: newName
+  });
+
+  displayName.textContent = newName;
+  usernameInput.value = "";
 };
 
-document.getElementById("logoutBtn").onclick = () => {
-  signOut(auth);
-};
 
+// Generate Party Code
+function generateCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+
+// Create Party
 document.getElementById("createParty").onclick = async () => {
   const user = auth.currentUser;
   const code = generateCode();
 
-  await set(ref(db, "parties/" + code), {
+  await set(ref(db, `parties/${code}`), {
     host: user.uid,
-    gameState: "waiting",
-    players: {
-      [user.uid]: {
-        name: user.displayName,
-        score: 0
-      }
-    }
+    createdAt: Date.now()
   });
 
-  localStorage.setItem("party", code);
-  localStorage.setItem("uid", user.uid);
-
-  window.location.href = "host.html";
+  partyCodeDisplay.textContent = "Party Code: " + code;
+  partyCodeDisplay.classList.remove("hidden");
 };
 
+
+// Join Party
 document.getElementById("joinParty").onclick = async () => {
-  const code = prompt("Enter Party Code:");
-  if(!code) return;
+  const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
+  if (!code) return;
 
-  const snap = await get(ref(db, "parties/" + code));
-  if(!snap.exists()){
+  const snapshot = await get(child(ref(db), `parties/${code}`));
+
+  if (snapshot.exists()) {
+    alert("Joined Party: " + code);
+  } else {
     alert("Party not found");
-    return;
   }
+};
 
-  const user = auth.currentUser;
 
-  await set(ref(db, "parties/" + code + "/players/" + user.uid), {
-    name: user.displayName,
-    score: 0
-  });
-
-  localStorage.setItem("party", code);
-  localStorage.setItem("uid", user.uid);
-
-  window.location.href = "games/Quiz/controller.html";
+// Logout
+document.getElementById("logoutBtn").onclick = async () => {
+  await signOut(auth);
 };
 
 </script>
