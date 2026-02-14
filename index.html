@@ -44,11 +44,6 @@ input{
   border:none;
   border-radius:10px;
 }
-.partyCode{
-  margin-top:15px;
-  font-size:20px;
-  font-weight:800;
-}
 .hidden{display:none;}
 </style>
 </head>
@@ -74,20 +69,27 @@ input{
     <input id="joinCode" placeholder="Enter Party Code">
     <button id="joinParty">Join Party</button>
 
-    <div id="partyCodeDisplay" class="partyCode hidden"></div>
-
   </div>
 
 </div>
 
-
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, child, onValue } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+import { 
+  getDatabase, 
+  ref, 
+  set, 
+  get 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -108,47 +110,61 @@ const loginSection = document.getElementById("loginSection");
 const appSection = document.getElementById("appSection");
 const displayName = document.getElementById("displayName");
 
-let currentParty = null;
+let currentUsername = "";
 
+/* GOOGLE LOGIN */
 document.getElementById("googleLogin").onclick = async () => {
   await signInWithPopup(auth, provider);
 };
 
+/* AUTH STATE */
 onAuthStateChanged(auth, async (user)=>{
-  if(user){
-    loginSection.classList.add("hidden");
-    appSection.classList.remove("hidden");
+  if(!user) return;
 
-    const snap = await get(child(ref(db), "users/"+user.uid));
-    if(snap.exists()){
-      displayName.textContent = snap.val().username;
-    }else{
-      await set(ref(db,"users/"+user.uid),{
-        username:user.displayName
-      });
-      displayName.textContent = user.displayName;
-    }
+  loginSection.classList.add("hidden");
+  appSection.classList.remove("hidden");
+
+  const userRef = ref(db, "users/" + user.uid);
+  const snap = await get(userRef);
+
+  if(snap.exists()){
+    currentUsername = snap.val().username;
+  }else{
+    currentUsername = user.displayName || "Player";
+    await set(userRef, { username: currentUsername });
   }
+
+  displayName.textContent = currentUsername;
 });
 
+/* SAVE USERNAME */
 document.getElementById("saveUsername").onclick = async ()=>{
   const user = auth.currentUser;
-  const name = document.getElementById("usernameInput").value.trim();
-  if(!name) return;
+  if(!user) return;
 
-  await set(ref(db,"users/"+user.uid),{username:name});
-  displayName.textContent = name;
+  const newName = document.getElementById("usernameInput").value.trim();
+  if(newName.length < 2) return alert("Username too short");
+
+  await set(ref(db,"users/"+user.uid),{
+    username:newName
+  });
+
+  currentUsername = newName;
+  displayName.textContent = newName;
   document.getElementById("usernameInput").value="";
 };
 
+/* GENERATE PARTY CODE */
 function generateCode(){
   return Math.random().toString(36).substring(2,7).toUpperCase();
 }
 
+/* CREATE PARTY */
 document.getElementById("createParty").onclick = async ()=>{
   const user = auth.currentUser;
+  if(!user) return;
+
   const code = generateCode();
-  currentParty = code;
 
   await set(ref(db,"parties/"+code),{
     host:user.uid,
@@ -156,29 +172,29 @@ document.getElementById("createParty").onclick = async ()=>{
   });
 
   await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username:displayName.textContent
+    username:currentUsername
   });
 
-  document.getElementById("partyCodeDisplay").textContent="Party Code: "+code;
-  document.getElementById("partyCodeDisplay").classList.remove("hidden");
+  /* REDIRECT TO HOST */
+  window.location.href = "host.html?code=" + code;
 };
 
+/* JOIN PARTY */
 document.getElementById("joinParty").onclick = async ()=>{
-  const code = document.getElementById("joinCode").value.trim().toUpperCase();
-  if(!code) return;
-
-  const snap = await get(child(ref(db),"parties/"+code));
-  if(!snap.exists()){
-    alert("Party not found");
-    return;
-  }
-
   const user = auth.currentUser;
+  if(!user) return;
+
+  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+  if(!code) return alert("Enter code");
+
+  const snap = await get(ref(db,"parties/"+code));
+  if(!snap.exists()) return alert("Party not found");
+
   await set(ref(db,"parties/"+code+"/players/"+user.uid),{
-    username:displayName.textContent
+    username:currentUsername
   });
 
-  alert("Joined party!");
+  alert("Joined party successfully!");
 };
 
 </script>
