@@ -32,18 +32,16 @@ body{
   font-weight:bold;
 }
 button{
-  margin-top:20px;
+  margin-top:15px;
   width:100%;
   padding:14px;
   border:none;
   border-radius:10px;
-  background:#00e0ff;
   font-weight:bold;
   cursor:pointer;
 }
-.endBtn{
-  background:#ff4d4d;
-}
+#startBtn{ background:#00e0ff; }
+#endBtn{ background:#ff4d4d; }
 </style>
 </head>
 <body>
@@ -53,27 +51,24 @@ button{
 <h2>Host Panel</h2>
 <h3 id="partyCodeText"></h3>
 
-<div id="playersList">Loading players...</div>
+<div id="playersList">Loading...</div>
 
 <button id="startBtn">Start Party</button>
-<button id="endBtn" class="endBtn">End Party</button>
+<button id="endBtn">End Party</button>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update, remove, get }
+import { getDatabase, ref, onValue, update, remove }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
   authDomain: "syncplay-17b6e.firebaseapp.com",
   databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048"
+  projectId: "syncplay-17b6e"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -95,38 +90,24 @@ const playersList = document.getElementById("playersList");
 const startBtn = document.getElementById("startBtn");
 const endBtn = document.getElementById("endBtn");
 
-/* ================= CLEAN OLD PARTY IF NEEDED ================= */
-(async ()=>{
-  const snap = await get(partyRef);
-  if(!snap.exists()){
-    playersList.innerHTML="Party does not exist.";
-    return;
-  }
+/* ================= REALTIME PLAYER + SCORE LIST ================= */
 
-  const data = snap.val();
-
-  if(data.started === true && data.gameState === "finished"){
-    await remove(partyRef);
-    location.reload();
-  }
-})();
-
-/* ================= REALTIME SCOREBOARD ================= */
 onValue(playersRef,(snapshot)=>{
 
   playersList.innerHTML="";
 
   if(!snapshot.exists()){
-    playersList.innerHTML="No players yet.";
+    playersList.innerHTML="No players joined yet.";
     return;
   }
 
   const players=[];
 
   snapshot.forEach(child=>{
+    const data = child.val();
     players.push({
-      username: child.val().username,
-      score: child.val().score || 0
+      username:data.username,
+      score:data.score || 0
     });
   });
 
@@ -142,6 +123,7 @@ onValue(playersRef,(snapshot)=>{
 });
 
 /* ================= START PARTY ================= */
+
 startBtn.onclick = async ()=>{
 
   await update(partyRef,{
@@ -155,15 +137,13 @@ startBtn.onclick = async ()=>{
 };
 
 /* ================= END PARTY ================= */
-endBtn.onclick = async ()=>{
 
-  await update(partyRef,{
-    gameState:"finished"
-  });
+endBtn.onclick = async ()=>{
 
   await remove(partyRef);
 
   window.location.href="index.html";
+
 };
 
 </script>
