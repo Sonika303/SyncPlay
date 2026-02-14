@@ -3,67 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SyncPlay Host</title>
+<title>Host Panel</title>
 
 <style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family:Arial, Helvetica, sans-serif;
-}
-
 body{
-  min-height:100vh;
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:white;
   display:flex;
   justify-content:center;
   align-items:center;
-  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color:white;
+  min-height:100vh;
 }
-
 .card{
   width:95%;
   max-width:600px;
   background:rgba(255,255,255,0.08);
-  backdrop-filter:blur(15px);
   padding:40px;
   border-radius:20px;
   text-align:center;
 }
-
-h2{
-  margin-bottom:10px;
-}
-
-.partyCode{
-  font-size:22px;
-  font-weight:bold;
-  margin-bottom:20px;
-}
-
-.players{
-  text-align:left;
-  margin-top:20px;
-}
-
 .player{
+  background:rgba(255,255,255,0.1);
   padding:10px;
   margin-top:8px;
-  background:rgba(255,255,255,0.1);
   border-radius:8px;
 }
-
 button{
-  margin-top:25px;
-  padding:14px;
+  margin-top:20px;
   width:100%;
+  padding:14px;
   border:none;
   border-radius:10px;
+  background:#00e0ff;
   font-weight:bold;
   cursor:pointer;
-  background:#00e0ff;
-  color:black;
 }
 </style>
 </head>
@@ -71,14 +46,12 @@ button{
 
 <div class="card">
 
-  <h2>Host Panel</h2>
+<h2>Host Panel</h2>
+<h3 id="partyCodeText"></h3>
 
-  <div id="partyCode" class="partyCode"></div>
+<div id="playersList"></div>
 
-  <h3>Players Joined:</h3>
-  <div id="playersList" class="players"></div>
-
-  <button id="startBtn">Has everyone joined? Start Party</button>
+<button id="startBtn">Has everyone joined? Start Party</button>
 
 </div>
 
@@ -101,26 +74,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* GET PARTY CODE FROM URL */
-const urlParams = new URLSearchParams(window.location.search);
-const partyCode = urlParams.get("code");
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
 
-if(!partyCode){
-  document.getElementById("partyCode").textContent = "No Party Code Found.";
-  throw new Error("No party code in URL");
+if(!code){
+  document.body.innerHTML = "No party code provided.";
+  throw new Error("No party code");
 }
 
-document.getElementById("partyCode").textContent = "Party Code: " + partyCode;
+document.getElementById("partyCodeText").textContent = "Party Code: " + code;
 
-/* REALTIME PLAYER LIST */
-const playersRef = ref(db, "parties/" + partyCode + "/players");
+const playersRef = ref(db,"parties/"+code+"/players");
 
-onValue(playersRef, (snapshot)=>{
+onValue(playersRef,(snapshot)=>{
   const list = document.getElementById("playersList");
   list.innerHTML = "";
 
   if(!snapshot.exists()){
-    list.innerHTML = "<p>No players yet.</p>";
+    list.innerHTML = "No players yet.";
     return;
   }
 
@@ -132,14 +103,12 @@ onValue(playersRef, (snapshot)=>{
   });
 });
 
-/* START PARTY */
 document.getElementById("startBtn").onclick = ()=>{
-  update(ref(db,"parties/" + partyCode),{
+  update(ref(db,"parties/"+code),{
     started:true
   });
 };
 
 </script>
-
 </body>
 </html>
