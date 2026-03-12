@@ -91,23 +91,21 @@ const provider = new GoogleAuthProvider();
 let currentUser;
 
 function googleLogin(){
-signInWithPopup(auth, provider);
+signInWithPopup(auth,provider);
 }
 
 onAuthStateChanged(auth, async (user)=>{
 
 if(user){
 
-currentUser = user;
+currentUser=user;
 
 document.getElementById("loginSection").style.display="none";
 document.getElementById("userSection").style.display="block";
 
-document.getElementById("welcome").innerText =
-"Welcome " + user.displayName;
+document.getElementById("welcome").innerText="Welcome "+user.displayName;
 
-document.getElementById("email").innerText =
-"Email: " + user.email;
+document.getElementById("email").innerText="Email: "+user.email;
 
 const snap = await get(ref(db,"users/"+user.uid+"/username"));
 
@@ -121,56 +119,65 @@ document.getElementById("usernameInput").value=snap.val();
 
 function saveUsername(){
 
-let name = document.getElementById("usernameInput").value;
+let name=document.getElementById("usernameInput").value;
 
 set(ref(db,"users/"+currentUser.uid+"/username"),name);
 
-alert("Username saved!");
+alert("Username saved");
 
 }
 
 function openSettings(){
 
-let box = document.getElementById("settingsBox");
+let box=document.getElementById("settingsBox");
 
-box.style.display =
-box.style.display==="none" ? "block":"none";
+box.style.display = box.style.display==="none"?"block":"none";
 
 }
 
 function logout(){
 
 signOut(auth);
-
 location.reload();
 
 }
 
 function createParty(){
+
 window.location.href="host.html";
+
 }
 
 async function joinParty(){
 
-let code = document.getElementById("partyCode").value;
+let code=document.getElementById("partyCode").value;
 
-const snapshot = await get(ref(db,"parties/"+code));
+const snapshot=await get(ref(db,"parties/"+code));
 
 if(snapshot.exists()){
+
+await set(ref(db,"parties/"+code+"/players/"+currentUser.uid),{
+name:currentUser.displayName,
+joined:Date.now()
+});
+
 alert("Joined Party!");
+
 }
 else{
+
 alert("Party not found");
-}
 
 }
 
-window.googleLogin = googleLogin;
-window.openSettings = openSettings;
-window.saveUsername = saveUsername;
-window.logout = logout;
-window.createParty = createParty;
-window.joinParty = joinParty;
+}
+
+window.googleLogin=googleLogin;
+window.openSettings=openSettings;
+window.saveUsername=saveUsername;
+window.logout=logout;
+window.createParty=createParty;
+window.joinParty=joinParty;
 
 </script>
 
