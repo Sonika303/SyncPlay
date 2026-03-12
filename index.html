@@ -1,50 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Party Lobby</title>
+<title>SyncPlay Lobby</title>
 
 <style>
+
 body{
 font-family:Arial;
 text-align:center;
-margin-top:80px;
+background:linear-gradient(135deg,#4facfe,#00f2fe);
+height:100vh;
+margin:0;
+color:white;
+}
+
+.container{
+margin-top:100px;
 }
 
 button{
-padding:10px 20px;
-margin:10px;
+padding:12px 20px;
+border:none;
+border-radius:8px;
+background:white;
+color:#333;
+font-weight:bold;
+cursor:pointer;
+margin:8px;
+}
+
+input{
+padding:10px;
+border-radius:6px;
+border:none;
+margin:5px;
 }
 
 #settings{
-border:1px solid #ccc;
-padding:20px;
+background:white;
+color:black;
 width:300px;
 margin:auto;
+padding:20px;
+border-radius:10px;
 display:none;
 }
+
 </style>
 
 </head>
 
 <body>
 
-<h1>Party Lobby</h1>
+<div class="container">
 
-<div id="login">
+<h1>🎬 SyncPlay Party</h1>
+
+<div id="loginBox">
 <button onclick="googleLogin()">Sign in with Google</button>
 </div>
 
-<div id="main" style="display:none">
+<div id="mainUI" style="display:none">
 
-<p id="welcome"></p>
+<h2 id="welcome"></h2>
 
 <button onclick="toggleSettings()">⚙ Settings</button>
 
-<h2>Join Party</h2>
+<br><br>
 
-<input id="codeInput" placeholder="Enter 4 digit code">
+<input id="partyCode" placeholder="Enter Party Code">
 
-<button onclick="joinParty()">Join</button>
+<button onclick="joinParty()">Join Party</button>
 
 <br><br>
 
@@ -52,13 +78,15 @@ display:none;
 
 </div>
 
+</div>
+
 <div id="settings">
 
-<h3>Settings</h3>
+<h3>Account Settings</h3>
 
 <p id="email"></p>
 
-<input id="username" placeholder="Username">
+<input id="usernameInput" placeholder="Enter username">
 
 <br><br>
 
@@ -97,22 +125,23 @@ function googleLogin(){
 signInWithPopup(auth,provider);
 }
 
-onAuthStateChanged(auth,async(user)=>{
+onAuthStateChanged(auth, async (user)=>{
 
 if(user){
 
 currentUser=user;
 
-document.getElementById("login").style.display="none";
-document.getElementById("main").style.display="block";
+document.getElementById("loginBox").style.display="none";
+document.getElementById("mainUI").style.display="block";
 
 document.getElementById("welcome").innerText="Welcome "+user.displayName;
-document.getElementById("email").innerText="Email: "+user.email;
 
-let snap = await get(ref(db,"users/"+user.uid+"/username"));
+document.getElementById("email").innerText=user.email;
+
+let snap=await get(ref(db,"users/"+user.uid+"/username"));
 
 if(snap.exists()){
-document.getElementById("username").value=snap.val();
+document.getElementById("usernameInput").value=snap.val();
 }
 
 }
@@ -121,19 +150,19 @@ document.getElementById("username").value=snap.val();
 
 function toggleSettings(){
 
-let box=document.getElementById("settings");
+let s=document.getElementById("settings");
 
-box.style.display = box.style.display==="none" ? "block":"none";
+s.style.display = s.style.display==="none"?"block":"none";
 
 }
 
 function saveUsername(){
 
-let name=document.getElementById("username").value;
+let name=document.getElementById("usernameInput").value;
 
 set(ref(db,"users/"+currentUser.uid+"/username"),name);
 
-alert("Username saved");
+alert("Username saved!");
 
 }
 
@@ -152,17 +181,21 @@ window.location.href="host.html";
 
 async function joinParty(){
 
-let code=document.getElementById("codeInput").value;
+let code=document.getElementById("partyCode").value;
 
-let snap = await get(ref(db,"parties/"+code));
+let snap=await get(ref(db,"parties/"+code));
 
 if(snap.exists()){
 
+let userSnap=await get(ref(db,"users/"+currentUser.uid+"/username"));
+
+let username=userSnap.exists()?userSnap.val():currentUser.displayName;
+
 await set(ref(db,"parties/"+code+"/players/"+currentUser.uid),{
-name: currentUser.displayName
+name:username
 });
 
-alert("Joined Party");
+alert("Joined Party!");
 
 }else{
 
