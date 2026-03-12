@@ -15,7 +15,7 @@ padding:10px 20px;
 margin:10px;
 }
 
-#settingsBox{
+#settings{
 border:1px solid #ccc;
 padding:20px;
 width:300px;
@@ -30,18 +30,20 @@ display:none;
 
 <h1>Party Lobby</h1>
 
-<div id="loginSection">
+<div id="login">
 <button onclick="googleLogin()">Sign in with Google</button>
 </div>
 
-<div id="userSection" style="display:none;">
+<div id="main" style="display:none">
 
 <p id="welcome"></p>
 
-<button onclick="openSettings()">⚙ Settings</button>
+<button onclick="toggleSettings()">⚙ Settings</button>
 
 <h2>Join Party</h2>
-<input id="partyCode" placeholder="Enter 4 digit code">
+
+<input id="codeInput" placeholder="Enter 4 digit code">
+
 <button onclick="joinParty()">Join</button>
 
 <br><br>
@@ -50,19 +52,21 @@ display:none;
 
 </div>
 
-<div id="settingsBox">
+<div id="settings">
 
 <h3>Settings</h3>
 
 <p id="email"></p>
 
-<input id="usernameInput" placeholder="Enter username">
+<input id="username" placeholder="Username">
+
 <br><br>
 
 <button onclick="saveUsername()">Save Username</button>
+
 <br><br>
 
-<button onclick="logout()">Log Out</button>
+<button onclick="logout()">Logout</button>
 
 </div>
 
@@ -70,7 +74,7 @@ display:none;
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
 apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -79,8 +83,7 @@ databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
 projectId: "syncplay-17b6e",
 storageBucket: "syncplay-17b6e.firebasestorage.app",
 messagingSenderId: "86016195929",
-appId: "1:86016195929:web:40262a28786f2ead712048",
-measurementId: "G-3NBT4GJ0FX"
+appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -94,44 +97,43 @@ function googleLogin(){
 signInWithPopup(auth,provider);
 }
 
-onAuthStateChanged(auth, async (user)=>{
+onAuthStateChanged(auth,async(user)=>{
 
 if(user){
 
 currentUser=user;
 
-document.getElementById("loginSection").style.display="none";
-document.getElementById("userSection").style.display="block";
+document.getElementById("login").style.display="none";
+document.getElementById("main").style.display="block";
 
 document.getElementById("welcome").innerText="Welcome "+user.displayName;
-
 document.getElementById("email").innerText="Email: "+user.email;
 
-const snap = await get(ref(db,"users/"+user.uid+"/username"));
+let snap = await get(ref(db,"users/"+user.uid+"/username"));
 
 if(snap.exists()){
-document.getElementById("usernameInput").value=snap.val();
+document.getElementById("username").value=snap.val();
 }
 
 }
 
 });
 
+function toggleSettings(){
+
+let box=document.getElementById("settings");
+
+box.style.display = box.style.display==="none" ? "block":"none";
+
+}
+
 function saveUsername(){
 
-let name=document.getElementById("usernameInput").value;
+let name=document.getElementById("username").value;
 
 set(ref(db,"users/"+currentUser.uid+"/username"),name);
 
 alert("Username saved");
-
-}
-
-function openSettings(){
-
-let box=document.getElementById("settingsBox");
-
-box.style.display = box.style.display==="none"?"block":"none";
 
 }
 
@@ -150,21 +152,19 @@ window.location.href="host.html";
 
 async function joinParty(){
 
-let code=document.getElementById("partyCode").value;
+let code=document.getElementById("codeInput").value;
 
-const snapshot=await get(ref(db,"parties/"+code));
+let snap = await get(ref(db,"parties/"+code));
 
-if(snapshot.exists()){
+if(snap.exists()){
 
 await set(ref(db,"parties/"+code+"/players/"+currentUser.uid),{
-name:currentUser.displayName,
-joined:Date.now()
+name: currentUser.displayName
 });
 
-alert("Joined Party!");
+alert("Joined Party");
 
-}
-else{
+}else{
 
 alert("Party not found");
 
@@ -173,7 +173,7 @@ alert("Party not found");
 }
 
 window.googleLogin=googleLogin;
-window.openSettings=openSettings;
+window.toggleSettings=toggleSettings;
 window.saveUsername=saveUsername;
 window.logout=logout;
 window.createParty=createParty;
