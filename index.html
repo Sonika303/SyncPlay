@@ -1,13 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Join Party</title>
+<title>Party System</title>
 
 <style>
 body{
-font-family:Arial;
+font-family: Arial;
 text-align:center;
 margin-top:120px;
+}
+
+button{
+padding:10px 20px;
+margin:10px;
+font-size:16px;
 }
 </style>
 
@@ -15,10 +21,17 @@ margin-top:120px;
 
 <body>
 
-<h1>Join Party</h1>
+<h1>Party Lobby</h1>
 
+<h2>Join Party</h2>
 <input id="partyCode" placeholder="Enter 4 digit code">
 <button onclick="joinParty()">Join</button>
+
+<br><br>
+
+<h2>Or</h2>
+
+<button onclick="createParty()">Create Party</button>
 
 <p id="result"></p>
 
@@ -48,15 +61,20 @@ let code = document.getElementById("partyCode").value;
 const snapshot = await get(ref(db,"parties/"+code));
 
 if(snapshot.exists()){
-document.getElementById("result").innerText = "✅ Joined Party!";
+document.getElementById("result").innerText="✅ Joined Party!";
 }
 else{
-document.getElementById("result").innerText = "❌ Party not found";
+document.getElementById("result").innerText="❌ Party not found";
 }
 
+}
+
+function createParty(){
+window.location.href="host.html";
 }
 
 window.joinParty = joinParty;
+window.createParty = createParty;
 
 </script>
 
