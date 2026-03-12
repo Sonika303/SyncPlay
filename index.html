@@ -1,1 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Join Party</title>
+<style>
+body{
+font-family:Arial;
+text-align:center;
+margin-top:100px;
+}
+</style>
+</head>
 
+<body>
+
+<h1>Join Party</h1>
+
+<input id="partyCode" placeholder="Enter 4 digit code">
+<button onclick="joinParty()">Join</button>
+
+<p id="result"></p>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "YOUR_KEY",
+authDomain: "YOUR_DOMAIN",
+databaseURL: "YOUR_DATABASE_URL",
+projectId: "YOUR_PROJECT_ID",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+async function joinParty(){
+
+let code = document.getElementById("partyCode").value;
+
+const snapshot = await get(ref(db,"parties/"+code));
+
+if(snapshot.exists()){
+document.getElementById("result").innerText="Joined Party!";
+}
+else{
+document.getElementById("result").innerText="Party not found";
+}
+
+}
+
+window.joinParty = joinParty;
+
+</script>
+
+</body>
+</html>
