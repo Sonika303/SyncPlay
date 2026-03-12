@@ -2,24 +2,27 @@
 <html>
 <head>
 <title>Host Party</title>
+
 <style>
 body{
 font-family: Arial;
 text-align:center;
-margin-top:100px;
+margin-top:120px;
 }
 
 #code{
-font-size:50px;
+font-size:60px;
 color:green;
 font-weight:bold;
 }
 </style>
+
 </head>
 
 <body>
 
-<h1>Host Party</h1>
+<h1>Create Party</h1>
+
 <button onclick="createParty()">Create Party</button>
 
 <h2>Your Party Code</h2>
@@ -31,10 +34,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-authDomain: "syncplay-17b6e.firebaseapp.com",
-databaseURL: "YOUR_DATABASE_URL",
-projectId: "YOUR_PROJECT_ID",
+  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+  authDomain: "syncplay-17b6e.firebaseapp.com",
+  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+  projectId: "syncplay-17b6e",
+  storageBucket: "syncplay-17b6e.firebasestorage.app",
+  messagingSenderId: "86016195929",
+  appId: "1:86016195929:web:40262a28786f2ead712048",
+  measurementId: "G-3NBT4GJ0FX"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -42,12 +49,13 @@ const db = getDatabase(app);
 
 function createParty(){
 
-let code = Math.floor(1000 + Math.random()*9000);
+let code = Math.floor(1000 + Math.random() * 9000);
 
 document.getElementById("code").innerText = code;
 
-set(ref(db,"parties/"+code),{
-created:true
+set(ref(db, "parties/" + code), {
+host:true,
+created: Date.now()
 });
 
 }
@@ -58,3 +66,4 @@ window.createParty = createParty;
 
 </body>
 </html>
+
