@@ -5,7 +5,7 @@
 
 <style>
 body{
-font-family: Arial;
+font-family:Arial;
 text-align:center;
 margin-top:120px;
 }
@@ -21,9 +21,9 @@ font-weight:bold;
 
 <body>
 
-<h1>Create Party</h1>
+<h1>Host Party</h1>
 
-<button onclick="createParty()">Create Party</button>
+<button onclick="createParty()">Generate Party Code</button>
 
 <h2>Your Party Code</h2>
 <div id="code">----</div>
@@ -49,21 +49,20 @@ const db = getDatabase(app);
 
 function createParty(){
 
-let code = Math.floor(1000 + Math.random() * 9000);
+let code = Math.floor(1000 + Math.random()*9000);
 
 document.getElementById("code").innerText = code;
 
-set(ref(db, "parties/" + code), {
+set(ref(db,"parties/"+code),{
 host:true,
-created: Date.now()
+created:Date.now()
 });
 
 }
 
-window.createParty = createParty;
+window.createParty=createParty;
 
 </script>
 
 </body>
 </html>
-
