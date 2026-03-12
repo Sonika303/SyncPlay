@@ -1,19 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Party System</title>
+<title>Party Lobby</title>
 
 <style>
 body{
-font-family: Arial;
+font-family:Arial;
 text-align:center;
-margin-top:120px;
+margin-top:80px;
 }
 
 button{
 padding:10px 20px;
 margin:10px;
-font-size:16px;
+}
+
+#settingsBox{
+border:1px solid #ccc;
+padding:20px;
+width:300px;
+margin:auto;
+display:none;
 }
 </style>
 
@@ -23,36 +30,125 @@ font-size:16px;
 
 <h1>Party Lobby</h1>
 
+<div id="loginSection">
+<button onclick="googleLogin()">Sign in with Google</button>
+</div>
+
+<div id="userSection" style="display:none;">
+
+<p id="welcome"></p>
+
+<button onclick="openSettings()">⚙ Settings</button>
+
 <h2>Join Party</h2>
 <input id="partyCode" placeholder="Enter 4 digit code">
 <button onclick="joinParty()">Join</button>
 
 <br><br>
 
-<h2>Or</h2>
-
 <button onclick="createParty()">Create Party</button>
 
-<p id="result"></p>
+</div>
+
+<div id="settingsBox">
+
+<h3>Settings</h3>
+
+<p id="email"></p>
+
+<input id="usernameInput" placeholder="Enter username">
+<br><br>
+
+<button onclick="saveUsername()">Save Username</button>
+<br><br>
+
+<button onclick="logout()">Log Out</button>
+
+</div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048",
-  measurementId: "G-3NBT4GJ0FX"
+apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+authDomain: "syncplay-17b6e.firebaseapp.com",
+databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+projectId: "syncplay-17b6e",
+storageBucket: "syncplay-17b6e.firebasestorage.app",
+messagingSenderId: "86016195929",
+appId: "1:86016195929:web:40262a28786f2ead712048",
+measurementId: "G-3NBT4GJ0FX"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser;
+
+function googleLogin(){
+signInWithPopup(auth, provider);
+}
+
+onAuthStateChanged(auth, async (user)=>{
+
+if(user){
+
+currentUser = user;
+
+document.getElementById("loginSection").style.display="none";
+document.getElementById("userSection").style.display="block";
+
+document.getElementById("welcome").innerText =
+"Welcome " + user.displayName;
+
+document.getElementById("email").innerText =
+"Email: " + user.email;
+
+const snap = await get(ref(db,"users/"+user.uid+"/username"));
+
+if(snap.exists()){
+document.getElementById("usernameInput").value=snap.val();
+}
+
+}
+
+});
+
+function saveUsername(){
+
+let name = document.getElementById("usernameInput").value;
+
+set(ref(db,"users/"+currentUser.uid+"/username"),name);
+
+alert("Username saved!");
+
+}
+
+function openSettings(){
+
+let box = document.getElementById("settingsBox");
+
+box.style.display =
+box.style.display==="none" ? "block":"none";
+
+}
+
+function logout(){
+
+signOut(auth);
+
+location.reload();
+
+}
+
+function createParty(){
+window.location.href="host.html";
+}
 
 async function joinParty(){
 
@@ -61,20 +157,20 @@ let code = document.getElementById("partyCode").value;
 const snapshot = await get(ref(db,"parties/"+code));
 
 if(snapshot.exists()){
-document.getElementById("result").innerText="✅ Joined Party!";
+alert("Joined Party!");
 }
 else{
-document.getElementById("result").innerText="❌ Party not found";
+alert("Party not found");
 }
 
 }
 
-function createParty(){
-window.location.href="host.html";
-}
-
-window.joinParty = joinParty;
+window.googleLogin = googleLogin;
+window.openSettings = openSettings;
+window.saveUsername = saveUsername;
+window.logout = logout;
 window.createParty = createParty;
+window.joinParty = joinParty;
 
 </script>
 
