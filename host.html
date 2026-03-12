@@ -7,13 +7,18 @@
 body{
 font-family:Arial;
 text-align:center;
-margin-top:120px;
+margin-top:100px;
 }
 
 #code{
 font-size:60px;
 color:green;
 font-weight:bold;
+}
+
+ul{
+list-style:none;
+padding:0;
 }
 </style>
 
@@ -23,39 +28,69 @@ font-weight:bold;
 
 <h1>Host Party</h1>
 
-<button onclick="createParty()">Generate Party Code</button>
+<button onclick="createParty()">Create Party</button>
 
-<h2>Your Party Code</h2>
+<h2>Party Code</h2>
+
 <div id="code">----</div>
+
+<h2>Players Joined</h2>
+
+<ul id="playerList"></ul>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-  authDomain: "syncplay-17b6e.firebaseapp.com",
-  databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-  projectId: "syncplay-17b6e",
-  storageBucket: "syncplay-17b6e.firebasestorage.app",
-  messagingSenderId: "86016195929",
-  appId: "1:86016195929:web:40262a28786f2ead712048",
-  measurementId: "G-3NBT4GJ0FX"
+apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+authDomain: "syncplay-17b6e.firebaseapp.com",
+databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+projectId: "syncplay-17b6e",
+storageBucket: "syncplay-17b6e.firebasestorage.app",
+messagingSenderId: "86016195929",
+appId: "1:86016195929:web:40262a28786f2ead712048",
+measurementId: "G-3NBT4GJ0FX"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+let partyCode;
 
 function createParty(){
 
-let code = Math.floor(1000 + Math.random()*9000);
+partyCode=Math.floor(1000+Math.random()*9000);
 
-document.getElementById("code").innerText = code;
+document.getElementById("code").innerText=partyCode;
 
-set(ref(db,"parties/"+code),{
-host:true,
+set(ref(db,"parties/"+partyCode),{
 created:Date.now()
+});
+
+listenPlayers();
+
+}
+
+function listenPlayers(){
+
+onValue(ref(db,"parties/"+partyCode+"/players"),(snapshot)=>{
+
+let list=document.getElementById("playerList");
+
+list.innerHTML="";
+
+snapshot.forEach((player)=>{
+
+let li=document.createElement("li");
+
+li.innerText=player.val().name;
+
+list.appendChild(li);
+
+});
+
 });
 
 }
