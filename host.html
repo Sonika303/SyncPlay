@@ -1,1 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Host Party</title>
+<style>
+body{
+font-family: Arial;
+text-align:center;
+margin-top:100px;
+}
 
+#code{
+font-size:50px;
+color:green;
+font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Host Party</h1>
+<button onclick="createParty()">Create Party</button>
+
+<h2>Your Party Code</h2>
+<div id="code">----</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "YOUR_KEY",
+authDomain: "YOUR_DOMAIN",
+databaseURL: "YOUR_DATABASE_URL",
+projectId: "YOUR_PROJECT_ID",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+function createParty(){
+
+let code = Math.floor(1000 + Math.random()*9000);
+
+document.getElementById("code").innerText = code;
+
+set(ref(db,"parties/"+code),{
+created:true
+});
+
+}
+
+window.createParty = createParty;
+
+</script>
+
+</body>
+</html>
