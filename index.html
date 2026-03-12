@@ -1,48 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>SyncPlay Lobby</title>
+<title>SyncPlay</title>
 
 <style>
 
 body{
 font-family:Arial;
-text-align:center;
-background:linear-gradient(135deg,#4facfe,#00f2fe);
-height:100vh;
 margin:0;
+background:linear-gradient(135deg,#667eea,#764ba2);
 color:white;
+text-align:center;
 }
 
 .container{
-margin-top:100px;
+margin-top:120px;
 }
 
 button{
 padding:12px 20px;
 border:none;
 border-radius:8px;
-background:white;
-color:#333;
-font-weight:bold;
-cursor:pointer;
 margin:8px;
+cursor:pointer;
+font-weight:bold;
 }
 
 input{
 padding:10px;
 border-radius:6px;
 border:none;
-margin:5px;
+margin:6px;
 }
 
 #settings{
 background:white;
 color:black;
+padding:20px;
 width:300px;
 margin:auto;
-padding:20px;
 border-radius:10px;
+display:none;
+}
+
+#partyScreen{
 display:none;
 }
 
@@ -54,9 +55,9 @@ display:none;
 
 <div class="container">
 
-<h1>🎬 SyncPlay Party</h1>
+<h1>🎬 SyncPlay</h1>
 
-<div id="loginBox">
+<div id="login">
 <button onclick="googleLogin()">Sign in with Google</button>
 </div>
 
@@ -78,11 +79,19 @@ display:none;
 
 </div>
 
+<div id="partyScreen">
+
+<h2 id="partyTitle"></h2>
+
+<p>You have joined this party.</p>
+
+</div>
+
 </div>
 
 <div id="settings">
 
-<h3>Account Settings</h3>
+<h3>Settings</h3>
 
 <p id="email"></p>
 
@@ -101,7 +110,7 @@ display:none;
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -114,10 +123,10 @@ messagingSenderId: "86016195929",
 appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+const auth=getAuth(app);
+const provider=new GoogleAuthProvider();
 
 let currentUser;
 
@@ -125,24 +134,30 @@ function googleLogin(){
 signInWithPopup(auth,provider);
 }
 
-onAuthStateChanged(auth, async (user)=>{
+onAuthStateChanged(auth, async(user)=>{
 
 if(user){
 
 currentUser=user;
 
-document.getElementById("loginBox").style.display="none";
+document.getElementById("login").style.display="none";
 document.getElementById("mainUI").style.display="block";
-
-document.getElementById("welcome").innerText="Welcome "+user.displayName;
-
-document.getElementById("email").innerText=user.email;
 
 let snap=await get(ref(db,"users/"+user.uid+"/username"));
 
+let username;
+
 if(snap.exists()){
-document.getElementById("usernameInput").value=snap.val();
+username=snap.val();
+}else{
+username="Player";
 }
+
+document.getElementById("welcome").innerText="Welcome "+username;
+
+document.getElementById("email").innerText=user.email;
+
+document.getElementById("usernameInput").value=username;
 
 }
 
@@ -152,7 +167,7 @@ function toggleSettings(){
 
 let s=document.getElementById("settings");
 
-s.style.display = s.style.display==="none"?"block":"none";
+s.style.display=s.style.display==="none"?"block":"none";
 
 }
 
@@ -162,7 +177,9 @@ let name=document.getElementById("usernameInput").value;
 
 set(ref(db,"users/"+currentUser.uid+"/username"),name);
 
-alert("Username saved!");
+document.getElementById("welcome").innerText="Welcome "+name;
+
+alert("Username saved");
 
 }
 
@@ -189,19 +206,37 @@ if(snap.exists()){
 
 let userSnap=await get(ref(db,"users/"+currentUser.uid+"/username"));
 
-let username=userSnap.exists()?userSnap.val():currentUser.displayName;
+let username=userSnap.exists()?userSnap.val():"Player";
 
 await set(ref(db,"parties/"+code+"/players/"+currentUser.uid),{
 name:username
 });
 
-alert("Joined Party!");
+document.getElementById("mainUI").style.display="none";
+document.getElementById("partyScreen").style.display="block";
+
+document.getElementById("partyTitle").innerText="Party "+code;
+
+watchKick(code);
 
 }else{
 
 alert("Party not found");
 
 }
+
+}
+
+function watchKick(code){
+
+onValue(ref(db,"parties/"+code+"/players/"+currentUser.uid),(snap)=>{
+
+if(!snap.exists()){
+alert("You were kicked from the party");
+location.reload();
+}
+
+});
 
 }
 
