@@ -7,11 +7,10 @@
 
 body{
 font-family:Arial;
-text-align:center;
-background:linear-gradient(135deg,#ff9a9e,#fad0c4);
-height:100vh;
-margin:0;
+background:linear-gradient(135deg,#ff9966,#ff5e62);
 color:white;
+text-align:center;
+margin:0;
 }
 
 .container{
@@ -20,36 +19,29 @@ margin-top:100px;
 
 #code{
 font-size:60px;
-font-weight:bold;
 margin:20px;
+font-weight:bold;
 }
 
 .playerBox{
 background:white;
 color:black;
-width:300px;
+width:350px;
 margin:auto;
 padding:20px;
 border-radius:10px;
 }
 
-ul{
-list-style:none;
-padding:0;
-}
-
 li{
+display:flex;
+justify-content:space-between;
 padding:6px;
-border-bottom:1px solid #ddd;
 }
 
 button{
-padding:12px 20px;
+padding:8px 12px;
 border:none;
-border-radius:8px;
-background:white;
-color:#333;
-font-weight:bold;
+border-radius:6px;
 cursor:pointer;
 }
 
@@ -80,7 +72,7 @@ cursor:pointer;
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
 apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -121,9 +113,13 @@ list.innerHTML="";
 
 snapshot.forEach(player=>{
 
+let data=player.val();
+let uid=player.key;
+
 let li=document.createElement("li");
 
-li.innerText=player.val().name;
+li.innerHTML=data.name+
+` <button onclick="kickPlayer('${uid}')">Kick</button>`;
 
 list.appendChild(li);
 
@@ -133,7 +129,14 @@ list.appendChild(li);
 
 }
 
+function kickPlayer(uid){
+
+remove(ref(db,"parties/"+partyCode+"/players/"+uid));
+
+}
+
 window.createParty=createParty;
+window.kickPlayer=kickPlayer;
 
 </script>
 
