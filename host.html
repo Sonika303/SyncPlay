@@ -4,39 +4,78 @@
 <title>Host Party</title>
 
 <style>
+
 body{
 font-family:Arial;
 text-align:center;
+background:linear-gradient(135deg,#ff9a9e,#fad0c4);
+height:100vh;
+margin:0;
+color:white;
+}
+
+.container{
 margin-top:100px;
 }
 
 #code{
 font-size:60px;
-color:green;
 font-weight:bold;
+margin:20px;
+}
+
+.playerBox{
+background:white;
+color:black;
+width:300px;
+margin:auto;
+padding:20px;
+border-radius:10px;
 }
 
 ul{
 list-style:none;
 padding:0;
 }
+
+li{
+padding:6px;
+border-bottom:1px solid #ddd;
+}
+
+button{
+padding:12px 20px;
+border:none;
+border-radius:8px;
+background:white;
+color:#333;
+font-weight:bold;
+cursor:pointer;
+}
+
 </style>
 
 </head>
 
 <body>
 
-<h1>Host Party</h1>
+<div class="container">
+
+<h1>🎉 Host Party</h1>
 
 <button onclick="createParty()">Create Party</button>
 
-<h2>Party Code</h2>
-
 <div id="code">----</div>
 
-<h2>Players Joined</h2>
+<div class="playerBox">
+
+<h3>Players Joined</h3>
 
 <ul id="players"></ul>
+
+</div>
+
+</div>
 
 <script type="module">
 
@@ -53,8 +92,8 @@ messagingSenderId: "86016195929",
 appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
 
 let partyCode;
 
