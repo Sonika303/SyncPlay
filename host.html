@@ -135,7 +135,7 @@ remove(ref(db,"parties/"+partyCode+"/players/"+uid));
 }
 function startGame() {
     set(ref(db, "parties/" + partyCode + "/gameState"), { status: "playing" });
-    window.location.href = `Games/WordBomb/game.html?code=${partyCode}`;
+    window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
 }
 window.startGame = startGame;
 window.createParty=createParty;
