@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Word Bomb - SyncPlay</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 0;
+            background: radial-gradient(circle, #2c3e50, #000000);
+            color: white;
+            text-align: center;
+        }
+
+        .game-container {
+            margin-top: 50px;
+        }
+
+        #bomb {
+            font-size: 100px;
+            margin: 20px;
+        }
+
+        #timer {
+            font-size: 40px;
+            font-weight: bold;
+            color: #ff4757;
+        }
+
+        #syllable-box {
+            background: #f1c40f;
+            color: black;
+            padding: 15px 30px;
+            font-size: 32px;
+            font-weight: bold;
+            display: inline-block;
+            border-radius: 10px;
+            margin: 20px;
+        }
+
+        #input {
+            padding: 15px;
+            font-size: 22px;
+            border-radius: 8px;
+            border: none;
+            width: 300px;
+            outline: none;
+            text-align: center;
+        }
+
+        #turn-info {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            height: 30px;
+        }
+
+        .your-turn {
+            color: #2ecc71;
+            text-shadow: 0 0 10px #2ecc71;
+        }
+
+        .waiting {
+            color: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h2 id="partyId">Party: ----</h2>
+
+        <div id="bomb">💣</div>
+        <div id="timer">10</div>
+
+        <p>Type a word containing:</p>
+        <div id="syllable-box"><span id="syllable">...</span></div>
+
+        <br>
+        <input type="text" id="input" placeholder="Type word here..." autocomplete="off">
+
+        <div id="turn-info">Loading game...</div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+
+</body>
+</html>

@@ -216,6 +216,11 @@ document.getElementById("mainUI").style.display="none";
 document.getElementById("partyScreen").style.display="block";
 
 document.getElementById("partyTitle").innerText="Party "+code;
+onValue(ref(db, "parties/" + code + "/gameState"), (snap) => {
+    if (snap.exists() && snap.val().status === "playing") {
+        window.location.href = `Games/WordBomb/game.html?code=${code}`;
+    }
+});
 
 watchKick(code);
 

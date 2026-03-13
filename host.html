@@ -64,6 +64,8 @@ cursor:pointer;
 <h3>Players Joined</h3>
 
 <ul id="players"></ul>
+<p id="msg" style="color:red;">Waiting for at least 2 players...</p>
+<button id="startBtn" onclick="startGame()" style="display:none; background:#2ecc71; color:white;">🚀 START GAME</button>
 
 </div>
 
@@ -104,37 +106,38 @@ listenPlayers();
 }
 
 function listenPlayers(){
+    onValue(ref(db,"parties/"+partyCode+"/players"),(snapshot)=>{
+        let list=document.getElementById("players");
+        list.innerHTML="";
+        let count = 0;
+        snapshot.forEach(player=>{
+            count++;
+            let data=player.val();
+            let uid=player.key;
+            let li=document.createElement("li");
+            li.innerHTML=data.name + ` <button onclick="kickPlayer('${uid}')">Kick</button>`;
+            list.appendChild(li);
+        });
 
-onValue(ref(db,"parties/"+partyCode+"/players"),(snapshot)=>{
-
-let list=document.getElementById("players");
-
-list.innerHTML="";
-
-snapshot.forEach(player=>{
-
-let data=player.val();
-let uid=player.key;
-
-let li=document.createElement("li");
-
-li.innerHTML=data.name+
-` <button onclick="kickPlayer('${uid}')">Kick</button>`;
-
-list.appendChild(li);
-
-});
-
-});
-
+        if(count >= 2) {
+            document.getElementById("startBtn").style.display = "inline-block";
+            document.getElementById("msg").style.display = "none";
+        } else {
+            document.getElementById("startBtn").style.display = "none";
+            document.getElementById("msg").style.display = "block";
+        }
+    });
 }
-
 function kickPlayer(uid){
 
 remove(ref(db,"parties/"+partyCode+"/players/"+uid));
 
 }
-
+function startGame() {
+    set(ref(db, "parties/" + partyCode + "/gameState"), { status: "playing" });
+    window.location.href = `Games/WordBomb/game.html?code=${partyCode}`;
+}
+window.startGame = startGame;
 window.createParty=createParty;
 window.kickPlayer=kickPlayer;
 
