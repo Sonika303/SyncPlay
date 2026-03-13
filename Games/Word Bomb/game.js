@@ -18,12 +18,6 @@ const auth = getAuth(app);
 const urlParams = new URLSearchParams(window.location.search);
 const partyCode = urlParams.get('code');
 
-// Sound References
-const tickSnd = document.getElementById('snd-tick');
-const boomSnd = document.getElementById('snd-boom');
-const winSnd = document.getElementById('snd-win');
-const correctSnd = document.getElementById('snd-correct');
-
 let players = []; 
 let myUid;
 let isHost = false;
@@ -72,7 +66,6 @@ async function initializeStats(playersObj) {
     updateTurn(0);
 }
 
-// Global Reset Function for Host
 window.resetGame = async () => {
     if (!isHost) return;
     const snap = await get(ref(db, `parties/${partyCode}/players`));
@@ -110,10 +103,6 @@ function listenToGame() {
         const data = snap.val();
         
         if (data.status === "finished") {
-            if (gameActive) { // Play win sound once
-                winSnd.currentTime = 0;
-                winSnd.play();
-            }
             gameActive = false;
             document.getElementById("syllable").innerText = "GAME OVER";
             document.getElementById("timer").innerText = "🏆";
@@ -190,9 +179,6 @@ function listenForControllerInput() {
         if (action.uid === gameData.turn && gameData.syllable !== "Choosing...") {
             const word = action.word.toUpperCase().trim();
             if (word.includes(gameData.syllable) && word.length >= 3) {
-                // Play Correct Sound
-                correctSnd.currentTime = 0;
-                correctSnd.play();
                 findNextPlayer(action.uid);
             }
         }
@@ -213,25 +199,15 @@ async function findNextPlayer(currentUid) {
     }
 }
 
-// Main Game Loop (Host Only)
 setInterval(async () => {
     if (isHost && gameActive) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
         if (snap.exists()) {
             let d = snap.val();
             if (d.syllable !== "Choosing..." && d.timer > 0) {
-                // Play Ticking Sound (Louder when time is low)
-                tickSnd.currentTime = 0;
-                tickSnd.volume = d.timer <= 5 ? 1.0 : 0.4;
-                tickSnd.play();
-
                 update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
             } 
             else if (d.syllable !== "Choosing..." && d.timer <= 0) {
-                // Play Explosion
-                boomSnd.currentTime = 0;
-                boomSnd.play();
-
                 const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
                 const pSnap = await get(pRef);
                 if (pSnap.exists()) {

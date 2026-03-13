@@ -180,11 +180,6 @@
 
     <button id="resetBtn" onclick="resetGame()">PLAY AGAIN</button>
 
-    <audio id="snd-tick" src="https://cdn.pixabay.com/audio/2022/03/15/audio_784d94314d.mp3"></audio>
-    <audio id="snd-boom" src="https://cdn.pixabay.com/audio/2021/08/04/audio_bbdec30935.mp3"></audio>
-    <audio id="snd-win" src="https://cdn.pixabay.com/audio/2021/08/04/audio_12b93806f1.mp3"></audio>
-    <audio id="snd-correct" src="https://cdn.pixabay.com/audio/2022/03/10/audio_c33ca44122.mp3"></audio>
-
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <script type="module" src="game.js"></script>
@@ -200,8 +195,7 @@
             // Bomb shaking logic
             if (val === "🏆") {
                 bombObs.className = "";
-                bombObs.innerText = "👑"; // Change bomb to crown on win
-                // Trigger Confetti
+                bombObs.innerText = "👑"; // Winner icon
                 confetti({
                     particleCount: 150,
                     spread: 70,
