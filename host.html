@@ -40,16 +40,23 @@
             border-radius: 15px;
             max-height: 300px;
             overflow-y: auto;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
         }
 
-        ul { list-style: none; padding: 0; }
+        ul { list-style: none; padding: 0; margin: 0; }
 
         li {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 12px;
             border-bottom: 1px solid #eee;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         button {
@@ -58,30 +65,34 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            transition: transform 0.2s;
+            transition: all 0.2s ease;
         }
 
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
         button:active { transform: scale(0.95); }
 
-        .kick-btn { background: #ff4757; color: white; padding: 5px 10px; }
-        .create-btn { background: white; color: #ff5e62; font-size: 18px; }
+        .kick-btn { background: #ff4757; color: white; padding: 5px 10px; font-size: 12px; }
+        .create-btn { background: white; color: #ff5e62; font-size: 18px; margin-bottom: 10px; }
         #startBtn { background: #2ecc71; color: white; font-size: 18px; width: 100%; margin-top: 10px; }
+        
+        .status-msg { font-size: 14px; margin-top: 10px; opacity: 0.8; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎉 Host Party</h1>
-    <button class="create-btn" onclick="createParty()">Create New Party</button>
+    <button class="create-btn" id="createBtn" onclick="createParty()">Create New Party</button>
     
     <div id="code">----</div>
 
     <div class="playerBox">
-        <h3>Players Joined</h3>
+        <h3 style="margin-top:0;">Players Joined</h3>
         <ul id="players"></ul>
-        <p id="msg" style="color: #ff4757; font-weight: bold;">Waiting for players...</p>
+        <p id="msg" style="color: #ff4757; font-weight: bold; margin: 10px 0;">Waiting for players...</p>
         <button id="startBtn" onclick="startGame()" style="display:none;">🚀 START GAME</button>
     </div>
+    <div class="status-msg" id="statusMsg">Log in to host a party</div>
 </div>
 
 <script type="module">
@@ -106,49 +117,50 @@
     let partyCode;
     let currentUser;
 
-    // Monitor auth state so we have the Host's UID
     onAuthStateChanged(auth, (user) => {
-        if (user) currentUser = user;
+        if (user) {
+            currentUser = user;
+            document.getElementById("statusMsg").innerText = "Ready to create party!";
+        } else {
+            document.getElementById("statusMsg").innerText = "Please sign in first.";
+        }
     });
 
     async function createParty() {
-        if (!currentUser) {
-            alert("Logging you in... please wait a second and try again.");
-            return;
-        }
+        if (!currentUser) return alert("Please wait for login...");
 
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         document.getElementById("code").innerText = partyCode;
+        document.getElementById("createBtn").style.display = "none";
+        document.getElementById("statusMsg").innerText = "Invite players using the code!";
 
         const partyRef = ref(db, "parties/" + partyCode);
 
-        // Auto-delete party if host closes tab
+        // Auto-delete if window closes (Dead Man's Switch)
         onDisconnect(partyRef).remove();
 
-        // INITIALIZE PARTY:
-        // Notice we save 'hostId' but we DO NOT add currentUser.uid to the 'players' list.
+        // Host is INVISIBLE: Not in players list, only stored as hostId
         await set(partyRef, {
             created: serverTimestamp(),
             hostId: currentUser.uid,
             hostActive: true
         });
 
-        console.log("Party created. Host is invisible (Server Mode).");
         listenPlayers();
     }
 
     function listenPlayers() {
-        onValue(ref(db, "parties/" + partyCode + "/players"), (snapshot) => {
-            let list = document.getElementById("players");
+        onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
+            const list = document.getElementById("players");
             list.innerHTML = "";
             let count = 0;
 
             if (snapshot.exists()) {
                 snapshot.forEach(player => {
                     count++;
-                    let data = player.val();
-                    let uid = player.key;
-                    let li = document.createElement("li");
+                    const data = player.val();
+                    const uid = player.key;
+                    const li = document.createElement("li");
                     li.innerHTML = `
                         <span>${data.name}</span>
                         <button class="kick-btn" onclick="kickPlayer('${uid}')">Kick</button>
@@ -157,28 +169,41 @@
                 });
             }
 
-            // Show start button if 2 or more REAL players have joined
+            const startBtn = document.getElementById("startBtn");
+            const msg = document.getElementById("msg");
+
             if (count >= 2) {
-                document.getElementById("startBtn").style.display = "block";
-                document.getElementById("msg").style.display = "none";
+                startBtn.style.display = "block";
+                msg.style.display = "none";
             } else {
-                document.getElementById("startBtn").style.display = "none";
-                document.getElementById("msg").style.display = "block";
-                document.getElementById("msg").innerText = `Waiting for players (${count}/2)...`;
+                startBtn.style.display = "none";
+                msg.style.display = "block";
+                msg.innerText = `Waiting for players (${count}/2)...`;
             }
         });
     }
 
     function kickPlayer(uid) {
-        remove(ref(db, `parties/${partyCode}/players/${uid}`));
+        if(confirm("Kick this player?")) {
+            remove(ref(db, `parties/${partyCode}/players/${uid}`));
+        }
     }
 
-    function startGame() {
-        set(ref(db, "parties/" + partyCode + "/gameState"), { status: "playing" });
+    async function startGame() {
+        if (!partyCode) return;
+
+        // IMPORTANT FIX: Cancel the onDisconnect before redirecting
+        // This prevents Firebase from deleting the party while the page is changing.
+        const partyRef = ref(db, "parties/" + partyCode);
+        await onDisconnect(partyRef).cancel(); 
+
+        // Tell all connected players to transition
+        set(ref(db, `parties/${partyCode}/gameState`), { status: "playing" });
+        
+        // Move host to the game screen
         window.location.href = `Games/Word%20Bomb/game.html?code=${partyCode}`;
     }
 
-    // Bind functions to window for the HTML buttons
     window.startGame = startGame;
     window.createParty = createParty;
     window.kickPlayer = kickPlayer;
