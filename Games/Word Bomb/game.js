@@ -27,15 +27,21 @@ onAuthStateChanged(auth, async (user) => {
     myUid = user.uid;
     document.getElementById("partyId").innerText = "Party: " + partyCode;
 
-    // 1. Get current players
+// 1. Get current players
     const pSnap = await get(ref(db, `parties/${partyCode}/players`));
-    if(!pSnap.exists()) return;
+    if(!pSnap.exists()) {
+        console.error("No players found in database");
+        return;
+    }
     
     const playersObj = pSnap.val();
     players = Object.keys(playersObj);
 
     // 2. Setup Game (Host Only)
-    if (myUid === players[0]) {
+    // Check if game data already exists so the host doesn't reset it on every refresh
+    const checkData = await get(ref(db, `parties/${partyCode}/playersData`));
+    
+    if (myUid === players[0] && !checkData.exists()) {
         console.log("Host detected. Initializing game data...");
         
         let startData = {};
@@ -46,10 +52,15 @@ onAuthStateChanged(auth, async (user) => {
             }; 
         });
 
-        // Push lives/names to DB
         await set(ref(db, `parties/${partyCode}/playersData`), startData);
         
-        // Start the first turn
+        // Initialize Game Data object
+        await set(ref(db, `parties/${partyCode}/gameData`), {
+            syllable: "Choosing...",
+            timer: 15,
+            turn: players[0]
+        });
+
         updateTurn(0);
     }
 
@@ -58,10 +69,14 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function updateTurn(playerIndex) {
+    if (!players[playerIndex]) return;
+
+    const nextPlayerUid = players[playerIndex];
+
     // Show choosing state globally
     await update(ref(db, `parties/${partyCode}/gameData`), {
         syllable: "Choosing...",
-        turn: players[playerIndex],
+        turn: nextPlayerUid,
         timer: 15
     });
 
@@ -72,8 +87,8 @@ async function updateTurn(playerIndex) {
             syllable: randomSyllable,
             timer: 15
         });
-        // Clear previous word submission
-        remove(ref(db, `parties/${partyCode}/action`));
+        // Clear previous word submission so it doesn't auto-trigger next turn
+        await remove(ref(db, `parties/${partyCode}/action`));
     }, 1500);
 }
 
