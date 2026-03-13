@@ -1,258 +1,227 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>SyncPlay</title>
+    <title>SyncPlay</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-align: center;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-<style>
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 350px;
+        }
 
-body{
-font-family:Arial;
-margin:0;
-background:linear-gradient(135deg,#667eea,#764ba2);
-color:white;
-text-align:center;
-}
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            margin: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
 
-.container{
-margin-top:120px;
-}
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
 
-button{
-padding:12px 20px;
-border:none;
-border-radius:8px;
-margin:8px;
-cursor:pointer;
-font-weight:bold;
-}
+        input {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            margin: 10px 0;
+            width: 80%;
+        }
 
-input{
-padding:10px;
-border-radius:6px;
-border:none;
-margin:6px;
-}
+        #settings {
+            background: white;
+            color: black;
+            padding: 20px;
+            width: 300px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 15px;
+            display: none;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
 
-#settings{
-background:white;
-color:black;
-padding:20px;
-width:300px;
-margin:auto;
-border-radius:10px;
-display:none;
-}
-
-#partyScreen{
-display:none;
-}
-
-</style>
-
+        #partyScreen { display: none; }
+        .profile-pic { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 10px; border: 2px solid white; }
+    </style>
 </head>
-
 <body>
 
 <div class="container">
+    <h1>🎬 SyncPlay</h1>
 
-<h1>🎬 SyncPlay</h1>
+    <div id="login">
+        <button style="background: white; color: #764ba2;" onclick="googleLogin()">Sign in with Google</button>
+    </div>
 
-<div id="login">
-<button onclick="googleLogin()">Sign in with Google</button>
-</div>
+    <div id="mainUI" style="display:none">
+        <img id="userPic" class="profile-pic" src="" alt="">
+        <h2 id="welcome"></h2>
+        <button style="background: rgba(255,255,255,0.2); color: white;" onclick="toggleSettings()">⚙ Settings</button>
+        <br><br>
+        <input id="partyCode" placeholder="Enter 4-Digit Code">
+        <button style="background: #2ecc71; color: white;" onclick="joinParty()">Join Party</button>
+        <br>
+        <button style="background: #3498db; color: white;" onclick="createParty()">Host a Game</button>
+    </div>
 
-<div id="mainUI" style="display:none">
-
-<h2 id="welcome"></h2>
-
-<button onclick="toggleSettings()">⚙ Settings</button>
-
-<br><br>
-
-<input id="partyCode" placeholder="Enter Party Code">
-
-<button onclick="joinParty()">Join Party</button>
-
-<br><br>
-
-<button onclick="createParty()">Create Party</button>
-
-</div>
-
-<div id="partyScreen">
-
-<h2 id="partyTitle"></h2>
-
-<p>You have joined this party.</p>
-
-</div>
-
+    <div id="partyScreen">
+        <h2 id="partyTitle"></h2>
+        <div class="loader"></div>
+        <p>Waiting for host to start...</p>
+    </div>
 </div>
 
 <div id="settings">
-
-<h3>Settings</h3>
-
-<p id="email"></p>
-
-<input id="usernameInput" placeholder="Enter username">
-
-<br><br>
-
-<button onclick="saveUsername()">Save Username</button>
-
-<br><br>
-
-<button onclick="logout()">Logout</button>
-
+    <h3>User Profile</h3>
+    <p id="email" style="font-size: 12px; color: gray;"></p>
+    <input id="usernameInput" placeholder="Enter username">
+    <br>
+    <button style="background: #764ba2; color: white;" onclick="saveUsername()">Update Profile</button>
+    <button style="background: #eee; color: black;" onclick="toggleSettings()">Close</button>
+    <hr>
+    <button style="background: #ff4757; color: white;" onclick="logout()">Logout</button>
 </div>
 
 <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, update, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    const firebaseConfig = {
+        apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+        authDomain: "syncplay-17b6e.firebaseapp.com",
+        databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+        projectId: "syncplay-17b6e",
+        storageBucket: "syncplay-17b6e.firebasestorage.app",
+        messagingSenderId: "86016195929",
+        appId: "1:86016195929:web:40262a28786f2ead712048"
+    };
 
-const firebaseConfig = {
-apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-authDomain: "syncplay-17b6e.firebaseapp.com",
-databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-projectId: "syncplay-17b6e",
-storageBucket: "syncplay-17b6e.firebasestorage.app",
-messagingSenderId: "86016195929",
-appId: "1:86016195929:web:40262a28786f2ead712048"
-};
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
 
-const app=initializeApp(firebaseConfig);
-const db=getDatabase(app);
-const auth=getAuth(app);
-const provider=new GoogleAuthProvider();
+    let currentUser;
 
-let currentUser;
+    window.googleLogin = () => signInWithPopup(auth, provider);
 
-function googleLogin(){
-signInWithPopup(auth,provider);
-}
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            document.getElementById("login").style.display = "none";
+            document.getElementById("mainUI").style.display = "block";
 
-onAuthStateChanged(auth, async(user)=>{
+            // 1. Fetch User Data
+            const userRef = ref(db, "users/" + user.uid);
+            const snap = await get(userRef);
+            
+            let username = user.displayName || "Player";
+            if (snap.exists() && snap.val().username) {
+                username = snap.val().username;
+            }
 
-if(user){
+            // 2. ENRICH DATA: Update database with full profile info
+            await update(userRef, {
+                username: username,
+                email: user.email,
+                profilePic: user.photoURL || "",
+                lastSeen: serverTimestamp()
+            });
 
-currentUser=user;
+            // 3. UI Update
+            document.getElementById("welcome").innerText = "Hey, " + username;
+            document.getElementById("email").innerText = user.email;
+            document.getElementById("usernameInput").value = username;
+            document.getElementById("userPic").src = user.photoURL || "https://via.placeholder.com/60";
+        }
+    });
 
-document.getElementById("login").style.display="none";
-document.getElementById("mainUI").style.display="block";
+    window.saveUsername = async () => {
+        let newName = document.getElementById("usernameInput").value;
+        if (!newName) return;
+        
+        await update(ref(db, "users/" + currentUser.uid), {
+            username: newName
+        });
+        
+        document.getElementById("welcome").innerText = "Hey, " + newName;
+        alert("Profile Updated!");
+        toggleSettings();
+    };
 
-let snap=await get(ref(db,"users/"+user.uid+"/username"));
+    window.joinParty = async () => {
+        let code = document.getElementById("partyCode").value;
+        if (!code) return alert("Enter a code!");
 
-let username;
+        let snap = await get(ref(db, "parties/" + code));
 
-if(snap.exists()){
-username=snap.val();
-}else{
-username="Player";
-}
+        if (snap.exists()) {
+            // Get current username for the party list
+            let userSnap = await get(ref(db, "users/" + currentUser.uid + "/username"));
+            let name = userSnap.exists() ? userSnap.val() : "Player";
 
-document.getElementById("welcome").innerText="Welcome "+username;
+            const playerEntryRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
 
-document.getElementById("email").innerText=user.email;
+            // 1. Set data
+            await set(playerEntryRef, { name: name });
 
-document.getElementById("usernameInput").value=username;
+            // 2. ON DISCONNECT: Automatically remove player if they leave/close tab
+            onDisconnect(playerEntryRef).remove();
 
-}
+            document.getElementById("mainUI").style.display = "none";
+            document.getElementById("partyScreen").style.display = "block";
+            document.getElementById("partyTitle").innerText = "Lobby: " + code;
 
-});
+            // Listen for game start
+            onValue(ref(db, "parties/" + code + "/gameState"), (gSnap) => {
+                if (gSnap.exists() && gSnap.val().status === "playing") {
+                    window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
+                }
+            });
 
-function toggleSettings(){
+            watchKick(code);
+        } else {
+            alert("Party Code Not Found!");
+        }
+    };
 
-let s=document.getElementById("settings");
-
-s.style.display=s.style.display==="none"?"block":"none";
-
-}
-
-function saveUsername(){
-
-let name=document.getElementById("usernameInput").value;
-
-set(ref(db,"users/"+currentUser.uid+"/username"),name);
-
-document.getElementById("welcome").innerText="Welcome "+name;
-
-alert("Username saved");
-
-}
-
-function logout(){
-
-signOut(auth);
-location.reload();
-
-}
-
-function createParty(){
-
-window.location.href="host.html";
-
-}
-
-async function joinParty(){
-
-let code=document.getElementById("partyCode").value;
-
-let snap=await get(ref(db,"parties/"+code));
-
-if(snap.exists()){
-
-let userSnap=await get(ref(db,"users/"+currentUser.uid+"/username"));
-
-let username=userSnap.exists()?userSnap.val():"Player";
-
-await set(ref(db,"parties/"+code+"/players/"+currentUser.uid),{
-name:username
-});
-
-document.getElementById("mainUI").style.display="none";
-document.getElementById("partyScreen").style.display="block";
-
-document.getElementById("partyTitle").innerText="Party "+code;
-onValue(ref(db, "parties/" + code + "/gameState"), (snap) => {
-    if (snap.exists() && snap.val().status === "playing") {
-        window.location.href = `Games/Word Bomb/controller.html?code=${code}`;
+    function watchKick(code) {
+        onValue(ref(db, `parties/${code}/players/${currentUser.uid}`), (snap) => {
+            if (!snap.exists()) {
+                alert("Disconnected from party.");
+                location.reload();
+            }
+        });
     }
-});
 
-watchKick(code);
+    window.toggleSettings = () => {
+        let s = document.getElementById("settings");
+        s.style.display = s.style.display === "none" ? "block" : "none";
+    };
 
-}else{
-
-alert("Party not found");
-
-}
-
-}
-
-function watchKick(code){
-
-onValue(ref(db,"parties/"+code+"/players/"+currentUser.uid),(snap)=>{
-
-if(!snap.exists()){
-alert("You were kicked from the party");
-location.reload();
-}
-
-});
-
-}
-
-window.googleLogin=googleLogin;
-window.toggleSettings=toggleSettings;
-window.saveUsername=saveUsername;
-window.logout=logout;
-window.createParty=createParty;
-window.joinParty=joinParty;
+    window.logout = () => signOut(auth).then(() => location.reload());
+    window.createParty = () => window.location.href = "host.html";
 
 </script>
-
 </body>
 </html>
