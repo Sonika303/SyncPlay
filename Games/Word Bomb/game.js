@@ -12,6 +12,8 @@ const firebaseConfig = {
     appId: "1:86016195929:web:40262a28786f2ead712048"
 };
 
+console.log("🔥 Script Loaded and Running");
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
@@ -23,22 +25,46 @@ let myUid;
 let isHost = false;
 const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE"];
 
-onAuthStateChanged(auth, (user) => {
-    if (!user || !partyCode) return;
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        console.error("❌ No user logged in");
+        return;
+    }
+    if (!partyCode) {
+        console.error("❌ No party code found in URL");
+        return;
+    }
+
     myUid = user.uid;
+    console.log("✅ Authenticated as:", myUid);
     document.getElementById("partyId").innerText = "Party: " + partyCode;
 
-    // 1. WATCH PLAYERS
-    onValue(ref(db, `parties/${partyCode}/players`), async (snapshot) => {
-        if (!snapshot.exists()) return;
-        const playersObj = snapshot.val();
-        players = Object.keys(playersObj);
-        
-        // 2. CHECK HOST STATUS
+    // Listen for players
+    onValue(ref(db, `parties/${partyCode}/players`), async (snap) => {
+        if (!snap.exists()) return;
+        players = Object.keys(snap.val());
+        console.log("Current Players:", players);
+
+        // First player is host
         if (myUid === players[0] && !isHost) {
             isHost = true;
-            console.log("👑 You are the Host. Checking game status...");
-            setupGameIfNeeded(playersObj);
+            console.log("👑 You are the Host. Initializing...");
+            
+            // Initial setup
+            const playersObj = snap.val();
+            let startData = {};
+            players.forEach(uid => { 
+                startData[uid] = { lives: 3, name: playersObj[uid].name || "Player" }; 
+            });
+
+            await set(ref(db, `parties/${partyCode}/playersData`), startData);
+            await set(ref(db, `parties/${partyCode}/gameData`), {
+                syllable: "Choosing...",
+                timer: 15,
+                turn: players[0]
+            });
+
+            updateTurn(0);
         }
     });
 
@@ -46,107 +72,48 @@ onAuthStateChanged(auth, (user) => {
     listenForControllerInput();
 });
 
-async function setupGameIfNeeded(playersObj) {
-    const gameDataSnap = await get(ref(db, `parties/${partyCode}/gameData`));
-    
-    if (!gameDataSnap.exists()) {
-        console.log("🚀 Initializing new game data...");
-        
-        let startData = {};
-        players.forEach(uid => { 
-            startData[uid] = { 
-                lives: 3, 
-                name: playersObj[uid].name || "Player" 
-            }; 
-        });
-
-        // Set everything simultaneously
-        await Promise.all([
-            set(ref(db, `parties/${partyCode}/playersData`), startData),
-            set(ref(db, `parties/${partyCode}/gameData`), {
-                syllable: "Choosing...",
-                timer: 15,
-                turn: players[0]
-            })
-        ]);
-
-        updateTurn(0);
-    }
-}
-
-async function updateTurn(playerIndex) {
-    if (players.length === 0) return;
-    const nextPlayerUid = players[playerIndex % players.length];
-
-    console.log("🎲 Moving turn to:", nextPlayerUid);
+async function updateTurn(idx) {
+    const nextUid = players[idx % players.length];
+    console.log("🔄 Switching turn to:", nextUid);
 
     await update(ref(db, `parties/${partyCode}/gameData`), {
         syllable: "Choosing...",
-        turn: nextPlayerUid,
+        turn: nextUid,
         timer: 15
     });
 
     setTimeout(async () => {
-        const randomSyllable = syllables[Math.floor(Math.random() * syllables.length)];
-        console.log("✨ New Syllable:", randomSyllable);
-        
-        await update(ref(db, `parties/${partyCode}/gameData`), {
-            syllable: randomSyllable,
-            timer: 15
-        });
+        const syl = syllables[Math.floor(Math.random() * syllables.length)];
+        await update(ref(db, `parties/${partyCode}/gameData`), { syllable: syl, timer: 15 });
         await remove(ref(db, `parties/${partyCode}/action`));
+        console.log("✨ Active Syllable:", syl);
     }, 1500);
 }
 
 function listenToGame() {
+    // UI Update for Syllable/Timer
     onValue(ref(db, `parties/${partyCode}/gameData`), (snap) => {
-        if(!snap.exists()) return;
+        if (!snap.exists()) return;
         const data = snap.val();
-        
         document.getElementById("syllable").innerText = data.syllable;
         document.getElementById("timer").innerText = data.timer;
-        
-        get(ref(db, `parties/${partyCode}/playersData/${data.turn}/name`)).then(s => {
-            if(s.exists()) {
-                document.getElementById("turn-info").innerText = s.val().toUpperCase() + "'s TURN";
-            }
-        });
+        document.getElementById("turn-info").innerText = "PLAYER TURN: " + data.turn.substring(0,5);
     });
 
+    // UI Update for Hearts
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
-        if(!snap.exists()) return;
+        if (!snap.exists()) return;
         const data = snap.val();
         const display = document.getElementById("lives-display");
         display.innerHTML = "";
         
-        let aliveCount = 0;
-        let winnerName = "";
-
         Object.keys(data).forEach(uid => {
             const p = data[uid];
-            if(p.lives > 0) {
-                aliveCount++;
-                winnerName = p.name;
-            }
-
             const card = document.createElement("div");
             card.className = `player-card ${p.lives <= 0 ? 'dead' : ''}`;
-            // Add active class if it's their turn
-            get(ref(db, `parties/${partyCode}/gameData/turn`)).then(tSnap => {
-                if(tSnap.val() === uid) card.classList.add("active-turn");
-            });
-
-            card.innerHTML = `
-                <span class="player-name">${p.name}</span>
-                <span class="hearts">${"❤️".repeat(Math.max(0, p.lives))}</span>
-            `;
+            card.innerHTML = `<span class="player-name">${p.name}</span><br><span class="hearts">${"❤️".repeat(Math.max(0, p.lives))}</span>`;
             display.appendChild(card);
         });
-
-        if (aliveCount === 1 && players.length > 1) {
-            alert("GAME OVER! " + winnerName + " WINS!");
-            window.location.href = "../../host.html";
-        }
     });
 }
 
@@ -155,13 +122,11 @@ function listenForControllerInput() {
         if (!snap.exists()) return;
         const action = snap.val();
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
-        if(!gSnap.exists()) return;
         const gameData = gSnap.val();
 
         if (action.uid === gameData.turn && gameData.syllable !== "Choosing...") {
-            const word = action.word.toUpperCase();
-            if (word.includes(gameData.syllable)) {
-                console.log("✅ Valid Word!");
+            if (action.word.toUpperCase().includes(gameData.syllable)) {
+                console.log("🎯 Correct Word!");
                 findNextPlayer(action.uid);
             }
         }
@@ -170,35 +135,30 @@ function listenForControllerInput() {
 
 async function findNextPlayer(currentUid) {
     const snap = await get(ref(db, `parties/${partyCode}/playersData`));
-    if(!snap.exists()) return;
     const data = snap.val();
     let idx = players.indexOf(currentUid);
-    
-    for(let i = 1; i <= players.length; i++) {
-        let nextIdx = (idx + i) % players.length;
-        if(data[players[nextIdx]] && data[players[nextIdx]].lives > 0) {
-            updateTurn(nextIdx);
+    for (let i = 1; i <= players.length; i++) {
+        let nIdx = (idx + i) % players.length;
+        if (data[players[nIdx]].lives > 0) {
+            updateTurn(nIdx);
             return;
         }
     }
 }
 
-// Host Timer Logic
 setInterval(async () => {
     if (isHost) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
-        if(!snap.exists()) return;
-        let data = snap.val();
-
-        if (data.syllable !== "Choosing..." && data.timer > 0) {
-            update(ref(db, `parties/${partyCode}/gameData`), { timer: data.timer - 1 });
-        } else if (data.syllable !== "Choosing..." && data.timer <= 0) {
-            console.log("💥 Timer Out!");
-            const pSnap = await get(ref(db, `parties/${partyCode}/playersData/${data.turn}`));
-            if(pSnap.exists()) {
-                let lives = pSnap.val().lives - 1;
-                await update(ref(db, `parties/${partyCode}/playersData/${data.turn}`), { lives: lives });
-                findNextPlayer(data.turn);
+        if (snap.exists()) {
+            let d = snap.val();
+            if (d.syllable !== "Choosing..." && d.timer > 0) {
+                update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
+            } else if (d.syllable !== "Choosing..." && d.timer <= 0) {
+                console.log("⏰ BOOM!");
+                const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
+                const pSnap = await get(pRef);
+                await update(pRef, { lives: pSnap.val().lives - 1 });
+                findNextPlayer(d.turn);
             }
         }
     }
