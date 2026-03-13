@@ -15,91 +15,125 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-
 const urlParams = new URLSearchParams(window.location.search);
 const partyCode = urlParams.get('code');
-let players = [];
+
+let players = []; 
 let myUid;
 const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE"];
 
 onAuthStateChanged(auth, async (user) => {
-    if (!user) return; 
+    if (!user) return;
     myUid = user.uid;
-    
+    document.getElementById("partyId").innerText = "Party: " + partyCode;
+
     const pSnap = await get(ref(db, `parties/${partyCode}/players`));
-    players = Object.keys(pSnap.val());
-    
+    const playersObj = pSnap.val();
+    players = Object.keys(playersObj);
+
+    // Initial setup: Host sets up lives for everyone
     if (myUid === players[0]) {
+        let startData = {};
+        players.forEach(uid => { 
+            startData[uid] = { lives: 3, name: playersObj[uid].name }; 
+        });
+        await set(ref(db, `parties/${partyCode}/playersData`), startData);
         updateTurn(0);
     }
-    
+
     listenToGame();
-    listenForControllerInput(); // Added this to listen for phone input
+    listenForControllerInput();
 });
 
-function updateTurn(playerIndex) {
-    const randomSyllable = syllables[Math.floor(Math.random() * syllables.length)];
-    update(ref(db, `parties/${partyCode}/gameData`), {
-        syllable: randomSyllable,
-        turn: players[playerIndex],
-        timer: 10
-    });
-    // Clear previous action so it doesn't trigger twice
-    remove(ref(db, `parties/${partyCode}/action`));
+async function updateTurn(playerIndex) {
+    document.getElementById("syllable").innerText = "Choosing...";
+    
+    // 1 second delay for "Choosing" feel
+    setTimeout(async () => {
+        const randomSyllable = syllables[Math.floor(Math.random() * syllables.length)];
+        await update(ref(db, `parties/${partyCode}/gameData`), {
+            syllable: randomSyllable,
+            turn: players[playerIndex],
+            timer: 10
+        });
+        remove(ref(db, `parties/${partyCode}/action`)); // Clear last submitted word
+    }, 1000);
 }
 
 function listenToGame() {
     onValue(ref(db, `parties/${partyCode}/gameData`), (snap) => {
         if(!snap.exists()) return;
         const data = snap.val();
-        
         document.getElementById("syllable").innerText = data.syllable;
         document.getElementById("timer").innerText = data.timer;
         
-        // Find the player's name whose turn it is
-        get(ref(db, `parties/${partyCode}/players/${data.turn}/name`)).then((nameSnap) => {
-            let name = nameSnap.val() || "Player";
-            document.getElementById("turn-info").innerText = `${name}'s TURN`;
+        get(ref(db, `parties/${partyCode}/playersData/${data.turn}/name`)).then(s => {
+            document.getElementById("turn-info").innerText = (s.val() || "Player") + "'s TURN";
         });
+    });
+
+    // Handle Lives & Win State
+    onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
+        if(!snap.exists()) return;
+        const data = snap.val();
+        let alivePlayers = [];
+
+        Object.keys(data).forEach(uid => {
+            if(data[uid].lives > 0) alivePlayers.push(uid);
+        });
+
+        // If only 1 person left, they win
+        if (alivePlayers.length === 1 && players.length > 1) {
+            alert(data[alivePlayers[0]].name + " WON THE GAME!");
+            window.location.href = "../../host.html"; // Back to lobby
+        }
     });
 }
 
-// THIS REPLACES THE KEYBOARD INPUT LOGIC
 function listenForControllerInput() {
     onValue(ref(db, `parties/${partyCode}/action`), async (snap) => {
         if (!snap.exists()) return;
-        
         const action = snap.val();
-        const gameDataSnap = await get(ref(db, `parties/${partyCode}/gameData`));
-        const gameData = gameDataSnap.val();
+        const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
+        const gameData = gSnap.val();
 
-        // 1. Check if the word came from the player whose turn it actually is
         if (action.uid === gameData.turn) {
-            const word = action.word.toUpperCase();
-            const currentSyllable = gameData.syllable;
-
-            // 2. Validate the word
-            if (word.includes(currentSyllable)) {
-                console.log("Correct word from controller!");
-                let nextIdx = (players.indexOf(action.uid) + 1) % players.length;
-                updateTurn(nextIdx);
-            } else {
-                console.log("Wrong word from controller!");
+            if (action.word.includes(gameData.syllable)) {
+                findNextPlayer(action.uid);
             }
         }
     });
 }
 
+async function findNextPlayer(currentUid) {
+    const snap = await get(ref(db, `parties/${partyCode}/playersData`));
+    const data = snap.val();
+    let idx = players.indexOf(currentUid);
+    
+    for(let i=1; i<=players.length; i++) {
+        let nextIdx = (idx + i) % players.length;
+        if(data[players[nextIdx]].lives > 0) {
+            updateTurn(nextIdx);
+            return;
+        }
+    }
+}
+
+// Host Timer Logic
 setInterval(async () => {
     if (players[0] === myUid) {
-        const snap = await get(ref(db, `parties/${partyCode}/gameData/timer`));
-        let time = snap.val();
-        if (time > 0) {
-            update(ref(db, `parties/${partyCode}/gameData`), { timer: time - 1 });
+        const snap = await get(ref(db, `parties/${partyCode}/gameData`));
+        if(!snap.exists()) return;
+        let data = snap.val();
+
+        if (data.timer > 0) {
+            update(ref(db, `parties/${partyCode}/gameData`), { timer: data.timer - 1 });
         } else {
-            const turnSnap = await get(ref(db, `parties/${partyCode}/gameData/turn`));
-            let currentIdx = players.indexOf(turnSnap.val());
-            updateTurn((currentIdx + 1) % players.length);
+            // BOOM: Lose a life
+            const pDataSnap = await get(ref(db, `parties/${partyCode}/playersData/${data.turn}`));
+            let currentLives = pDataSnap.val().lives;
+            await update(ref(db, `parties/${partyCode}/playersData/${data.turn}`), { lives: currentLives - 1 });
+            findNextPlayer(data.turn);
         }
     }
 }, 1000);

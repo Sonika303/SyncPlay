@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Word Bomb - SyncPlay</title>
+    <title>Word Bomb - Main Screen</title>
     <style>
         body {
             font-family: Arial;
@@ -9,6 +9,7 @@
             background: radial-gradient(circle, #2c3e50, #000000);
             color: white;
             text-align: center;
+            overflow: hidden;
         }
 
         .game-container {
@@ -16,51 +17,80 @@
         }
 
         #bomb {
-            font-size: 100px;
+            font-size: 120px;
             margin: 20px;
+            display: inline-block;
         }
 
         #timer {
-            font-size: 40px;
+            font-size: 60px;
             font-weight: bold;
             color: #ff4757;
+            text-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
         }
 
         #syllable-box {
             background: #f1c40f;
             color: black;
-            padding: 15px 30px;
-            font-size: 32px;
+            padding: 20px 40px;
+            font-size: 40px;
             font-weight: bold;
             display: inline-block;
-            border-radius: 10px;
+            border-radius: 15px;
             margin: 20px;
-        }
-
-        #input {
-            padding: 15px;
-            font-size: 22px;
-            border-radius: 8px;
-            border: none;
-            width: 300px;
-            outline: none;
-            text-align: center;
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.4);
+            min-width: 150px;
         }
 
         #turn-info {
-            margin-top: 20px;
-            font-size: 24px;
+            margin-top: 10px;
+            font-size: 32px;
             font-weight: bold;
-            height: 30px;
-        }
-
-        .your-turn {
             color: #2ecc71;
-            text-shadow: 0 0 10px #2ecc71;
+            height: 40px;
         }
 
-        .waiting {
-            color: #95a5a6;
+        /* Lives Display Section */
+        #lives-display {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 50px;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 12px;
+            min-width: 140px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        /* Highlight the card of the player whose turn it is */
+        .active-turn {
+            border-color: #f1c40f;
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .dead {
+            opacity: 0.3;
+            filter: grayscale(1);
+        }
+
+        .player-name {
+            font-size: 18px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .hearts {
+            color: #ff4757;
+            font-size: 22px;
+            letter-spacing: 2px;
         }
     </style>
 </head>
@@ -72,13 +102,12 @@
         <div id="bomb">💣</div>
         <div id="timer">10</div>
 
-        <p>Type a word containing:</p>
-        <div id="syllable-box"><span id="syllable">...</span></div>
+        <p style="font-size: 20px; color: #bdc3c7;">Use your phone to type a word containing:</p>
+        <div id="syllable-box"><span id="syllable">Choosing...</span></div>
 
-        <br>
-        <input type="text" id="input" placeholder="Type word here..." autocomplete="off">
+        <div id="turn-info">Waiting for players...</div>
 
-        <div id="turn-info">Loading game...</div>
+        <div id="lives-display"></div>
     </div>
 
     <script type="module" src="game.js"></script>
