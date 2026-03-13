@@ -1,72 +1,202 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Controller</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Word Bomb Controller</title>
     <style>
-        body { font-family: Arial; background: #121212; color: white; text-align: center; padding: 20px; margin: 0; }
-        .controller-card { background: #1e1e1e; padding: 30px; border-radius: 20px; margin-top: 20px; border: 3px solid #333; }
-        .my-turn { border-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
-        #heart-container { font-size: 35px; margin: 15px; }
-        input { width: 85%; padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin: 20px 0; text-align: center; }
-        button { width: 85%; padding: 15px; background: #2ecc71; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; }
-        button:disabled { background: #444; color: #888; }
-        #status { font-size: 20px; font-weight: bold; text-transform: uppercase; }
+        :root {
+            --bg: #0f0f13;
+            --card: #1c1c24;
+            --accent: #2ecc71;
+            --danger: #ff4757;
+            --text: #ffffff;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0; 
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .controller-card { 
+            background: var(--card); 
+            padding: 40px 20px; 
+            border-radius: 30px; 
+            border: 4px solid #333; 
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .my-turn { 
+            border-color: var(--accent); 
+            box-shadow: 0 0 40px rgba(46, 204, 113, 0.3); 
+            transform: scale(1.02);
+        }
+
+        #playerName { font-size: 28px; margin: 0; letter-spacing: 1px; }
+        
+        #heart-container { 
+            font-size: 30px; 
+            margin: 15px 0; 
+            letter-spacing: 5px;
+            filter: drop-shadow(0 0 5px var(--danger));
+        }
+
+        #status { 
+            font-size: 18px; 
+            font-weight: 900; 
+            text-transform: uppercase; 
+            letter-spacing: 2px;
+            color: #888;
+        }
+
+        .active-status { color: var(--accent) !important; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        input { 
+            width: 100%; 
+            padding: 18px; 
+            font-size: 24px; 
+            border-radius: 15px; 
+            border: 2px solid #444; 
+            margin: 25px 0; 
+            text-align: center; 
+            background: #25252e;
+            color: white;
+            box-sizing: border-box;
+            outline: none;
+            text-transform: uppercase;
+        }
+
+        input:focus { border-color: var(--accent); }
+
+        button { 
+            width: 100%; 
+            padding: 18px; 
+            background: var(--accent); 
+            color: white; 
+            border: none; 
+            border-radius: 15px; 
+            font-size: 20px; 
+            font-weight: 900; 
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        button:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
+
+        /* Mobile specific: stop zoom on input */
+        input:focus { font-size: 24px; }
     </style>
 </head>
 <body>
+
     <div class="controller-card" id="card">
-        <h2 id="playerName">Waiting for game...</h2>
+        <h2 id="playerName">---</h2>
         <div id="heart-container"></div>
-        <p id="status">Syncing...</p>
+        <p id="status">Connecting...</p>
+        
         <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
         <button id="sendBtn" onclick="submitWord()" disabled>SUBMIT WORD</button>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const firebaseConfig = { apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU", authDomain: "syncplay-17b6e.firebaseapp.com", databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com", projectId: "syncplay-17b6e", storageBucket: "syncplay-17b6e.firebasestorage.app", messagingSenderId: "86016195929", appId: "1:86016195929:web:40262a28786f2ead712048" };
+        const firebaseConfig = { 
+            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU", 
+            authDomain: "syncplay-17b6e.firebaseapp.com", 
+            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com", 
+            projectId: "syncplay-17b6e", 
+            storageBucket: "syncplay-17b6e.firebasestorage.app", 
+            messagingSenderId: "86016195929", 
+            appId: "1:86016195929:web:40262a28786f2ead712048" 
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const auth = getAuth(app);
         const code = new URLSearchParams(window.location.search).get('code');
 
+        let myTurn = false;
+
         onAuthStateChanged(auth, (user) => {
             if (user) { 
                 const myUid = user.uid;
                 
-                // Watch Lives & Name
+                // Watch My Stats (Lives/Name)
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
-                    document.getElementById("playerName").innerText = data.name;
+                    document.getElementById("playerName").innerText = data.name.toUpperCase();
                     document.getElementById("heart-container").innerText = "❤️".repeat(data.lives);
-                    if(data.lives <= 0) document.getElementById("status").innerText = "ELIMINATED";
+                    if(data.lives <= 0) {
+                        document.getElementById("status").innerText = "ELIMINATED";
+                        document.getElementById("card").style.opacity = "0.5";
+                    }
                 });
 
-                // Watch Turn
+                // Watch Turn Logic
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
-                    const isMe = snap.val().turn === myUid;
-                    document.getElementById("wordInput").disabled = !isMe;
-                    document.getElementById("sendBtn").disabled = !isMe;
-                    document.getElementById("status").innerText = isMe ? "YOUR TURN!" : "WAITING...";
-                    document.getElementById("card").className = isMe ? "controller-card my-turn" : "controller-card";
-                    if(isMe) document.getElementById("wordInput").focus();
+                    const gameData = snap.val();
+                    myTurn = gameData.turn === myUid && gameData.syllable !== "Choosing...";
+                    
+                    const input = document.getElementById("wordInput");
+                    const btn = document.getElementById("sendBtn");
+                    const status = document.getElementById("status");
+                    const card = document.getElementById("card");
+
+                    input.disabled = !myTurn;
+                    btn.disabled = !myTurn;
+
+                    if (myTurn) {
+                        status.innerText = "YOUR TURN!";
+                        status.classList.add("active-status");
+                        card.classList.add("my-turn");
+                        input.focus();
+                        if (navigator.vibrate) navigator.vibrate(200); // Haptic feedback
+                    } else {
+                        status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
+                        status.classList.remove("active-status");
+                        card.classList.remove("my-turn");
+                    }
                 });
             }
         });
 
+        // Submit via Button or Enter Key
         window.submitWord = () => {
             const input = document.getElementById("wordInput");
             const word = input.value.trim();
-            if(!word) return;
-            set(ref(db, `parties/${code}/action`), { uid: auth.currentUser.uid, word: word });
+            if(!word || !myTurn) return;
+
+            set(ref(db, `parties/${code}/action`), { 
+                uid: auth.currentUser.uid, 
+                word: word,
+                time: Date.now() 
+            });
             input.value = "";
         };
+
+        document.getElementById("wordInput").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") submitWord();
+        });
     </script>
 </body>
 </html>
