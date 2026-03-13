@@ -1,26 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SyncPlay - Controller</title>
+    <title>Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
-        .controller-card { background: #1e1e1e; padding: 30px; border-radius: 15px; border: 2px solid transparent; }
-        .my-turn { border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
-        #heart-container { font-size: 30px; margin: 20px; }
-        .heart { display: inline-block; animation: pulse 1s infinite; margin: 0 5px; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        input { width: 80%; padding: 15px; font-size: 20px; border-radius: 8px; border: none; margin-bottom: 20px; text-align: center; }
-        button { width: 80%; padding: 15px; background: #2ecc71; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
-        button:disabled { background: #555; }
+        body { font-family: Arial; background: #121212; color: white; text-align: center; padding: 20px; margin: 0; }
+        .controller-card { background: #1e1e1e; padding: 30px; border-radius: 20px; margin-top: 20px; border: 3px solid #333; }
+        .my-turn { border-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
+        #heart-container { font-size: 35px; margin: 15px; }
+        input { width: 85%; padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin: 20px 0; text-align: center; }
+        button { width: 85%; padding: 15px; background: #2ecc71; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; }
+        button:disabled { background: #444; color: #888; }
+        #status { font-size: 20px; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
 <body>
     <div class="controller-card" id="card">
-        <h2 id="playerName">Connecting...</h2>
+        <h2 id="playerName">Waiting for game...</h2>
         <div id="heart-container"></div>
-        <div id="status">Waiting for turn...</div>
-        <input type="text" id="wordInput" placeholder="Enter word" autocomplete="off" disabled>
+        <p id="status">Syncing...</p>
+        <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
         <button id="sendBtn" onclick="submitWord()" disabled>SUBMIT WORD</button>
     </div>
 
@@ -29,52 +28,44 @@
         import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const firebaseConfig = { 
-            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-            authDomain: "syncplay-17b6e.firebaseapp.com",
-            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-            projectId: "syncplay-17b6e",
-            storageBucket: "syncplay-17b6e.firebasestorage.app",
-            messagingSenderId: "86016195929",
-            appId: "1:86016195929:web:40262a28786f2ead712048"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU", authDomain: "syncplay-17b6e.firebaseapp.com", databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com", projectId: "syncplay-17b6e", storageBucket: "syncplay-17b6e.firebasestorage.app", messagingSenderId: "86016195929", appId: "1:86016195929:web:40262a28786f2ead712048" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const auth = getAuth(app);
         const code = new URLSearchParams(window.location.search).get('code');
-        let myUid;
 
         onAuthStateChanged(auth, (user) => {
             if (user) { 
-                myUid = user.uid;
-                // Watch my own lives/name
+                const myUid = user.uid;
+                
+                // Watch Lives & Name
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
                     document.getElementById("playerName").innerText = data.name;
-                    document.getElementById("heart-container").innerHTML = `<span class="heart">` + "❤️".repeat(data.lives) + "</span>";
-                    if(data.lives <= 0) document.getElementById("status").innerText = "YOU DIED!";
+                    document.getElementById("heart-container").innerText = "❤️".repeat(data.lives);
+                    if(data.lives <= 0) document.getElementById("status").innerText = "ELIMINATED";
                 });
-                listenForTurn();
+
+                // Watch Turn
+                onValue(ref(db, `parties/${code}/gameData`), (snap) => {
+                    if(!snap.exists()) return;
+                    const isMe = snap.val().turn === myUid;
+                    document.getElementById("wordInput").disabled = !isMe;
+                    document.getElementById("sendBtn").disabled = !isMe;
+                    document.getElementById("status").innerText = isMe ? "YOUR TURN!" : "WAITING...";
+                    document.getElementById("card").className = isMe ? "controller-card my-turn" : "controller-card";
+                    if(isMe) document.getElementById("wordInput").focus();
+                });
             }
         });
 
-        function listenForTurn() {
-            onValue(ref(db, `parties/${code}/gameData`), (snap) => {
-                const data = snap.val();
-                const isMe = data.turn === myUid;
-                document.getElementById("wordInput").disabled = !isMe;
-                document.getElementById("sendBtn").disabled = !isMe;
-                document.getElementById("status").innerText = isMe ? "YOUR TURN!" : "Waiting...";
-                document.getElementById("card").className = isMe ? "controller-card my-turn" : "controller-card";
-            });
-        }
-
         window.submitWord = () => {
-            const word = document.getElementById("wordInput").value.toUpperCase();
+            const input = document.getElementById("wordInput");
+            const word = input.value.trim();
             if(!word) return;
-            set(ref(db, `parties/${code}/action`), { uid: myUid, word: word });
-            document.getElementById("wordInput").value = "";
+            set(ref(db, `parties/${code}/action`), { uid: auth.currentUser.uid, word: word });
+            input.value = "";
         };
     </script>
 </body>
