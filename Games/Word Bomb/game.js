@@ -26,27 +26,33 @@ const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE", "PRE"
 
 onAuthStateChanged(auth, async (user) => {
     if (!user || !partyCode) {
-        console.error("No user or no party code found in URL");
+        console.error("No user or no party code found");
         return;
     }
     myUid = user.uid;
     document.getElementById("partyId").innerText = "PARTY ID: " + partyCode;
 
-    // Monitor the players list
+    // 1. Identify the Invisible Host
+    const partySnap = await get(ref(db, `parties/${partyCode}`));
+    if (partySnap.exists() && partySnap.val().hostId === myUid) {
+        isHost = true;
+        console.log("Invisible Host Mode: ACTIVE");
+    }
+
+    // 2. Monitor actual players
     onValue(ref(db, `parties/${partyCode}/players`), async (snap) => {
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+            players = [];
+            return;
+        }
         const playersObj = snap.val();
         players = Object.keys(playersObj);
 
-        // First player joined is the Host
-        if (myUid === players[0]) {
-            isHost = true;
-            console.log("Host Status Confirmed");
-            
-            // Check if game setup is needed
+        // Only the host initializes the game engine
+        if (isHost) {
             const gameDataSnap = await get(ref(db, `parties/${partyCode}/gameData`));
-            if (!gameDataSnap.exists()) {
-                console.log("Initializing Game Data...");
+            if (!gameDataSnap.exists() && players.length > 0) {
+                console.log("Host initializing game data...");
                 forceInit(playersObj);
             }
         }
@@ -66,26 +72,19 @@ async function forceInit(playersObj) {
         }; 
     });
 
-    try {
-        // Set players data
-        await set(ref(db, `parties/${partyCode}/playersData`), startData);
-        // Set initial game state
-        await set(ref(db, `parties/${partyCode}/gameData`), {
-            syllable: "READY?",
-            timer: 15,
-            turn: players[0],
-            status: "playing"
-        });
-        console.log("Database initialized successfully.");
-        // Kick off the first turn
-        setTimeout(() => updateTurn(0), 2000);
-    } catch (e) {
-        console.error("Database Write Failed: ", e);
-    }
+    await set(ref(db, `parties/${partyCode}/playersData`), startData);
+    await set(ref(db, `parties/${partyCode}/gameData`), {
+        syllable: "READY?",
+        timer: 15,
+        turn: players[0], // First real player joined
+        status: "playing"
+    });
+    
+    setTimeout(() => updateTurn(0), 2500);
 }
 
 async function updateTurn(idx) {
-    if (!gameActive || !players[idx % players.length]) return;
+    if (!gameActive || players.length === 0) return;
     const nextUid = players[idx % players.length];
 
     await update(ref(db, `parties/${partyCode}/gameData`), {
@@ -121,20 +120,12 @@ function listenToGame() {
             return;
         }
 
-        // Update turn UI
         get(ref(db, `parties/${partyCode}/playersData/${data.turn}`)).then(s => {
             if(s.exists()){
                 const p = s.val();
                 const info = document.getElementById("turn-info");
                 info.innerText = p.name.toUpperCase() + "'S TURN";
                 info.style.color = p.color;
-            }
-        });
-
-        document.querySelectorAll('.player-card').forEach(card => {
-            card.classList.remove('active-turn');
-            if (card.getAttribute('data-uid') === data.turn) {
-                card.classList.add('active-turn');
             }
         });
     });
@@ -166,7 +157,8 @@ function listenToGame() {
 
 async function checkWinner(playersData) {
     const alivePlayers = Object.keys(playersData).filter(uid => playersData[uid].lives > 0);
-    if (alivePlayers.length === 1 && gameActive && players.length > 1) {
+    // Game ends if 1 or 0 players remain (if players left mid-game)
+    if (alivePlayers.length <= 1 && gameActive && players.length > 1) {
         gameActive = false;
         await update(ref(db, `parties/${partyCode}/gameData`), { status: "finished" });
     }
@@ -196,7 +188,7 @@ async function findNextPlayer(currentUid) {
     
     for (let i = 1; i <= players.length; i++) {
         let nIdx = (idx + i) % players.length;
-        if (data[players[nIdx]].lives > 0) {
+        if (data[players[nIdx]] && data[players[nIdx]].lives > 0) {
             updateTurn(nIdx);
             return;
         }
@@ -224,3 +216,13 @@ setInterval(async () => {
         }
     }
 }, 1000);
+
+// Play Again logic
+window.resetGame = async () => {
+    const pSnap = await get(ref(db, `parties/${partyCode}/players`));
+    if (pSnap.exists()) {
+        gameActive = true;
+        document.getElementById("resetBtn").style.display = "none";
+        forceInit(pSnap.val());
+    }
+};
