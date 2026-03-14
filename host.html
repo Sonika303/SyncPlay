@@ -117,7 +117,6 @@
     let currentUser;
     let currentPlayers = {};
 
-    // Check if we are returning from a game with a code
     const urlParams = new URLSearchParams(window.location.search);
     const existingCode = urlParams.get('code');
 
@@ -126,7 +125,7 @@
             currentUser = user;
             document.getElementById("statusMsg").innerText = "Logged in as Host";
             
-            // If code exists in URL (coming back from game), rejoin lobby automatically
+            // IF RETURNING: Restore party state immediately
             if (existingCode) {
                 rejoinLobby(existingCode);
             }
@@ -141,11 +140,17 @@
         document.getElementById("createBtn").classList.add("hidden");
         document.getElementById("lobbyArea").classList.remove("hidden");
         
-        // Reset game state to lobby so controllers also switch back
+        // Update DB to tell everyone we are back in Lobby
+        const partyRef = ref(db, `parties/${partyCode}`);
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "lobby",
             redirect: false 
         });
+
+        // Setup the host presence again
+        const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
+        onDisconnect(hostPresenceRef).set(false);
+        await set(hostPresenceRef, true);
         
         listenPlayers();
     }
@@ -155,7 +160,7 @@
 
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         
-        // Professional URL Update
+        // URL Magic: Updates browser bar without refreshing
         const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?code=' + partyCode;
         window.history.pushState({path:newurl},'',newurl);
 
@@ -180,6 +185,7 @@
     }
 
     function listenPlayers() {
+        // Listening to the PERSISTENT player list
         onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
             const list = document.getElementById("players");
             const startBtn = document.getElementById("startBtn");
@@ -225,6 +231,8 @@
         
         const partyRef = ref(db, "parties/" + partyCode);
         const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
+        
+        // Prevent onDisconnect from deleting party while we navigate
         await onDisconnect(hostPresenceRef).cancel();
 
         await update(partyRef, { 
@@ -232,9 +240,8 @@
             "gameData/redirect": false 
         });
 
-        setTimeout(() => {
-            window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
-        }, 200);
+        // Relative path fix for GitHub Pages
+        window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
     }
 </script>
 
