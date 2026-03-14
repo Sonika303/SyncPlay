@@ -14,16 +14,15 @@
             --glass: rgba(255, 255, 255, 0.12);
         }
 
-        /* Optimization: GPU acceleration for smoother rendering */
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease;
         }
 
         body {
             font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
             margin: 0;
-            /* Static gradient is much faster than animated ones */
             background: radial-gradient(circle at top left, var(--primary), var(--secondary));
             background-attachment: fixed;
             color: white;
@@ -34,66 +33,85 @@
             overflow: hidden;
         }
 
+        /* The "#" for no reason - purely aesthetic background deco */
+        body::before {
+            content: "#";
+            position: absolute;
+            top: 10%;
+            right: 10%;
+            font-size: 20rem;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            z-index: 0;
+            user-select: none;
+        }
+
         .container {
+            position: relative;
+            z-index: 1;
             background: var(--glass);
             padding: 35px;
-            border-radius: 28px;
-            /* Lower blur = Higher FPS */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+            border-radius: 32px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             width: 90%;
-            max-width: 380px;
+            max-width: 400px;
             text-align: center;
             will-change: transform, opacity;
-            animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes slideUp { 
-            from { opacity: 0; transform: translateY(20px) scale(0.98); } 
+            from { opacity: 0; transform: translateY(40px) scale(0.95); } 
             to { opacity: 1; transform: translateY(0) scale(1); } 
         }
 
         .avatar {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
+            width: 95px;
+            height: 95px;
+            border-radius: 24px; /* Squircle style */
             margin: 0 auto 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 38px;
+            font-size: 40px;
             font-weight: 800;
             color: white;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            border: 4px solid white;
-            transition: background 0.3s ease;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 4px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        h1 { margin: 0 0 5px 0; letter-spacing: -1px; font-size: 2.4rem; font-weight: 800; }
-        p { opacity: 0.8; margin-bottom: 25px; font-size: 0.9rem; }
+        h1 { margin: 0 0 5px 0; letter-spacing: -1.5px; font-size: 2.6rem; font-weight: 800; }
+        p { opacity: 0.7; margin-bottom: 25px; font-size: 0.95rem; line-height: 1.4; }
 
         .input-group { position: relative; margin-bottom: 12px; }
-        .input-group i { position: absolute; left: 15px; top: 14px; color: #555; pointer-events: none; }
+        .input-group i { position: absolute; left: 16px; top: 15px; color: #444; pointer-events: none; z-index: 2; }
 
-        input {
-            padding: 14px 14px 14px 45px;
-            border-radius: 14px;
-            border: none;
+        input[type="text"] {
+            padding: 15px 15px 15px 48px;
+            border-radius: 16px;
+            border: 2px solid transparent;
             width: 100%;
             background: rgba(255,255,255,0.95);
             font-size: 16px;
             font-weight: 600;
             color: #111;
             outline: none;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        input[type="text"]:focus { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+
         button {
-            padding: 15px 20px;
+            padding: 16px 20px;
             border: none;
-            border-radius: 14px;
-            margin: 6px 0;
+            border-radius: 16px;
+            margin: 8px 0;
             cursor: pointer;
             font-weight: 800;
             width: 100%;
@@ -101,45 +119,59 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            transition: 0.2s;
+            gap: 12px;
+            transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        button:active { transform: scale(0.96); opacity: 0.9; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button:active { transform: scale(0.97); }
 
-        .btn-google { background: white; color: var(--secondary); }
+        .btn-google { background: white; color: #111; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .btn-join { background: var(--accent); color: white; }
-        .btn-host { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
+        .btn-host { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); }
         
         .btn-settings { 
-            position: absolute; top: 15px; right: 15px; width: 42px; height: 42px; 
-            background: var(--glass); border-radius: 12px; color: white; padding: 0;
+            position: absolute; top: 20px; right: 20px; width: 44px; height: 44px; 
+            background: var(--glass); border-radius: 14px; color: white; padding: 0;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2);
         }
 
-        /* Settings Modal Optimization */
+        /* Settings Modal */
         #settings {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             display: none; justify-content: center; align-items: center; z-index: 1000;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(12px);
+            animation: fadeIn 0.3s ease;
         }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .settings-content {
-            background: white; color: #111; padding: 30px; border-radius: 24px;
-            width: 90%; max-width: 340px; text-align: center;
+            background: #ffffff; color: #111; padding: 30px; border-radius: 32px;
+            width: 90%; max-width: 360px; text-align: center;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
         }
+
+        /* RGB Picker Styling */
+        .color-controls { margin-top: 15px; text-align: left; }
+        .rgb-group { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; background: #f4f4f4; padding: 10px; border-radius: 12px; }
+        .rgb-group label { font-size: 12px; font-weight: 800; width: 80px; }
+        #colorPickerInput { cursor: pointer; border: none; width: 40px; height: 40px; background: none; }
 
         .color-picker {
             display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0;
         }
 
         .color-opt {
-            width: 100%; aspect-ratio: 1; border-radius: 10px; cursor: pointer;
-            border: 3px solid transparent;
+            width: 100%; aspect-ratio: 1; border-radius: 12px; cursor: pointer;
+            border: 3px solid transparent; transition: 0.2s;
         }
 
-        .color-opt.active { border-color: #111; transform: scale(1.05); }
+        .color-opt.active { border-color: #111; transform: scale(1.1); }
 
-        .preview-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #888; margin-bottom: 8px; display: block;}
+        #colorDisplay { font-size: 14px; font-weight: 800; color: #666; margin-bottom: 10px; display: block; }
+
+        .preview-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #aaa; margin-bottom: 8px; display: block;}
 
         .hidden { display: none; }
     </style>
@@ -147,62 +179,83 @@
 <body>
 
 <div class="container">
-    <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none"><i data-lucide="settings" size="20"></i></button>
+    <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none">
+        <i data-lucide="sliders-horizontal"></i>
+    </button>
     
     <h1>🎬 SyncPlay</h1>
 
     <div id="login">
-        <p>Challenge your friends in Word Bomb!</p>
-        <button class="btn-google" onclick="googleLogin()"><i data-lucide="log-in" size="18"></i> Google Sign In</button>
+        <p>The ultimate word showdown.<br>Connect. Play. Survive.</p>
+        <button class="btn-google" onclick="googleLogin()">
+            <i data-lucide="log-in"></i> Sign in with Google
+        </button>
     </div>
 
     <div id="mainUI" style="display:none">
         <div id="avatarCircle" class="avatar">?</div>
-        <h2 id="welcome" style="margin-top:0; font-size: 1.5rem;">Hey there!</h2>
+        <h2 id="welcome" style="margin-top:0; font-size: 1.6rem; font-weight: 800;">Welcome!</h2>
         
         <div class="input-group">
-            <i data-lucide="hash" size="18"></i>
-            <input id="partyCode" type="text" maxlength="4" placeholder="4-Digit Room Code">
+            <i data-lucide="hash"></i>
+            <input id="partyCode" type="text" maxlength="4" placeholder="Room Code">
         </div>
-        <button class="btn-join" onclick="joinParty()"><i data-lucide="play" size="18"></i> Join Party</button>
-        <button class="btn-host" onclick="createParty()"><i data-lucide="plus" size="18"></i> Host Game</button>
+        <button class="btn-join" onclick="joinParty()">
+            <i data-lucide="zap"></i> Join Party
+        </button>
+        <button class="btn-host" onclick="createParty()">
+            <i data-lucide="plus-circle"></i> Host Game
+        </button>
     </div>
 
     <div id="partyScreen" class="hidden">
         <h2 id="partyTitle">Lobby</h2>
-        <p>Waiting for host...</p>
         <div style="margin: 20px auto;" class="avatar" id="lobbyAvatar">?</div>
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span style="width: 8px; height: 8px; background: var(--accent); border-radius: 50%;"></span>
-            <p id="lobbyStatus" style="margin: 0; font-size: 14px; font-weight: 600;">Ready to Play</p>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span style="width: 10px; height: 10px; background: var(--accent); border-radius: 50%; animation: pulse 1.5s infinite;"></span>
+            <p id="lobbyStatus" style="margin: 0; font-size: 15px; font-weight: 700;">Waiting for host...</p>
         </div>
     </div>
 </div>
 
 <div id="settings">
     <div class="settings-content">
-        <h3 style="margin-top:0">Profile Settings</h3>
+        <h3 style="margin-top:0; font-weight: 800;">Edit Profile</h3>
+        
         <span class="preview-label">Live Preview</span>
-        <div id="previewAvatar" class="avatar" style="color: white; margin-bottom: 20px;">?</div>
+        <div id="previewAvatar" class="avatar" style="color: white; margin-bottom: 5px;">?</div>
+        <span id="colorDisplay">#FF5E62</span>
 
         <div class="input-group">
-            <i data-lucide="user" size="18"></i>
+            <i data-lucide="user"></i>
             <input id="usernameInput" type="text" placeholder="Username" oninput="updatePreview()">
         </div>
 
-        <span class="preview-label" style="margin-top:15px">Avatar Color</span>
+        <div class="color-controls">
+            <span class="preview-label">Custom RGB Picker</span>
+            <div class="rgb-group">
+                <label>CHOOSE:</label>
+                <input type="color" id="colorPickerInput" oninput="handleRgbChange(this.value)">
+                <span style="font-size: 12px; font-weight: 700; opacity: 0.6;">Click box to pick</span>
+            </div>
+        </div>
+
+        <span class="preview-label">Quick Presets</span>
         <div class="color-picker" id="colorPicker"></div>
 
         <button class="btn-join" onclick="saveSettings()">Save Changes</button>
-        <button style="background:#eee; color:#111" onclick="toggleSettings()">Cancel</button>
-        <hr style="margin: 15px 0; opacity: 0.1;">
-        <button style="background:var(--danger); color:white" onclick="logout()"><i data-lucide="log-out" size="18"></i> Logout</button>
+        <button style="background:#f0f0f0; color:#444" onclick="toggleSettings()">Cancel</button>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+        <button style="background:var(--danger); color:white" onclick="logout()">
+            <i data-lucide="log-out"></i> Logout
+        </button>
     </div>
 </div>
 
 <script type="module">
+    // To resolve VS Code warnings, we define globals on the window object
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update, onDisconnect, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, update, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -222,31 +275,44 @@
 
     let currentUser;
     let selectedColor = "#ff5e62"; 
-    const profileColors = ["#ff5e62", "#ff9966", "#f1c40f", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6", "#34495e", "#e67e22", "#eb4d4b"];
+    const profileColors = ["#ff5e62", "#ff9966", "#f1c40f", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6", "#e67e22", "#eb4d4b", "#2c3e50"];
 
+    // Init Icons
     lucide.createIcons();
 
+    // Init Color Presets
     const cp = document.getElementById("colorPicker");
     profileColors.forEach(color => {
         let div = document.createElement("div");
         div.className = "color-opt";
         div.style.background = color;
-        div.onclick = () => selectColor(color, div);
+        div.onclick = () => selectPresetColor(color, div);
         cp.appendChild(div);
     });
 
-    function selectColor(color, element) {
+    function selectPresetColor(color, element) {
         selectedColor = color;
+        document.getElementById("colorPickerInput").value = color;
         document.querySelectorAll(".color-opt").forEach(el => el.classList.remove("active"));
         if(element) element.classList.add("active");
         updatePreview();
     }
 
+    window.handleRgbChange = (hex) => {
+        selectedColor = hex;
+        document.querySelectorAll(".color-opt").forEach(el => el.classList.remove("active"));
+        updatePreview();
+    };
+
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "?";
         const preview = document.getElementById("previewAvatar");
+        const display = document.getElementById("colorDisplay");
+        
         preview.innerText = name.charAt(0).toUpperCase();
         preview.style.background = selectedColor;
+        preview.style.boxShadow = `0 10px 20px ${selectedColor}44`;
+        display.innerText = selectedColor.toUpperCase();
     };
 
     window.googleLogin = () => signInWithPopup(auth, provider);
@@ -270,12 +336,9 @@
             }
 
             selectedColor = color;
+            document.getElementById("colorPickerInput").value = color;
             await update(userRef, { username, email: user.email, profileColor: color, lastLogin: serverTimestamp() });
             updateUI(username, color);
-            
-            document.querySelectorAll('.color-opt').forEach(opt => {
-                if(opt.style.backgroundColor === color) opt.classList.add('active');
-            });
         }
     });
 
@@ -286,14 +349,14 @@
             const el = document.getElementById(id);
             if(el) { el.innerText = initials; el.style.background = color; }
         });
-        document.getElementById("welcome").innerText = "Hey, " + name;
+        document.getElementById("welcome").innerText = "Hey, " + name + "!";
         document.getElementById("usernameInput").value = name;
+        updatePreview();
     }
 
     window.joinParty = async () => {
         const code = document.getElementById("partyCode").value.trim();
         if (!code) return;
-
         const partyRef = ref(db, "parties/" + code);
         const snap = await get(partyRef);
 
@@ -304,19 +367,11 @@
                 color: selectedColor, 
                 joinedAt: serverTimestamp() 
             });
-
             onDisconnect(playerRef).remove();
-
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("setBtn").style.display = "none";
             document.getElementById("partyScreen").classList.remove("hidden");
             document.getElementById("partyTitle").innerText = "Room: " + code;
-
-            onValue(ref(db, `parties/${code}/gameData`), (gSnap) => {
-                if (gSnap.exists() && gSnap.val().status === "playing") {
-                    window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
-                }
-            });
         } else { alert("Room not found!"); }
     };
 
@@ -330,8 +385,9 @@
 
     window.toggleSettings = () => {
         const s = document.getElementById("settings");
-        s.style.display = (s.style.display === "flex") ? "none" : "flex";
-        updatePreview();
+        const isVisible = s.style.display === "flex";
+        s.style.display = isVisible ? "none" : "flex";
+        if (!isVisible) updatePreview();
     };
 
     window.logout = () => signOut(auth).then(() => location.reload());
