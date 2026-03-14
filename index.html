@@ -150,7 +150,7 @@
         <h2 id="partyTitle">Lobby</h2>
         <p>Waiting for the host to ignite the bomb...</p>
         <div style="margin: 20px auto;" class="avatar" id="lobbyAvatar">?</div>
-        <p id="lobbyStatus" style="font-size: 12px; opacity: 0.7;">Connected to Server</p>
+        <p id="lobbyStatus" style="font-size: 12px; opacity: 0.7;">Connected to Lobby</p>
     </div>
 </div>
 
@@ -196,8 +196,6 @@
     let selectedColor = "#ff5e62"; 
     const profileColors = ["#ff5e62", "#2ecc71", "#3498db", "#f1c40f", "#9b59b6", "#e67e22"];
 
-    console.log("🛠️ App Loaded. Firebase initialized.");
-
     const cp = document.getElementById("colorPicker");
     profileColors.forEach(color => {
         let div = document.createElement("div");
@@ -213,14 +211,10 @@
         element.classList.add("active");
     }
 
-    window.googleLogin = () => {
-        console.log("🔑 Initiating Google Login...");
-        signInWithPopup(auth, provider).catch(e => console.error("Login Error:", e));
-    };
+    window.googleLogin = () => signInWithPopup(auth, provider);
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            console.log("✅ User Authenticated:", user.uid);
             currentUser = user;
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
@@ -236,11 +230,9 @@
                 const data = snap.val();
                 username = data.username || username;
                 color = data.profileColor || color;
-                console.log("📂 Existing user data found.");
             }
 
             selectedColor = color;
-
             await update(userRef, {
                 username: username,
                 email: user.email,
@@ -265,53 +257,51 @@
 
     window.joinParty = async () => {
         const code = document.getElementById("partyCode").value.trim();
-        if (!code) {
-            alert("Please enter a 4-digit code.");
-            return;
-        }
+        if (!code) return;
 
-        console.log(`🔍 Checking for Party: ${code}...`);
         const partyRef = ref(db, "parties/" + code);
         const snap = await get(partyRef);
 
         if (snap.exists()) {
-            console.log("✅ Party Found. Joining...");
             const userSnap = await get(ref(db, "users/" + currentUser.uid));
             const userData = userSnap.val();
-
-            const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
+            const playerPath = `parties/${code}/players/${currentUser.uid}`;
+            const playerRef = ref(db, playerPath);
             
-            // JOIN DATA
+            // 1. Add player to DB
             await set(playerRef, {
                 name: userData.username,
                 color: userData.profileColor,
                 joinedAt: serverTimestamp()
             });
 
-            // Disconnect cleanup
-            onDisconnect(playerRef).remove();
+            // 2. Initial Disconnect setup (for if they close the tab now)
+            let disconnectRef = onDisconnect(playerRef);
+            await disconnectRef.remove();
 
-            // SWITCH UI
+            // 3. UI Switch
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("setBtn").style.display = "none";
             document.getElementById("partyScreen").style.display = "block";
             document.getElementById("partyTitle").innerText = "Party: " + code;
 
-            // WATCH FOR START
-            console.log("👂 Watching for GameState status change...");
-            onValue(ref(db, `parties/${code}/gameState`), (gSnap) => {
-                if (gSnap.exists()) {
-                    const status = gSnap.val().status;
-                    console.log("📡 Current Game Status:", status);
-                    if (status === "playing") {
-                        console.log("🚀 LETS GO! Redirecting to Controller.");
+            // 4. Listen for Game Start
+            onValue(ref(db, `parties/${code}/gameState`), async (gSnap) => {
+                if (gSnap.exists() && gSnap.val().status === "playing") {
+                    console.log("🚀 Redirecting... cancelling auto-remove.");
+                    
+                    // --- CRITICAL FIX ---
+                    // Cancel the disconnect trigger so the data survives the page hop
+                    await disconnectRef.cancel(); 
+                    
+                    // Small delay to ensure Firebase processes the cancel before redirect
+                    setTimeout(() => {
                         window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
-                    }
+                    }, 300);
                 }
             });
         } else {
-            console.error("❌ Party Not Found in DB.");
-            alert("Invalid Party Code. Check if the host has created it!");
+            alert("Party not found!");
         }
     };
 
@@ -324,7 +314,6 @@
         });
         updateUI(name, selectedColor);
         toggleSettings();
-        console.log("💾 Settings Saved.");
     };
 
     window.toggleSettings = () => {
@@ -333,10 +322,7 @@
     };
 
     window.logout = () => signOut(auth).then(() => location.reload());
-    window.createParty = () => {
-        console.log("➡️ Moving to Host Page...");
-        window.location.href = "host.html";
-    };
+    window.createParty = () => window.location.href = "host.html";
 
 </script>
 </body>

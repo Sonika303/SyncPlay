@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Host Party</title>
+    <title>SyncPlay | Host Lobby</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,14 +13,16 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
+            overflow: hidden;
         }
 
         .container {
             background: rgba(0, 0, 0, 0.2);
             padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-radius: 24px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             width: 400px;
         }
 
@@ -30,6 +32,7 @@
             font-weight: bold;
             letter-spacing: 5px;
             text-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+            color: white;
         }
 
         .playerBox {
@@ -53,22 +56,23 @@
             align-items: center;
             padding: 12px;
             border-bottom: 1px solid #eee;
+            font-weight: 600;
         }
 
         button {
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.2s ease;
         }
 
-        .kick-btn { background: #ff4757; color: white; padding: 5px 10px; font-size: 12px; }
+        .kick-btn { background: #ff4757; color: white; padding: 6px 12px; font-size: 12px; border-radius: 8px; }
         .create-btn { background: white; color: #ff5e62; font-size: 18px; margin-bottom: 10px; width: 100%; }
-        #startBtn { background: #2ecc71; color: white; font-size: 18px; width: 100%; margin-top: 10px; }
+        #startBtn { background: #2ecc71; color: white; font-size: 20px; width: 100%; margin-top: 10px; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); }
         
-        .status-msg { font-size: 14px; margin-top: 10px; opacity: 0.8; }
+        .status-msg { font-size: 14px; margin-top: 15px; opacity: 0.8; }
         .hidden { display: none; }
     </style>
 </head>
@@ -87,12 +91,12 @@
             <button id="startBtn" onclick="startGame()" style="display:none;">🚀 START GAME</button>
         </div>
     </div>
-    <div class="status-msg" id="statusMsg">Connecting...</div>
+    <div class="status-msg" id="statusMsg">Connecting to Server...</div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -111,30 +115,30 @@
 
     let partyCode;
     let currentUser;
-    let isTransitioning = false;
+    let currentPlayers = {};
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
-            document.getElementById("statusMsg").innerText = "Ready to create party!";
+            document.getElementById("statusMsg").innerText = "Logged in as Host";
         } else {
-            document.getElementById("statusMsg").innerText = "Please sign in first.";
+            document.getElementById("statusMsg").innerText = "Authentication required.";
         }
     });
 
     window.createParty = async function() {
-        if (!currentUser) return alert("Please wait for login...");
+        if (!currentUser) return alert("Please sign in first.");
 
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         document.getElementById("code").innerText = partyCode;
         document.getElementById("createBtn").classList.add("hidden");
         document.getElementById("lobbyArea").classList.remove("hidden");
-        document.getElementById("statusMsg").innerText = "Invite players!";
+        document.getElementById("statusMsg").innerText = "Share the code with your friends!";
 
         const partyRef = ref(db, "parties/" + partyCode);
         const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
 
-        // Smart Disconnect: Only mark host inactive, don't delete everything yet
+        // If host closes tab, mark inactive. Don't delete party yet so players can stay.
         onDisconnect(hostPresenceRef).set(false);
 
         await set(partyRef, {
@@ -144,7 +148,6 @@
             gameState: { status: "lobby" }
         });
 
-        console.log("Party Created:", partyCode);
         listenPlayers();
     }
 
@@ -156,12 +159,13 @@
             
             list.innerHTML = "";
             let count = 0;
+            currentPlayers = {};
 
             if (snapshot.exists()) {
-                const playersObj = snapshot.val();
-                Object.keys(playersObj).forEach(uid => {
+                currentPlayers = snapshot.val();
+                Object.keys(currentPlayers).forEach(uid => {
                     count++;
-                    const data = playersObj[uid];
+                    const data = currentPlayers[uid];
                     const li = document.createElement("li");
                     li.innerHTML = `
                         <span>${data.name}</span>
@@ -171,15 +175,13 @@
                 });
             }
 
-            console.log("Player Count:", count);
-
-            if (count >= 1) { // Testing with 1, change to 2 for real games
+            if (count >= 1) { // Set to 2 for production
                 startBtn.style.display = "block";
                 msg.style.display = "none";
             } else {
                 startBtn.style.display = "none";
                 msg.style.display = "block";
-                msg.innerText = `Waiting for players (${count}/2)...`;
+                msg.innerText = `Waiting for players...`;
             }
         });
     }
@@ -193,26 +195,43 @@
     window.startGame = async function() {
         if (!partyCode) return;
         
-        console.log("🚀 Starting Game...");
-        isTransitioning = true; // Block the disconnect logic
+        // 1. Prepare Player Data (Lives/Scores) for the game
+        const playersData = {};
+        Object.keys(currentPlayers).forEach(uid => {
+            playersData[uid] = {
+                name: currentPlayers[uid].name,
+                lives: 3,
+                score: 0,
+                color: currentPlayers[uid].color || "#667eea"
+            };
+        });
 
+        // 2. Initialize Game State
         const partyRef = ref(db, "parties/" + partyCode);
         
-        // Cancel the onDisconnect before moving pages
-        await onDisconnect(partyRef).cancel(); 
+        // --- TRANSITION PROTECTION ---
+        // Cancel any onDisconnect that might fire during page reload
+        const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
+        await onDisconnect(hostPresenceRef).cancel();
 
-        // Update state
         await update(partyRef, { 
             "gameState/status": "playing",
-            "gameData": { syllable: "WAITING", timer: 15 } 
+            "playersData": playersData, // This is what the controllers read
+            "gameData": { 
+                syllable: "", 
+                turn: Object.keys(currentPlayers)[0], // First player goes first
+                timer: 15,
+                round: 1
+            }
         });
+
+        console.log("🚀 Game State initialized. Redirecting...");
         
-        // Use a slight delay to ensure DB write finishes before redirect
+        // 3. Move to Game Board
         setTimeout(() => {
             window.location.href = `Games/Word%20Bomb/game.html?code=${partyCode}`;
-        }, 500);
+        }, 400);
     }
-
 </script>
 
 </body>

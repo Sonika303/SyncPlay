@@ -24,6 +24,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            overflow: hidden;
         }
 
         .controller-card { 
@@ -98,16 +99,19 @@
 
         button:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
 
-        /* Mobile specific: stop zoom on input */
-        input:focus { font-size: 24px; }
+        /* Prevent zoom on mobile */
+        @media screen and (max-width: 768px) {
+            input { font-size: 16px; }
+            input:focus { font-size: 16px; }
+        }
     </style>
 </head>
 <body>
 
     <div class="controller-card" id="card">
-        <h2 id="playerName">---</h2>
+        <h2 id="playerName">CONNECTING...</h2>
         <div id="heart-container"></div>
-        <p id="status">Connecting...</p>
+        <p id="status">Syncing with Game...</p>
         
         <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
         <button id="sendBtn" onclick="submitWord()" disabled>SUBMIT WORD</button>
@@ -115,7 +119,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, get, onValue, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { 
@@ -135,10 +139,29 @@
 
         let myTurn = false;
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 const myUid = user.uid;
+                console.log("🎮 Controller active for:", myUid);
+
+                // --- SESSION RECOVERY LOGIC ---
+                // Re-verify presence in the player list and setup disconnect removal
+                const playerRef = ref(db, `parties/${code}/players/${myUid}`);
+                const userRef = ref(db, `users/${myUid}`);
+                const userSnap = await get(userRef);
                 
+                if (userSnap.exists()) {
+                    const userData = userSnap.val();
+                    // Put us back in the party player list if we were cleared during redirect
+                    await update(playerRef, {
+                        name: userData.username,
+                        color: userData.profileColor,
+                        status: "active"
+                    });
+                    // Re-enable "remove if I leave now"
+                    onDisconnect(playerRef).remove();
+                }
+
                 // Watch My Stats (Lives/Name)
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
@@ -148,6 +171,8 @@
                     if(data.lives <= 0) {
                         document.getElementById("status").innerText = "ELIMINATED";
                         document.getElementById("card").style.opacity = "0.5";
+                        document.getElementById("wordInput").disabled = true;
+                        document.getElementById("sendBtn").disabled = true;
                     }
                 });
 
@@ -155,7 +180,9 @@
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
-                    myTurn = gameData.turn === myUid && gameData.syllable !== "Choosing...";
+                    
+                    // Logic: It's my turn if turn matches UID AND game isn't in "between rounds" state
+                    myTurn = (gameData.turn === myUid && gameData.syllable !== "Choosing..." && gameData.syllable !== "");
                     
                     const input = document.getElementById("wordInput");
                     const btn = document.getElementById("sendBtn");
@@ -170,30 +197,36 @@
                         status.classList.add("active-status");
                         card.classList.add("my-turn");
                         input.focus();
-                        if (navigator.vibrate) navigator.vibrate(200); // Haptic feedback
+                        if (navigator.vibrate) navigator.vibrate(200); 
                     } else {
                         status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
                         status.classList.remove("active-status");
                         card.classList.remove("my-turn");
                     }
                 });
+            } else {
+                // If not logged in, go back to index
+                window.location.href = "../../index.html";
             }
         });
 
-        // Submit via Button or Enter Key
         window.submitWord = () => {
             const input = document.getElementById("wordInput");
-            const word = input.value.trim();
+            const word = input.value.trim().toUpperCase();
             if(!word || !myTurn) return;
 
+            // Send action to Firebase
             set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
                 time: Date.now() 
             });
+            
             input.value = "";
+            console.log("📤 Word submitted:", word);
         };
 
+        // Listen for enter key
         document.getElementById("wordInput").addEventListener("keypress", (e) => {
             if (e.key === "Enter") submitWord();
         });
