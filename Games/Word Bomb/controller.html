@@ -155,24 +155,29 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 const myUid = user.uid;
-
                 const playerRef = ref(db, `parties/${code}/players/${myUid}`);
-                // Only remove from matchmaking, game logic uses playersData
-                onDisconnect(playerRef).remove();
+                const disconnectRef = onDisconnect(playerRef);
+                
+                // Set default disconnect behavior
+                disconnectRef.remove();
 
-                // Listen for used words to prevent repeats client-side
+                // PROTECTIVE LOGIC: If game is active, don't remove player on disconnect
+                onValue(ref(db, `parties/${code}/gameData/status`), (snap) => {
+                    if (snap.val() === "playing") {
+                        disconnectRef.cancel(); // Prevent deletion during game transitions
+                    }
+                });
+
                 onValue(ref(db, `parties/${code}/usedWords`), (snap) => {
                     usedWords = snap.val() || [];
                 });
 
-                // Redirect listener
                 onValue(ref(db, `parties/${code}/gameData/redirect`), (snap) => {
                     if (snap.exists() && snap.val() === true) {
                         window.location.href = `../../index.html?code=${code}`;
                     }
                 });
 
-                // Player data listener (Lives and Names)
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
@@ -187,7 +192,6 @@
                     }
                 });
 
-                // Game State listener
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
@@ -212,7 +216,6 @@
                         status.innerText = "YOUR TURN!";
                         status.classList.add("active-status");
                         card.classList.add("my-turn");
-                        // Delay focus slightly for mobile compatibility
                         setTimeout(() => input.focus(), 50);
                     } else {
                         status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
@@ -231,19 +234,16 @@
 
             if(!word || !myTurn) return;
 
-            // 1. Syllable Check
             if(!word.includes(currentSyllable)) {
                 feedback.innerText = `MUST INCLUDE "${currentSyllable}"`;
                 return;
             }
 
-            // 2. Used Word Check
             if(usedWords.includes(word.toLowerCase())) {
                 feedback.innerText = "WORD ALREADY USED!";
                 return;
             }
 
-            // Send to Host for Dictionary check
             set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,

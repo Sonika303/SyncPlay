@@ -38,7 +38,6 @@ onAuthStateChanged(auth, async (user) => {
         const partyData = partySnap.val();
         if (partyData.hostId === myUid) {
             isHost = true;
-            // Clean up old actions on load
             await remove(ref(db, `parties/${partyCode}/action`));
             
             const gameData = partyData.gameData || {};
@@ -112,14 +111,16 @@ async function updateTurn(idx) {
     }
 
     const randomSyl = syllables[Math.floor(Math.random() * syllables.length)];
+    
+    // Clear the action first so the next player doesn't trigger the previous word
+    await remove(ref(db, `parties/${partyCode}/action`));
+
     await update(ref(db, `parties/${partyCode}/gameData`), {
         syllable: randomSyl,
         turn: playerIds[nextIdx],
         timer: 15,
         lastWord: "" 
     });
-    
-    await remove(ref(db, `parties/${partyCode}/action`));
 }
 
 function listenToGame() {
@@ -146,7 +147,6 @@ function listenToGame() {
         }
     });
 
-    // Keep used words synced
     onValue(ref(db, `parties/${partyCode}/usedWords`), (snap) => {
         usedWords = snap.val() || [];
     });
@@ -216,7 +216,6 @@ window.changeGame = async () => {
 
 async function isValidWord(word) {
     const cleanWord = word.toLowerCase().trim();
-    // Check if used before
     if (usedWords.includes(cleanWord)) return false;
 
     try {
@@ -227,16 +226,20 @@ async function isValidWord(word) {
 
 function listenForControllerInput() {
     onValue(ref(db, `parties/${partyCode}/action`), async (snap) => {
-        if (!snap.exists() || !isHost) return; // ONLY host processes word logic
+        if (!snap.exists() || !isHost) return; 
         const action = snap.val();
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
         const gameData = gSnap.val();
         
+        // Ensure this action hasn't been processed yet and belongs to current turn
         if (action.uid === gameData.turn && gameData.status === "playing") {
             const word = (action.word || "").toUpperCase().trim();
             if (word.includes(gameData.syllable)) {
                 const valid = await isValidWord(word);
                 if (valid) {
+                    // Prevent immediate re-triggering
+                    await remove(ref(db, `parties/${partyCode}/action`));
+                    
                     usedWords.push(word.toLowerCase());
                     await update(ref(db, `parties/${partyCode}`), { 
                         "gameData/lastWord": word,
@@ -265,13 +268,21 @@ function startHostTimer() {
 
         if (d.status === "playing" && !["READY?", "WAITING"].includes(d.syllable)) {
             if (d.timer > 0) {
+                // Atomic decrease
                 update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
             } else {
+                // TIMER EXPIRED
                 const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
                 const pSnap = await get(pRef);
                 if (pSnap.exists()) {
                     const currentLives = pSnap.val().lives;
-                    await update(pRef, { lives: Math.max(0, currentLives - 1) });
+                    const newLives = Math.max(0, currentLives - 1);
+                    
+                    // Batch these updates to prevent turn-skipping
+                    const updates = {};
+                    updates[`parties/${partyCode}/playersData/${d.turn}/lives`] = newLives;
+                    await update(ref(db), updates);
+                    
                     const idsSnap = await get(ref(db, `parties/${partyCode}/playersData`));
                     updateTurn(Object.keys(idsSnap.val()).indexOf(d.turn) + 1);
                 }

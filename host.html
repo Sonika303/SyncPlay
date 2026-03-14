@@ -193,7 +193,6 @@
         const snapshot = await get(ref(db, `parties/${partyCode}`));
         if(snapshot.exists()) {
             setupUI();
-            // Reset redirect and status so players don't get kicked instantly
             await update(ref(db, `parties/${partyCode}/gameData`), { 
                 status: "lobby", 
                 redirect: false 
@@ -215,7 +214,6 @@
 
         setupUI();
         
-        // Using set() for creation is fine as it's a new node
         const initialData = {
             created: serverTimestamp(),
             hostId: currentUser.uid,
@@ -305,18 +303,27 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> INITIALIZING...`;
         lucide.createIcons();
 
-        // 1. Clear old data from PREVIOUS rounds (leaves the joined players list alone)
+        // 1. FINAL PROTECTION: Check if players actually exist before starting
+        const pSnap = await get(ref(db, `parties/${partyCode}/players`));
+        if (!pSnap.exists()) {
+            alert("Error: No players found in database. Wait for them to join.");
+            startBtn.disabled = false;
+            startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
+            return;
+        }
+
+        // 2. Clear old data using remove() on specific paths only
         await remove(ref(db, `parties/${partyCode}/playersData`));
         await remove(ref(db, `parties/${partyCode}/action`));
         await remove(ref(db, `parties/${partyCode}/usedWords`));
 
-        // 2. Set status to playing
+        // 3. Set status to playing using update() so we don't overwrite the 'players' folder
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             redirect: false 
         });
 
-        // 3. Small delay to let Firebase sync, then redirect host
+        // 4. Smooth transition to the Game screen
         setTimeout(() => {
             window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
         }, 800);
