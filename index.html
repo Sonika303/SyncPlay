@@ -17,7 +17,7 @@
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
-            transition: background-color 0.4s ease, transform 0.2s ease;
+            transition: all 0.4s ease;
         }
 
         body {
@@ -54,12 +54,12 @@
 
         #bg-color-name {
             display: block;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 4px;
-            color: rgba(255, 255, 255, 0.1);
-            margin-top: -20px;
+            letter-spacing: 5px;
+            color: rgba(255, 255, 255, 0.15);
+            margin-top: -30px;
         }
 
         @keyframes float {
@@ -80,7 +80,6 @@
             width: 90%;
             max-width: 400px;
             text-align: center;
-            will-change: transform, opacity;
             animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -187,7 +186,7 @@
 
 <div class="bg-deco">
     <span class="bg-hash">#</span>
-    <span id="bg-color-name">HEX_NULL</span>
+    <span id="bg-color-name">DEFAULT</span>
 </div>
 
 <div class="container">
@@ -224,6 +223,9 @@
         <h2 id="partyTitle">Room Lobby</h2>
         <div style="margin: 20px auto;" class="avatar" id="lobbyAvatar">?</div>
         <p id="lobbyStatus" style="font-weight: 700; color: var(--accent);">WAITING FOR HOST...</p>
+        <button class="btn-host" onclick="shareRoom()">
+            <i data-lucide="share-2"></i> Invite Friends
+        </button>
     </div>
 </div>
 
@@ -232,7 +234,8 @@
         <h3 style="margin-top:0">Profile Customization</h3>
         
         <div id="previewAvatar" class="avatar" style="margin-bottom: 5px;">?</div>
-        <span id="colorHexLabel" style="font-weight: 800; color: #888; font-size: 13px;">#FFFFFF</span>
+        <span id="colorNameLabel" style="display:block; font-weight: 900; color: #111; font-size: 14px;">COLOR NAME</span>
+        <span id="colorHexLabel" style="font-weight: 800; color: #888; font-size: 11px;">#FFFFFF</span>
 
         <div class="input-group" style="margin-top: 15px;">
             <i data-lucide="user"></i>
@@ -276,6 +279,19 @@
     let selectedColor = "#ff5e62"; 
     const profileColors = ["#ff5e62", "#ff9966", "#f1c40f", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6", "#e67e22", "#eb4d4b", "#2c3e50"];
 
+    // COLOR NAMING DATA
+    const colorNames = {
+        "#ff5e62": "Sunset", "#ff9966": "Peach", "#f1c40f": "Sunshine",
+        "#2ecc71": "Emerald", "#1abc9c": "Turquoise", "#3498db": "Ocean",
+        "#9b59b6": "Amethyst", "#e67e22": "Carrot", "#eb4d4b": "Crimson",
+        "#2c3e50": "Midnight", "#ff0000": "Pure Red", "#000000": "Pure Black",
+        "#ffffff": "Pure White"
+    };
+
+    function getNameFromHex(hex) {
+        return colorNames[hex.toLowerCase()] || "Custom Hue";
+    }
+
     lucide.createIcons();
 
     const cp = document.getElementById("colorPicker");
@@ -302,14 +318,19 @@
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "?";
         const char = name.charAt(0).toUpperCase();
+        const readableName = getNameFromHex(selectedColor);
         
         document.getElementById("previewAvatar").innerText = char;
         document.getElementById("previewAvatar").style.background = selectedColor;
         document.getElementById("colorHexLabel").innerText = selectedColor.toUpperCase();
+        document.getElementById("colorNameLabel").innerText = readableName;
         
-        // Update the background deco text
-        document.getElementById("bg-color-name").innerText = selectedColor;
-        document.getElementById("bg-color-name").style.color = selectedColor + "22"; // 22 is low opacity
+        // Update the background deco text to the COLOR NAME
+        document.getElementById("bg-color-name").innerText = readableName;
+        document.getElementById("bg-color-name").style.color = selectedColor + "33"; 
+        
+        // Bonus: Change body background based on theme
+        document.body.style.background = `radial-gradient(circle at top left, ${selectedColor}, #1a1a2e)`;
     };
 
     window.googleLogin = () => signInWithPopup(auth, provider);
@@ -364,6 +385,19 @@
             document.getElementById("setBtn").style.display = "none";
             document.getElementById("partyScreen").classList.remove("hidden");
         } else { alert("Room not found!"); }
+    };
+
+    window.shareRoom = () => {
+        const code = document.getElementById("partyCode").value || "ABCD";
+        if (navigator.share) {
+            navigator.share({
+                title: 'Join my SyncPlay Room!',
+                text: `Join my game room: ${code}`,
+                url: window.location.href
+            });
+        } else {
+            alert(`Room Code: ${code} - Invite your friends!`);
+        }
     };
 
     window.saveSettings = async () => {
