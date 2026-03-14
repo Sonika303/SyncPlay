@@ -47,6 +47,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     listenToGame();
     listenForControllerInput();
+    listenForRedirect(); // New: Watch for the host changing the game
 });
 
 async function forceInit(playersObj) {
@@ -67,7 +68,8 @@ async function forceInit(playersObj) {
         timer: 10,
         turn: players[0],
         status: "playing",
-        lastWord: ""
+        lastWord: "",
+        redirect: false // Reset redirect flag
     });
     
     document.getElementById("victory-overlay").style.display = "none";
@@ -106,6 +108,15 @@ function listenToGame() {
         document.getElementById("syllable").innerText = data.syllable;
         document.getElementById("timer").innerText = data.timer;
         document.getElementById("word-display").innerText = data.lastWord || "";
+
+        // UI Feedback for low time
+        if (data.timer <= 3 && data.status === "playing") {
+            document.getElementById("timer").style.color = "#ff0000";
+            document.getElementById("timer").style.transform = "scale(1.2)";
+        } else {
+            document.getElementById("timer").style.color = "";
+            document.getElementById("timer").style.transform = "";
+        }
 
         if (data.status === "finished") {
             showVictoryScreen();
@@ -153,7 +164,6 @@ function showVictoryScreen() {
     const slot = document.getElementById("winner-card-slot");
     const controls = document.getElementById("host-controls");
 
-    // Find the one person with lives > 0
     const cards = document.querySelectorAll('.player-card:not(.dead)');
     if (cards.length > 0) {
         slot.innerHTML = "";
@@ -174,18 +184,26 @@ async function checkWinner(playersData) {
     }
 }
 
-// HOST GLOBAL ACTIONS
+// REDIRECT LOGIC
+function listenForRedirect() {
+    onValue(ref(db, `parties/${partyCode}/gameData/redirect`), (snap) => {
+        if (snap.val() === true) {
+            window.location.href = `host.html?code=${partyCode}`;
+        }
+    });
+}
+
 window.resetGame = async () => {
     const pSnap = await get(ref(db, `parties/${partyCode}/players`));
     if (pSnap.exists()) forceInit(pSnap.val());
 };
 
-window.changeGame = () => {
-    // Redirect host back to party area
-    window.location.href = `host.html?code=${partyCode}`;
+window.changeGame = async () => {
+    // Signal to all players to go back to lobby
+    await update(ref(db, `parties/${partyCode}/gameData`), { redirect: true });
 };
 
-// Word validation + Input logic
+// Input Handling
 async function isValidWord(word) {
     try {
         const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
@@ -216,7 +234,7 @@ function listenForControllerInput() {
     });
 }
 
-// Master Timer
+// Master Host Timer
 setInterval(async () => {
     if (isHost && gameActive) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
