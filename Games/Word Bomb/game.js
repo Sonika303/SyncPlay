@@ -43,7 +43,6 @@ onAuthStateChanged(auth, async (user) => {
                 if (pSnap.exists()) {
                     const playersObj = pSnap.val();
                     players = Object.keys(playersObj);
-                    
                     if (players.length > 0) {
                         clearInterval(huntForPlayers);
                         const gDataSnap = await get(ref(db, `parties/${partyCode}/gameData`));
@@ -55,7 +54,6 @@ onAuthStateChanged(auth, async (user) => {
             }, 1000);
         }
     }
-
     listenToGame();
     listenForControllerInput();
 });
@@ -77,9 +75,8 @@ async function forceInit(playersObj) {
         timer: 15,
         turn: players[0],
         status: "playing",
-        lastWord: "" // Tracks the word for the display
+        lastWord: ""
     });
-    
     setTimeout(() => updateTurn(0), 3000);
 }
 
@@ -94,7 +91,6 @@ async function updateTurn(idx) {
         return updateTurn(idx + 1);
     }
 
-    // Reset word display and show "Choosing..."
     await update(ref(db, `parties/${partyCode}/gameData`), {
         syllable: "Choosing...",
         turn: nextUid,
@@ -120,10 +116,7 @@ function listenToGame() {
         
         document.getElementById("syllable").innerText = data.syllable;
         document.getElementById("timer").innerText = data.timer;
-        
-        // Show the word currently being typed or submitted
-        const wordBox = document.getElementById("word-display");
-        if (wordBox) wordBox.innerText = data.lastWord || "";
+        document.getElementById("word-display").innerText = data.lastWord || "";
 
         get(ref(db, `parties/${partyCode}/playersData/${data.turn}`)).then(s => {
             if(s.exists()){
@@ -140,14 +133,6 @@ function listenToGame() {
             document.getElementById("timer").innerText = "🏆";
             if (isHost) document.getElementById("resetBtn").style.display = "block";
         }
-
-        // Apply visual scaling to the active player card
-        document.querySelectorAll('.player-card').forEach(card => {
-            card.classList.remove('active-turn');
-            if (card.dataset.uid === data.turn) {
-                card.classList.add('active-turn');
-            }
-        });
     });
 
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
@@ -160,7 +145,7 @@ function listenToGame() {
             const p = data[uid];
             const card = document.createElement("div");
             card.className = `player-card ${p.lives <= 0 ? 'dead' : ''}`;
-            card.dataset.uid = uid; // Store UID for the active-turn logic
+            card.dataset.uid = uid;
             card.innerHTML = `
                 <div class="mini-avatar" style="background:${p.color}">${p.name.charAt(0).toUpperCase()}</div>
                 <div class="player-info">
@@ -172,6 +157,16 @@ function listenToGame() {
         });
         if (isHost) checkWinner(data);
     });
+}
+
+// --- NEW: Dictionary Validation ---
+async function isValidWord(word) {
+    try {
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        return response.ok; // If status is 200, word exists.
+    } catch (e) {
+        return false;
+    }
 }
 
 function listenForControllerInput() {
@@ -186,32 +181,44 @@ function listenForControllerInput() {
             const word = action.word.toUpperCase().trim();
             const syl = gameData.syllable.toUpperCase();
 
-            // Update word display on the main screen immediately
+            // Instant visual feedback
             await update(ref(db, `parties/${partyCode}/gameData`), { lastWord: word });
 
-            if (word.includes(syl) && word.length >= 3) {
-                console.log("✅ Valid Word:", word);
-                await remove(ref(db, `parties/${partyCode}/action`));
-                updateTurn(players.indexOf(action.uid) + 1);
+            // Only validate if it's longer than the syllable itself to avoid "STA" = "STA"
+            if (word.includes(syl) && word.length > syl.length) {
+                const realWord = await isValidWord(word.toLowerCase());
+                if (realWord) {
+                    console.log("✅ Real Word Accepted:", word);
+                    await remove(ref(db, `parties/${partyCode}/action`));
+                    updateTurn(players.indexOf(action.uid) + 1);
+                } else {
+                    console.warn("❌ Fake Word Rejected:", word);
+                }
             }
         }
     });
 }
 
+// Host Timer Logic - Fixed the "Pausing at 0" bug
 setInterval(async () => {
     if (isHost && gameActive) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
         if (snap.exists()) {
             let d = snap.val();
-            if (d.syllable !== "Choosing..." && d.syllable !== "READY?" && d.timer > 0) {
-                update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
-            } 
-            else if (d.timer <= 0 && d.status === "playing") {
-                const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
-                const pSnap = await get(pRef);
-                if (pSnap.exists()) {
-                    await update(pRef, { lives: pSnap.val().lives - 1 });
-                    updateTurn(players.indexOf(d.turn) + 1);
+            if (d.syllable !== "Choosing..." && d.syllable !== "READY?" && d.status === "playing") {
+                if (d.timer > 0) {
+                    update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
+                } else {
+                    // TIMER IS 0 - KILL PLAYER
+                    console.log("⏰ BOOM! Time's up for", d.turn);
+                    const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
+                    const pSnap = await get(pRef);
+                    if (pSnap.exists()) {
+                        const newLives = pSnap.val().lives - 1;
+                        await update(pRef, { lives: newLives });
+                        // Move to next turn immediately
+                        updateTurn(players.indexOf(d.turn) + 1);
+                    }
                 }
             }
         }
