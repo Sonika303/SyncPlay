@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SyncPlay | Word Bomb</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -11,14 +11,21 @@
             --secondary: #764ba2;
             --accent: #2ecc71;
             --danger: #ff4757;
-            --glass: rgba(255, 255, 255, 0.1);
-            --glass-heavy: rgba(255, 255, 255, 0.2);
+            --glass: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Optimization: GPU acceleration for smoother rendering */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
             margin: 0;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            /* Static gradient is much faster than animated ones */
+            background: radial-gradient(circle at top left, var(--primary), var(--secondary));
+            background-attachment: fixed;
             color: white;
             height: 100vh;
             display: flex;
@@ -27,76 +34,66 @@
             overflow: hidden;
         }
 
-        /* Subtle Background Animation */
-        body::before {
-            content: "";
-            position: absolute;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 80%);
-            animation: rotate 20s linear infinite;
-            z-index: -1;
-        }
-
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
         .container {
             background: var(--glass);
-            padding: 40px;
-            border-radius: 32px;
-            backdrop-filter: blur(25px);
+            padding: 35px;
+            border-radius: 28px;
+            /* Lower blur = Higher FPS */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-            width: 380px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+            width: 90%;
+            max-width: 380px;
             text-align: center;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            animation: slideUp 0.6s ease-out;
+            will-change: transform, opacity;
+            animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { 
+            from { opacity: 0; transform: translateY(20px) scale(0.98); } 
+            to { opacity: 1; transform: translateY(0) scale(1); } 
+        }
 
         .avatar {
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
-            margin: 0 auto 20px;
+            margin: 0 auto 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 42px;
+            font-size: 38px;
             font-weight: 800;
             color: white;
-            text-transform: uppercase;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
             border: 4px solid white;
-            transition: all 0.3s ease;
+            transition: background 0.3s ease;
         }
 
-        h1 { margin-bottom: 10px; letter-spacing: -1px; font-size: 2.8rem; font-weight: 800; }
-        p { opacity: 0.8; margin-bottom: 30px; font-size: 0.95rem; }
+        h1 { margin: 0 0 5px 0; letter-spacing: -1px; font-size: 2.4rem; font-weight: 800; }
+        p { opacity: 0.8; margin-bottom: 25px; font-size: 0.9rem; }
 
-        .input-group { position: relative; margin-bottom: 15px; }
-        .input-group i { position: absolute; left: 15px; top: 16px; color: #666; }
+        .input-group { position: relative; margin-bottom: 12px; }
+        .input-group i { position: absolute; left: 15px; top: 14px; color: #555; pointer-events: none; }
 
         input {
-            padding: 16px 16px 16px 45px;
-            border-radius: 16px;
+            padding: 14px 14px 14px 45px;
+            border-radius: 14px;
             border: none;
             width: 100%;
-            box-sizing: border-box;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.95);
             font-size: 16px;
             font-weight: 600;
-            color: #333;
-            transition: all 0.3s ease;
+            color: #111;
+            outline: none;
         }
 
-        input:focus { outline: none; background: white; box-shadow: 0 0 0 4px rgba(255,255,255,0.3); }
-
         button {
-            padding: 16px 24px;
+            padding: 15px 20px;
             border: none;
-            border-radius: 16px;
-            margin: 8px 0;
+            border-radius: 14px;
+            margin: 6px 0;
             cursor: pointer;
             font-weight: 800;
             width: 100%;
@@ -105,47 +102,44 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            transition: all 0.3s ease;
+            transition: 0.2s;
         }
 
-        button:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        button:active { transform: scale(0.97); }
+        button:active { transform: scale(0.96); opacity: 0.9; }
 
         .btn-google { background: white; color: var(--secondary); }
         .btn-join { background: var(--accent); color: white; }
         .btn-host { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
+        
         .btn-settings { 
-            position: absolute; top: 20px; right: 20px; width: 45px; height: 45px; 
-            background: var(--glass); border-radius: 12px; padding: 0; color: white;
-            border: 1px solid rgba(255,255,255,0.2);
+            position: absolute; top: 15px; right: 15px; width: 42px; height: 42px; 
+            background: var(--glass); border-radius: 12px; color: white; padding: 0;
         }
 
-        /* Settings Modal */
+        /* Settings Modal Optimization */
         #settings {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
             display: none; justify-content: center; align-items: center; z-index: 1000;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(8px);
         }
 
         .settings-content {
-            background: white; color: #333; padding: 35px; border-radius: 30px;
-            width: 340px; text-align: center; animation: zoomIn 0.3s ease;
+            background: white; color: #111; padding: 30px; border-radius: 24px;
+            width: 90%; max-width: 340px; text-align: center;
         }
 
-        @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-
         .color-picker {
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0;
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0;
         }
 
         .color-opt {
-            width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
-            border: 3px solid transparent; transition: all 0.2s;
+            width: 100%; aspect-ratio: 1; border-radius: 10px; cursor: pointer;
+            border: 3px solid transparent;
         }
 
-        .color-opt.active { border-color: #333; transform: scale(1.1); box-shadow: 0 5px 10px rgba(0,0,0,0.1); }
+        .color-opt.active { border-color: #111; transform: scale(1.05); }
 
-        .preview-label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #999; margin-bottom: 10px; display: block;}
+        .preview-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #888; margin-bottom: 8px; display: block;}
 
         .hidden { display: none; }
     </style>
@@ -153,34 +147,34 @@
 <body>
 
 <div class="container">
-    <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none"><i data-lucide="settings"></i></button>
+    <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none"><i data-lucide="settings" size="20"></i></button>
     
     <h1>🎬 SyncPlay</h1>
 
     <div id="login">
         <p>Challenge your friends in Word Bomb!</p>
-        <button class="btn-google" onclick="googleLogin()"><i data-lucide="log-in"></i> Sign in with Google</button>
+        <button class="btn-google" onclick="googleLogin()"><i data-lucide="log-in" size="18"></i> Google Sign In</button>
     </div>
 
     <div id="mainUI" style="display:none">
         <div id="avatarCircle" class="avatar">?</div>
-        <h2 id="welcome" style="margin-top:0">Welcome</h2>
+        <h2 id="welcome" style="margin-top:0; font-size: 1.5rem;">Hey there!</h2>
         
         <div class="input-group">
-            <i data-lucide="hash"></i>
-            <input id="partyCode" type="text" maxlength="4" placeholder="Enter 4-Digit Code">
+            <i data-lucide="hash" size="18"></i>
+            <input id="partyCode" type="text" maxlength="4" placeholder="4-Digit Room Code">
         </div>
-        <button class="btn-join" onclick="joinParty()"><i data-lucide="play"></i> Join Party</button>
-        <button class="btn-host" onclick="createParty()"><i data-lucide="plus-circle"></i> Host a Game</button>
+        <button class="btn-join" onclick="joinParty()"><i data-lucide="play" size="18"></i> Join Party</button>
+        <button class="btn-host" onclick="createParty()"><i data-lucide="plus" size="18"></i> Host Game</button>
     </div>
 
     <div id="partyScreen" class="hidden">
         <h2 id="partyTitle">Lobby</h2>
-        <p>Waiting for the host to ignite the bomb...</p>
+        <p>Waiting for host...</p>
         <div style="margin: 20px auto;" class="avatar" id="lobbyAvatar">?</div>
         <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
             <span style="width: 8px; height: 8px; background: var(--accent); border-radius: 50%;"></span>
-            <p id="lobbyStatus" style="margin: 0; font-size: 14px; font-weight: 600;">Connected & Ready</p>
+            <p id="lobbyStatus" style="margin: 0; font-size: 14px; font-weight: 600;">Ready to Play</p>
         </div>
     </div>
 </div>
@@ -188,22 +182,21 @@
 <div id="settings">
     <div class="settings-content">
         <h3 style="margin-top:0">Profile Settings</h3>
-        
         <span class="preview-label">Live Preview</span>
-        <div id="previewAvatar" class="avatar" style="color: white; margin-bottom: 25px;">?</div>
+        <div id="previewAvatar" class="avatar" style="color: white; margin-bottom: 20px;">?</div>
 
         <div class="input-group">
-            <i data-lucide="user"></i>
+            <i data-lucide="user" size="18"></i>
             <input id="usernameInput" type="text" placeholder="Username" oninput="updatePreview()">
         </div>
 
-        <span class="preview-label" style="margin-top:20px">Choose Avatar Color</span>
+        <span class="preview-label" style="margin-top:15px">Avatar Color</span>
         <div class="color-picker" id="colorPicker"></div>
 
         <button class="btn-join" onclick="saveSettings()">Save Changes</button>
-        <button style="background:#f1f1f1; color:#333" onclick="toggleSettings()">Cancel</button>
-        <hr style="margin: 20px 0; opacity: 0.1;">
-        <button style="background:var(--danger); color:white" onclick="logout()"><i data-lucide="log-out"></i> Logout</button>
+        <button style="background:#eee; color:#111" onclick="toggleSettings()">Cancel</button>
+        <hr style="margin: 15px 0; opacity: 0.1;">
+        <button style="background:var(--danger); color:white" onclick="logout()"><i data-lucide="log-out" size="18"></i> Logout</button>
     </div>
 </div>
 
@@ -229,11 +222,7 @@
 
     let currentUser;
     let selectedColor = "#ff5e62"; 
-    // BRO - I added 10 professional colors here
-    const profileColors = [
-        "#ff5e62", "#ff9966", "#f1c40f", "#2ecc71", "#1abc9c", 
-        "#3498db", "#9b59b6", "#34495e", "#e67e22", "#eb4d4b"
-    ];
+    const profileColors = ["#ff5e62", "#ff9966", "#f1c40f", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6", "#34495e", "#e67e22", "#eb4d4b"];
 
     lucide.createIcons();
 
@@ -253,7 +242,6 @@
         updatePreview();
     }
 
-    // Live Preview Logic
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "?";
         const preview = document.getElementById("previewAvatar");
@@ -285,19 +273,18 @@
             await update(userRef, { username, email: user.email, profileColor: color, lastLogin: serverTimestamp() });
             updateUI(username, color);
             
-            // Auto-select active color in picker
-            const opts = document.querySelectorAll('.color-opt');
-            opts.forEach(opt => {
-                if(opt.style.backgroundColor === color || opt.style.background === color) opt.classList.add('active');
+            document.querySelectorAll('.color-opt').forEach(opt => {
+                if(opt.style.backgroundColor === color) opt.classList.add('active');
             });
         }
     });
 
     function updateUI(name, color) {
         const initials = name.charAt(0).toUpperCase();
-        const avatars = [document.getElementById("avatarCircle"), document.getElementById("lobbyAvatar"), document.getElementById("previewAvatar")];
-        avatars.forEach(av => {
-            if(av) { av.innerText = initials; av.style.background = color; }
+        const targets = ["avatarCircle", "lobbyAvatar", "previewAvatar"];
+        targets.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) { el.innerText = initials; el.style.background = color; }
         });
         document.getElementById("welcome").innerText = "Hey, " + name;
         document.getElementById("usernameInput").value = name;
@@ -312,18 +299,13 @@
 
         if (snap.exists()) {
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
-            await set(playerRef, { name: document.getElementById("usernameInput").value, color: selectedColor, joinedAt: serverTimestamp() });
+            await set(playerRef, { 
+                name: document.getElementById("usernameInput").value, 
+                color: selectedColor, 
+                joinedAt: serverTimestamp() 
+            });
 
             onDisconnect(playerRef).remove();
-
-            // Kick Listener
-            onValue(ref(db, `parties/${code}/kicked/${currentUser.uid}`), (kSnap) => {
-                if (kSnap.exists() && kSnap.val() === true) {
-                    remove(ref(db, `parties/${code}/kicked/${currentUser.uid}`));
-                    alert("You have been kicked from the lobby.");
-                    location.reload();
-                }
-            });
 
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("setBtn").style.display = "none";
@@ -354,7 +336,6 @@
 
     window.logout = () => signOut(auth).then(() => location.reload());
     window.createParty = () => window.location.href = "host.html";
-
 </script>
 </body>
 </html>
