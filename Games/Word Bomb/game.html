@@ -70,20 +70,14 @@
             min-width: 180px;
         }
 
-        #word-input {
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.2);
-            padding: 15px;
-            font-size: 30px;
+        #word-display {
+            font-size: 35px;
+            font-weight: bold;
             color: white;
-            border-radius: 15px;
-            text-align: center;
             margin-top: 20px;
-            outline: none;
             text-transform: uppercase;
+            min-height: 50px;
         }
-
-        #word-input:focus { border-color: var(--accent); }
 
         #lives-display {
             display: flex;
@@ -108,6 +102,8 @@
             transform: scale(1.1);
         }
 
+        .dead { opacity: 0.3; filter: grayscale(1); }
+
         .mini-avatar {
             width: 35px; height: 35px; border-radius: 50%;
             margin: 0 auto 5px; display: flex; align-items: center;
@@ -125,7 +121,7 @@
         .btn-lobby { background: var(--primary); color: white; }
 
         .shake-slow { animation: shake 0.5s infinite; }
-        .shake-fast { animation: shake 0.15s infinite; color: var(--danger); }
+        .shake-fast { animation: shake 0.15s infinite; }
         @keyframes shake {
             0%, 100% { transform: rotate(0deg); }
             25% { transform: rotate(-2deg); }
@@ -146,7 +142,8 @@
             <span id="syllable">WAIT</span>
         </div>
 
-        <input type="text" id="word-input" placeholder="TYPE HERE..." autocomplete="off" disabled>
+        <div id="word-display"></div> 
+        
         <div id="turn-info" style="margin-top:15px; font-weight:bold; color:var(--accent);">WAITING...</div>
     </div>
 
@@ -154,138 +151,16 @@
 
     <div id="victory-overlay">
         <h1 id="winner-text">PLAYER WINS!</h1>
-        <div id="host-controls" style="display: none;">
+        <div id="winner-card-slot"></div>
+        <div id="host-controls" style="display: none; gap: 10px; margin-top: 20px;">
             <button class="vic-btn btn-again" onclick="resetGame()">PLAY AGAIN</button>
-            <button class="vic-btn btn-lobby" onclick="backToLobby()">BACK TO LOBBY</button>
+            <button class="vic-btn btn-lobby" onclick="changeGame()">BACK TO LOBBY</button>
         </div>
         <p id="player-msg" style="color: #888;">Waiting for host to restart...</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, set, update, serverTimestamp, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-            authDomain: "syncplay-17b6e.firebaseapp.com",
-            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-            projectId: "syncplay-17b6e",
-            storageBucket: "syncplay-17b6e.firebasestorage.app",
-            messagingSenderId: "86016195929",
-            appId: "1:86016195929:web:40262a28786f2ead712048"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const partyCode = urlParams.get('code');
-        let currentUser, isHost = false;
-
-        if (!partyCode) { window.location.href = "../../index.html"; }
-
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('partyId').innerText = `ROOM: ${partyCode}`;
-                
-                // Check if user is Host
-                const partySnap = await get(ref(db, `parties/${partyCode}`));
-                if (partySnap.exists()) {
-                    isHost = partySnap.val().hostId === user.uid;
-                    if (isHost) {
-                        document.getElementById('host-controls').style.display = 'block';
-                        document.getElementById('player-msg').style.display = 'none';
-                        initGame();
-                    }
-                }
-                listenToGame();
-            }
-        });
-
-        // --- GAME LOGIC ---
-        function listenToGame() {
-            // Listen for players to build cards
-            onValue(ref(db, `parties/${partyCode}/players`), (snap) => {
-                const container = document.getElementById('lives-display');
-                container.innerHTML = "";
-                const players = snap.val() || {};
-                Object.keys(players).forEach(uid => {
-                    const p = players[uid];
-                    const div = document.createElement('div');
-                    div.className = `player-card ${p.isTurn ? 'active-turn' : ''}`;
-                    div.innerHTML = `
-                        <div class="mini-avatar" style="background:${p.color}">${p.name[0]}</div>
-                        <div style="font-size:12px; font-weight:bold">${p.name}</div>
-                        <div style="color:var(--danger)">${'❤'.repeat(p.lives || 3)}</div>
-                    `;
-                    container.appendChild(div);
-
-                    // If it's MY turn, enable input
-                    if (uid === currentUser.uid && p.isTurn && (p.lives > 0)) {
-                        document.getElementById('word-input').disabled = false;
-                        document.getElementById('word-input').focus();
-                        document.getElementById('turn-info').innerText = "YOUR TURN!";
-                    } else if (uid === currentUser.uid) {
-                        document.getElementById('word-input').disabled = true;
-                        document.getElementById('turn-info').innerText = p.isTurn ? "WAITING..." : "OTHER PLAYER'S TURN";
-                    }
-                });
-            });
-
-            // Listen for Syllable & Timer
-            onValue(ref(db, `parties/${partyCode}/gameData`), (snap) => {
-                const data = snap.val();
-                if (!data) return;
-                document.getElementById('syllable').innerText = data.syllable || "WAIT";
-                document.getElementById('timer').innerText = data.timer || "15";
-                
-                if (data.status === "lobby") {
-                    window.location.href = `../../host.html?code=${partyCode}`;
-                }
-            });
-        }
-
-        // Host initializes or resets game
-        async function initGame() {
-            const snap = await get(ref(db, `parties/${partyCode}/players`));
-            const players = snap.val();
-            const updates = {};
-            const ids = Object.keys(players);
-            
-            ids.forEach((id, index) => {
-                updates[`players/${id}/lives`] = 3;
-                updates[`players/${id}/isTurn`] = (index === 0);
-            });
-            
-            updates['gameData/syllable'] = "EN";
-            updates['gameData/timer'] = 15;
-            updates['gameData/status'] = "playing";
-            
-            await update(ref(db, `parties/${partyCode}`), updates);
-        }
-
-        // Basic Word Input Logic
-        document.getElementById('word-input').addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
-                const word = e.target.value.toUpperCase();
-                const syl = document.getElementById('syllable').innerText;
-                
-                if (word.includes(syl)) {
-                    // Logic to pass turn (Host or Cloud Function would normally handle timer)
-                    e.target.value = "";
-                    // Note: For a real game, you'd trigger a Turn Switch here in DB
-                }
-            }
-        });
-
-        window.resetGame = () => initGame();
-        window.backToLobby = () => update(ref(db, `parties/${partyCode}/gameData`), { status: "lobby" });
-
-    </script>
+    
+    <script type="module" src="game.js"></script>
 </body>
 </html>
