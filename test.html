@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Web Voxel World</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: sans-serif;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px #000;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="ui">Tap and hold screen to move forward</div>
+
+    <script>
+        // 1. Setup Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.fog = new THREE.Fog(0x87CEEB, 10, 50); // Fog hides the edge of the world
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 10, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false }); // Antialias off for mobile performance
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 50, 50);
+        scene.add(dirLight);
+
+        // 3. Terrain Generation (InstancedMesh for high performance)
+        const gridSize = 60; // 60x60 grid = 3600 blocks
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        
+        // Simple dirt/grass material
+        const material = new THREE.MeshLambertMaterial({ color: 0x228B22 }); 
+        const instancedMesh = new THREE.InstancedMesh(geometry, material, gridSize * gridSize);
+        
+        const dummy = new THREE.Object3D();
+        let index = 0;
+
+        // Procedural math to create hills and valleys
+        for (let x = -gridSize / 2; x < gridSize / 2; x++) {
+            for (let z = -gridSize / 2; z < gridSize / 2; z++) {
+                // Mix sine and cosine waves to fake terrain noise
+                let height = Math.floor(Math.sin(x / 6) * 3 + Math.cos(z / 5) * 3);
+                
+                dummy.position.set(x, height, z);
+                dummy.updateMatrix();
+                instancedMesh.setMatrixAt(index++, dummy.matrix);
+            }
+        }
+        scene.add(instancedMesh);
+
+        // 4. Water Physics (Visual representation)
+        const waterGeo = new THREE.PlaneGeometry(gridSize, gridSize);
+        const waterMat = new THREE.MeshBasicMaterial({ 
+            color: 0x1CA3EC, 
+            transparent: true, 
+            opacity: 0.7 
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -1; // Water level
+        scene.add(water);
+
+        // 5. Mobile Touch Controls
+        let isMoving = false;
+        
+        document.addEventListener('touchstart', () => isMoving = true);
+        document.addEventListener('touchend', () => isMoving = false);
+        // Mouse fallback for PC testing
+        document.addEventListener('mousedown', () => isMoving = true);
+        document.addEventListener('mouseup', () => isMoving = false);
+
+        // 6. Game Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Move camera forward in the direction it's facing
+            if (isMoving) {
+                const direction = new THREE.Vector3(0, 0, -1);
+                direction.applyQuaternion(camera.quaternion);
+                camera.position.addScaledVector(direction, 0.2);
+            }
+
+            // Slowly rotate camera to look around automatically
+            camera.rotation.y += 0.005;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle Screen Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

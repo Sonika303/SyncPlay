@@ -117,19 +117,48 @@
     let currentUser;
     let currentPlayers = {};
 
+    // Check if we are returning from a game with a code
+    const urlParams = new URLSearchParams(window.location.search);
+    const existingCode = urlParams.get('code');
+
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById("statusMsg").innerText = "Logged in as Host";
+            
+            // If code exists in URL (coming back from game), rejoin lobby automatically
+            if (existingCode) {
+                rejoinLobby(existingCode);
+            }
         } else {
             document.getElementById("statusMsg").innerText = "Authentication required.";
         }
     });
 
+    async function rejoinLobby(code) {
+        partyCode = code;
+        document.getElementById("code").innerText = partyCode;
+        document.getElementById("createBtn").classList.add("hidden");
+        document.getElementById("lobbyArea").classList.remove("hidden");
+        
+        // Reset game state to lobby so controllers also switch back
+        await update(ref(db, `parties/${partyCode}/gameData`), { 
+            status: "lobby",
+            redirect: false 
+        });
+        
+        listenPlayers();
+    }
+
     window.createParty = async function() {
         if (!currentUser) return alert("Please sign in first.");
 
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
+        
+        // Professional URL Update
+        const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?code=' + partyCode;
+        window.history.pushState({path:newurl},'',newurl);
+
         document.getElementById("code").innerText = partyCode;
         document.getElementById("createBtn").classList.add("hidden");
         document.getElementById("lobbyArea").classList.remove("hidden");
@@ -138,14 +167,13 @@
         const partyRef = ref(db, "parties/" + partyCode);
         const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
 
-        // If host closes tab, mark inactive. Don't delete party yet so players can stay.
         onDisconnect(hostPresenceRef).set(false);
 
         await set(partyRef, {
             created: serverTimestamp(),
             hostId: currentUser.uid,
             hostActive: true,
-            gameState: { status: "lobby" }
+            gameData: { status: "lobby", redirect: false }
         });
 
         listenPlayers();
@@ -175,7 +203,7 @@
                 });
             }
 
-            if (count >= 1) { // Set to 2 for production
+            if (count >= 1) { 
                 startBtn.style.display = "block";
                 msg.style.display = "none";
             } else {
@@ -195,42 +223,18 @@
     window.startGame = async function() {
         if (!partyCode) return;
         
-        // 1. Prepare Player Data (Lives/Scores) for the game
-        const playersData = {};
-        Object.keys(currentPlayers).forEach(uid => {
-            playersData[uid] = {
-                name: currentPlayers[uid].name,
-                lives: 3,
-                score: 0,
-                color: currentPlayers[uid].color || "#667eea"
-            };
-        });
-
-        // 2. Initialize Game State
         const partyRef = ref(db, "parties/" + partyCode);
-        
-        // --- TRANSITION PROTECTION ---
-        // Cancel any onDisconnect that might fire during page reload
         const hostPresenceRef = ref(db, `parties/${partyCode}/hostActive`);
         await onDisconnect(hostPresenceRef).cancel();
 
         await update(partyRef, { 
-            "gameState/status": "playing",
-            "playersData": playersData, // This is what the controllers read
-            "gameData": { 
-                syllable: "", 
-                turn: Object.keys(currentPlayers)[0], // First player goes first
-                timer: 15,
-                round: 1
-            }
+            "gameData/status": "playing",
+            "gameData/redirect": false 
         });
 
-        console.log("🚀 Game State initialized. Redirecting...");
-        
-        // 3. Move to Game Board
         setTimeout(() => {
-            window.location.href = `Games/Word%20Bomb/game.html?code=${partyCode}`;
-        }, 400);
+            window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
+        }, 200);
     }
 </script>
 

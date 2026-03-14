@@ -47,7 +47,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     listenToGame();
     listenForControllerInput();
-    listenForRedirect(); // New: Watch for the host changing the game
+    listenForRedirect(); 
 });
 
 async function forceInit(playersObj) {
@@ -69,7 +69,7 @@ async function forceInit(playersObj) {
         turn: players[0],
         status: "playing",
         lastWord: "",
-        redirect: false // Reset redirect flag
+        redirect: false 
     });
     
     document.getElementById("victory-overlay").style.display = "none";
@@ -109,7 +109,6 @@ function listenToGame() {
         document.getElementById("timer").innerText = data.timer;
         document.getElementById("word-display").innerText = data.lastWord || "";
 
-        // UI Feedback for low time
         if (data.timer <= 3 && data.status === "playing") {
             document.getElementById("timer").style.color = "#ff0000";
             document.getElementById("timer").style.transform = "scale(1.2)";
@@ -188,7 +187,8 @@ async function checkWinner(playersData) {
 function listenForRedirect() {
     onValue(ref(db, `parties/${partyCode}/gameData/redirect`), (snap) => {
         if (snap.val() === true) {
-            window.location.href = `host.html?code=${partyCode}`;
+            // Goes up 2 levels: Games/Word Bomb/ -> Root host.html
+            window.location.href = `../../host.html?code=${partyCode}`;
         }
     });
 }
@@ -199,7 +199,7 @@ window.resetGame = async () => {
 };
 
 window.changeGame = async () => {
-    // Signal to all players to go back to lobby
+    // Trigger redirect for all players and host
     await update(ref(db, `parties/${partyCode}/gameData`), { redirect: true });
 };
 
