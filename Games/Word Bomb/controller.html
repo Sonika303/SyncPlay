@@ -39,7 +39,7 @@
         .my-turn { 
             border-color: var(--accent); 
             box-shadow: 0 0 40px rgba(46, 204, 113, 0.3); 
-            transform: scale(1.02);
+            transform: scale(1.05);
         }
 
         #playerName { font-size: 28px; margin: 0; letter-spacing: 1px; }
@@ -57,6 +57,14 @@
             text-transform: uppercase; 
             letter-spacing: 2px;
             color: #888;
+            margin-bottom: 5px;
+        }
+
+        #feedback {
+            font-size: 14px;
+            height: 20px;
+            color: var(--danger);
+            font-weight: bold;
         }
 
         .active-status { color: var(--accent) !important; animation: pulse 1.5s infinite; }
@@ -73,7 +81,7 @@
             font-size: 24px; 
             border-radius: 15px; 
             border: 2px solid #444; 
-            margin: 25px 0; 
+            margin: 15px 0; 
             text-align: center; 
             background: #25252e;
             color: white;
@@ -99,7 +107,6 @@
 
         button:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
 
-        /* Prevent zoom on mobile */
         @media screen and (max-width: 768px) {
             input { font-size: 16px; }
             input:focus { font-size: 16px; }
@@ -109,9 +116,10 @@
 <body>
 
     <div class="controller-card" id="card">
-        <h2 id="playerName">CONNECTING...</h2>
+        <h2 id="playerName">---</h2>
         <div id="heart-container"></div>
-        <p id="status">Syncing with Game...</p>
+        <p id="status">CONNECTING...</p>
+        <div id="feedback"></div>
         
         <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
         <button id="sendBtn" onclick="submitWord()" disabled>SUBMIT WORD</button>
@@ -138,51 +146,36 @@
         const code = new URLSearchParams(window.location.search).get('code');
 
         let myTurn = false;
+        let currentSyllable = "";
 
         onAuthStateChanged(auth, async (user) => {
             if (user) { 
                 const myUid = user.uid;
-                console.log("🎮 Controller active for:", myUid);
 
-                // --- SESSION RECOVERY LOGIC ---
-                // Re-verify presence in the player list and setup disconnect removal
+                // Re-join player list
                 const playerRef = ref(db, `parties/${code}/players/${myUid}`);
-                const userRef = ref(db, `users/${myUid}`);
-                const userSnap = await get(userRef);
-                
-                if (userSnap.exists()) {
-                    const userData = userSnap.val();
-                    // Put us back in the party player list if we were cleared during redirect
-                    await update(playerRef, {
-                        name: userData.username,
-                        color: userData.profileColor,
-                        status: "active"
-                    });
-                    // Re-enable "remove if I leave now"
-                    onDisconnect(playerRef).remove();
-                }
+                onDisconnect(playerRef).remove();
 
-                // Watch My Stats (Lives/Name)
+                // Listen to My Data
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
                     document.getElementById("playerName").innerText = data.name.toUpperCase();
                     document.getElementById("heart-container").innerText = "❤️".repeat(data.lives);
                     if(data.lives <= 0) {
-                        document.getElementById("status").innerText = "ELIMINATED";
-                        document.getElementById("card").style.opacity = "0.5";
-                        document.getElementById("wordInput").disabled = true;
-                        document.getElementById("sendBtn").disabled = true;
+                        document.getElementById("status").innerText = "DEAD";
+                        document.getElementById("card").style.opacity = "0.4";
                     }
                 });
 
-                // Watch Turn Logic
+                // Listen to Game State
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
+                    currentSyllable = gameData.syllable;
                     
-                    // Logic: It's my turn if turn matches UID AND game isn't in "between rounds" state
-                    myTurn = (gameData.turn === myUid && gameData.syllable !== "Choosing..." && gameData.syllable !== "");
+                    // Critical Turn Check
+                    myTurn = (gameData.turn === myUid && currentSyllable !== "Choosing..." && currentSyllable !== "READY?");
                     
                     const input = document.getElementById("wordInput");
                     const btn = document.getElementById("sendBtn");
@@ -197,25 +190,30 @@
                         status.classList.add("active-status");
                         card.classList.add("my-turn");
                         input.focus();
-                        if (navigator.vibrate) navigator.vibrate(200); 
                     } else {
                         status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
                         status.classList.remove("active-status");
                         card.classList.remove("my-turn");
+                        document.getElementById("feedback").innerText = "";
                     }
                 });
-            } else {
-                // If not logged in, go back to index
-                window.location.href = "../../index.html";
             }
         });
 
         window.submitWord = () => {
             const input = document.getElementById("wordInput");
+            const feedback = document.getElementById("feedback");
             const word = input.value.trim().toUpperCase();
+
             if(!word || !myTurn) return;
 
-            // Send action to Firebase
+            // Client-side quick check
+            if(!word.includes(currentSyllable)) {
+                feedback.innerText = `MUST INCLUDE "${currentSyllable}"`;
+                return;
+            }
+
+            // Send to Game Engine
             set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
@@ -223,10 +221,9 @@
             });
             
             input.value = "";
-            console.log("📤 Word submitted:", word);
+            feedback.innerText = "";
         };
 
-        // Listen for enter key
         document.getElementById("wordInput").addEventListener("keypress", (e) => {
             if (e.key === "Enter") submitWord();
         });
