@@ -36,14 +36,15 @@ onAuthStateChanged(auth, async (user) => {
         const partyData = partySnap.val();
         if (partyData.hostId === myUid) {
             isHost = true;
-            // Removed .remove() on disconnect so the party stays alive if you refresh
             
-            // If we just arrived and status is lobby, start the game setup
-            if (partyData.gameData && partyData.gameData.status === "lobby") {
+            // If the game status is lobby or playersData is missing, initialize it!
+            if (!partyData.playersData || (partyData.gameData && partyData.gameData.status === "lobby")) {
                 const pRef = ref(db, `parties/${partyCode}/players`);
                 const pSnap = await get(pRef);
                 if (pSnap.exists()) {
                     forceInit(pSnap.val());
+                } else {
+                    console.error("No players found to start the game.");
                 }
             }
         }
@@ -67,6 +68,7 @@ async function forceInit(playersObj) {
         }; 
     });
 
+    // Push fresh game state
     await set(ref(db, `parties/${partyCode}/playersData`), startData);
     await set(ref(db, `parties/${partyCode}/gameData`), {
         syllable: "READY?",
@@ -90,6 +92,7 @@ async function updateTurn(idx) {
 
     let nextIdx = idx % players.length;
     let attempts = 0;
+    // Skip dead players
     while (pData[players[nextIdx]] && pData[players[nextIdx]].lives <= 0 && attempts < players.length) {
         nextIdx = (nextIdx + 1) % players.length;
         attempts++;
@@ -110,31 +113,34 @@ function listenToGame() {
         if (!snap.exists()) return;
         const data = snap.val();
         
-        document.getElementById("syllable").innerText = data.syllable || "---";
-        document.getElementById("timer").innerText = data.timer ?? "0";
-        document.getElementById("word-display").innerText = data.lastWord || "";
+        // Only update UI if we are actually playing
+        if (data.status === "playing" || data.status === "finished") {
+            document.getElementById("syllable").innerText = data.syllable || "---";
+            document.getElementById("timer").innerText = data.timer ?? "0";
+            document.getElementById("word-display").innerText = data.lastWord || "";
 
-        if (data.timer <= 3 && data.status === "playing") {
-            document.getElementById("timer").style.color = "#ff0000";
-            document.getElementById("timer").style.transform = "scale(1.2)";
-        } else {
-            document.getElementById("timer").style.color = "";
-            document.getElementById("timer").style.transform = "";
-        }
+            if (data.timer <= 3 && data.status === "playing") {
+                document.getElementById("timer").style.color = "#ff0000";
+                document.getElementById("timer").style.transform = "scale(1.2)";
+            } else {
+                document.getElementById("timer").style.color = "";
+                document.getElementById("timer").style.transform = "";
+            }
 
-        if (data.status === "finished") {
-            showVictoryScreen();
-        } else if (data.status === "playing") {
-            document.getElementById("victory-overlay").style.display = "none";
-            if (data.turn) {
-                get(ref(db, `parties/${partyCode}/playersData/${data.turn}`)).then(s => {
-                    if(s.exists()){
-                        const p = s.val();
-                        const info = document.getElementById("turn-info");
-                        info.innerText = (p.name || "PLAYER").toUpperCase() + "'S TURN";
-                        info.style.color = p.color || "#ffffff";
-                    }
-                });
+            if (data.status === "finished") {
+                showVictoryScreen();
+            } else {
+                document.getElementById("victory-overlay").style.display = "none";
+                if (data.turn) {
+                    get(ref(db, `parties/${partyCode}/playersData/${data.turn}`)).then(s => {
+                        if(s.exists()){
+                            const p = s.val();
+                            const info = document.getElementById("turn-info");
+                            info.innerText = (p.name || "PLAYER").toUpperCase() + "'S TURN";
+                            info.style.color = p.color || "#ffffff";
+                        }
+                    });
+                }
             }
         }
 
@@ -196,7 +202,7 @@ async function checkWinner(playersData) {
 
 function listenForRedirect() {
     onValue(ref(db, `parties/${partyCode}/gameData/redirect`), (snap) => {
-        if (snap.val() === true) {
+        if (snap.exists() && snap.val() === true) {
             window.location.href = `../../host.html?code=${partyCode}`;
         }
     });
@@ -223,6 +229,7 @@ function listenForControllerInput() {
         if (!snap.exists()) return;
         const action = snap.val();
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
+        if (!gSnap.exists()) return;
         const gameData = gSnap.val();
         
         if (action.uid === gameData.turn && gameData.status === "playing") {

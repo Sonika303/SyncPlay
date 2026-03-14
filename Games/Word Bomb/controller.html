@@ -152,30 +152,44 @@
             if (user) { 
                 const myUid = user.uid;
 
-                // Re-join player list
                 const playerRef = ref(db, `parties/${code}/players/${myUid}`);
                 onDisconnect(playerRef).remove();
 
-                // Listen to My Data
+                // 1. REDIRECT LISTENER - Kicks players back to main lobby if host changes game
+                onValue(ref(db, `parties/${code}/gameData/redirect`), (snap) => {
+                    if (snap.exists() && snap.val() === true) {
+                        // Assuming index.html is 2 folders up from this file
+                        window.location.href = `../../index.html?code=${code}`;
+                    }
+                });
+
+                // 2. PLAYER DATA LISTENER
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
                     document.getElementById("playerName").innerText = data.name.toUpperCase();
-                    document.getElementById("heart-container").innerText = "❤️".repeat(data.lives);
+                    document.getElementById("heart-container").innerText = data.lives > 0 ? "❤️".repeat(data.lives) : "💀";
                     if(data.lives <= 0) {
                         document.getElementById("status").innerText = "DEAD";
                         document.getElementById("card").style.opacity = "0.4";
+                        document.getElementById("wordInput").disabled = true;
                     }
                 });
 
-                // Listen to Game State
+                // 3. GAME STATE LISTENER
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
-                    currentSyllable = gameData.syllable;
                     
-                    // Critical Turn Check
-                    myTurn = (gameData.turn === myUid && currentSyllable !== "Choosing..." && currentSyllable !== "READY?");
+                    // Also redirect if host sets status back to lobby
+                    if (gameData.status === "lobby") {
+                        window.location.href = `../../index.html?code=${code}`;
+                        return;
+                    }
+
+                    currentSyllable = gameData.syllable || "";
+                    
+                    myTurn = (gameData.turn === myUid && !["Choosing...", "READY?", "LOBBY"].includes(currentSyllable));
                     
                     const input = document.getElementById("wordInput");
                     const btn = document.getElementById("sendBtn");
@@ -207,13 +221,11 @@
 
             if(!word || !myTurn) return;
 
-            // Client-side quick check
             if(!word.includes(currentSyllable)) {
                 feedback.innerText = `MUST INCLUDE "${currentSyllable}"`;
                 return;
             }
 
-            // Send to Game Engine
             set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
