@@ -20,6 +20,7 @@
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
             font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         body {
@@ -67,13 +68,12 @@
             color: white;
             box-shadow: 0 15px 30px rgba(0,0,0,0.1);
             background: var(--user-color);
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         h1 { margin: 0; font-size: 2.5rem; font-weight: 800; color: #2d3436; letter-spacing: -1.5px; }
         p { color: #636e72; margin-bottom: 30px; font-weight: 600; }
 
-        .input-group { position: relative; margin-bottom: 15px; }
+        .input-group { position: relative; margin-bottom: 15px; text-align: left; }
         .input-group i { position: absolute; left: 18px; top: 16px; color: #b2bec3; z-index: 2; }
 
         input[type="text"] {
@@ -86,7 +86,6 @@
             font-weight: 700;
             color: #2d3436;
             outline: none;
-            transition: 0.2s;
         }
 
         input[type="text"]:focus { border-color: var(--user-color); background: white; }
@@ -104,7 +103,6 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            transition: 0.2s;
         }
 
         button:active { transform: scale(0.95); }
@@ -117,44 +115,42 @@
             position: absolute; top: 20px; right: 20px; width: 50px; height: 50px; 
             background: white; border-radius: 18px; color: #2d3436; padding: 0;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            z-index: 100;
         }
 
-        /* --- FULL PAGE PROFILE CUSTOMIZER --- */
-        #settingsPage {
+        /* --- PAGES --- */
+        #settingsPage, #colorSubPage {
             position: fixed; inset: 0; background: #f9f9fb;
             display: none; flex-direction: column; z-index: 2000;
             padding: 40px 20px; overflow-y: auto;
         }
 
         .settings-header { display: flex; align-items: center; justify-content: space-between; max-width: 600px; margin: 0 auto 30px; width: 100%; }
-        .preview-section { text-align: center; margin-bottom: 40px; }
-        
-        .color-grid-container {
-            max-width: 600px; margin: 0 auto; width: 100%;
-            background: white; padding: 25px; border-radius: 30px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+
+        /* SubCategory Trigger Button */
+        .subcat-btn {
+            background: white; border-radius: 25px; padding: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); cursor: pointer;
+            margin-bottom: 25px; border: 2px solid transparent;
         }
+        .subcat-btn:hover { border-color: var(--user-color); }
 
         .color-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(45px, 1fr)); 
-            gap: 10px; margin-top: 20px; max-height: 300px; overflow-y: auto;
-            padding-right: 10px;
+            gap: 10px; margin-top: 20px;
         }
 
         .color-cell {
             aspect-ratio: 1; border-radius: 12px; cursor: pointer;
-            border: 4px solid transparent; transition: 0.2s;
+            border: 4px solid transparent;
         }
-
         .color-cell.active { border-color: #2d3436; transform: scale(1.1); }
 
         .custom-picker-box {
             display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
-            padding: 15px; background: #f1f2f6; border-radius: 20px;
+            padding: 15px; background: white; border-radius: 20px; border: 2px solid #f1f2f6;
         }
-
-        #hexDisplay { font-family: monospace; font-weight: 800; color: #636e72; }
-        #colorName { font-weight: 800; text-transform: uppercase; color: #2d3436; }
 
         .hidden { display: none; }
     </style>
@@ -163,7 +159,7 @@
 
 <div class="container">
     <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none">
-        <i data-lucide="palette"></i>
+        <i data-lucide="settings"></i>
     </button>
     
     <h1>SyncPlay</h1>
@@ -196,35 +192,58 @@
 
 <div id="settingsPage">
     <div class="settings-header">
-        <h2 style="font-weight: 800;">Profile Designer</h2>
+        <h2 style="font-weight: 800; margin:0;">Profile Designer</h2>
         <button onclick="toggleSettings()" style="width: auto; padding: 10px 20px; background: #eee; color: #444;">Close</button>
     </div>
 
-    <div class="preview-section">
-        <div id="previewAvatar" class="avatar" style="width: 120px; height: 120px; font-size: 55px;">?</div>
-        <div id="colorName">Joy Purple</div>
-        <div id="hexDisplay">#6C5CE7</div>
-    </div>
-
-    <div class="color-grid-container">
-        <div class="input-group">
+    <div style="max-width: 500px; margin: 0 auto; width: 100%;">
+        <div class="avatar" id="previewAvatar" style="width: 120px; height: 120px; font-size: 55px;">?</div>
+        
+        <div class="input-group" style="margin-top: 20px;">
             <i data-lucide="user"></i>
             <input id="usernameInput" type="text" placeholder="Your Display Name" oninput="updatePreview()">
         </div>
 
+        <div style="text-align: left; margin: 30px 0 10px 10px; font-weight: 800; color: #b2bec3; font-size: 12px;">PREFERENCES</div>
+        
+        <div class="subcat-btn" onclick="toggleColorPage()">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="background:var(--user-color); color:white; width:45px; height:45px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                    <i data-lucide="palette"></i>
+                </div>
+                <div>
+                    <div style="font-weight: 800; color:#2d3436;">SubCategories</div>
+                    <div style="font-size: 12px; color:#b2bec3;">Colors, Theme & Customs</div>
+                </div>
+            </div>
+            <i data-lucide="chevron-right" style="color:#b2bec3"></i>
+        </div>
+
+        <button class="btn-join" onclick="saveSettings()">Apply Profile</button>
+        <button style="background:none; color:var(--danger);" onclick="logout()">Sign Out</button>
+    </div>
+</div>
+
+<div id="colorSubPage">
+    <div class="settings-header">
+        <button onclick="toggleColorPage()" style="width:auto; padding:10px; background:none; color:#2d3436;">
+            <i data-lucide="arrow-left"></i>
+        </button>
+        <h2 style="font-weight: 800; margin:0;">The Color Vault</h2>
+        <div style="width:40px;"></div>
+    </div>
+
+    <div style="max-width: 500px; margin: 0 auto; width: 100%;">
         <div class="custom-picker-box">
             <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:50px; height:50px; border:none; background:none; cursor:pointer;">
             <div>
-                <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">CUSTOM COLOR SLIDER</div>
-                <div style="font-size: 14px; font-weight: 700;">Tap to choose any hue</div>
+                <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">HEX CODE</div>
+                <div id="hexDisplay" style="font-size: 16px; font-weight: 700;">#6C5CE7</div>
             </div>
         </div>
 
-        <div style="font-weight: 800; font-size: 14px; color: #636e72;">PRESET PALETTE (100 COLORS)</div>
+        <div style="font-weight: 800; font-size: 14px; color: #636e72; margin-top:20px;">PRESET PALETTE (100 COLORS)</div>
         <div class="color-grid" id="colorGrid"></div>
-
-        <button class="btn-join" onclick="saveSettings()" style="margin-top: 25px;">Apply Profile</button>
-        <button style="background:none; color:var(--danger);" onclick="logout()">Sign Out</button>
     </div>
 </div>
 
@@ -251,20 +270,13 @@
     let currentUser;
     let selectedColor = "#6c5ce7";
     
-    // GENERATE 100 UNIQUE COLORS
-    const generateColors = () => {
-        const colors = [];
-        for(let i=0; i<100; i++) {
-            const h = Math.floor((i * 3.6)); // Spread across 360 degrees
-            colors.push(`hsl(${h}, 70%, 60%)`);
-        }
-        return colors;
-    };
-    const palette = generateColors();
+    // Generate 100 Colors
+    const palette = [];
+    for(let i=0; i<100; i++) {
+        palette.push(`hsl(${Math.floor(i * 3.6)}, 75%, 60%)`);
+    }
 
-    lucide.createIcons();
-
-    // Populate the 100-color grid
+    // Populate Grid
     const grid = document.getElementById("colorGrid");
     palette.forEach(color => {
         const cell = document.createElement("div");
@@ -279,6 +291,16 @@
         grid.appendChild(cell);
     });
 
+    window.toggleSettings = () => {
+        const page = document.getElementById("settingsPage");
+        page.style.display = (page.style.display === "flex") ? "none" : "flex";
+    };
+
+    window.toggleColorPage = () => {
+        const page = document.getElementById("colorSubPage");
+        page.style.display = (page.style.display === "flex") ? "none" : "flex";
+    };
+
     window.pickCustomColor = (hex) => {
         selectedColor = hex;
         document.querySelectorAll(".color-cell").forEach(c => c.classList.remove("active"));
@@ -288,10 +310,8 @@
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "?";
         const char = name.charAt(0).toUpperCase();
-        const preview = document.getElementById("previewAvatar");
-        
-        preview.innerText = char;
-        preview.style.background = selectedColor;
+        document.getElementById("previewAvatar").innerText = char;
+        document.getElementById("previewAvatar").style.background = selectedColor;
         document.getElementById("hexDisplay").innerText = selectedColor.toUpperCase();
         document.documentElement.style.setProperty('--user-color', selectedColor);
     };
@@ -326,11 +346,6 @@
         document.getElementById("usernameInput").value = name;
         document.documentElement.style.setProperty('--user-color', color);
     }
-
-    window.toggleSettings = () => {
-        const page = document.getElementById("settingsPage");
-        page.style.display = (page.style.display === "flex") ? "none" : "flex";
-    };
 
     window.saveSettings = async () => {
         const name = document.getElementById("usernameInput").value;
@@ -369,6 +384,7 @@
     };
 
     window.logout = () => signOut(auth).then(() => location.reload());
+    lucide.createIcons();
 </script>
 </body>
 </html>
