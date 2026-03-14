@@ -89,31 +89,18 @@
         }
 
         .mini-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 800;
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 800;
         }
 
         .player-name { flex: 1; text-align: left; font-weight: 700; color: #2d3436; font-size: 14px; }
 
         button {
-            padding: 18px;
-            border: none;
-            border-radius: 20px;
-            font-weight: 800;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: 0.2s;
+            padding: 18px; border: none; border-radius: 20px;
+            font-weight: 800; font-size: 16px; cursor: pointer;
+            width: 100%; display: flex; align-items: center;
+            justify-content: center; gap: 10px; transition: 0.2s;
         }
 
         .create-btn { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(108,92,231,0.2); }
@@ -126,15 +113,13 @@
         .hidden { display: none !important; }
         
         .status-pill {
-            display: inline-block;
-            padding: 6px 12px;
-            background: #f1f2f6;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 800;
-            color: #b2bec3;
-            margin-top: 20px;
+            display: inline-block; padding: 6px 12px; background: #f1f2f6;
+            border-radius: 20px; font-size: 11px; font-weight: 800;
+            color: #b2bec3; margin-top: 20px;
         }
+
+        .spin { animation: rotate 1s linear infinite; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -203,20 +188,19 @@
 
     async function rejoinLobby(code) {
         partyCode = code;
-        // Verify if room exists before showing UI
         const snapshot = await get(ref(db, `parties/${partyCode}`));
         if(snapshot.exists()) {
             setupUI();
-            // Surgical update: reset game status without deleting players
+            // NEVER use set() here, only update gameData status
             await update(ref(db, `parties/${partyCode}/gameData`), { 
                 status: "lobby", 
-                syllable: "LOBBY" 
+                syllable: "LOBBY",
+                redirect: false 
             });
             setupHostPresence();
             listenPlayers();
         } else {
             document.getElementById("statusMsg").innerText = "Invalid Room Code";
-            window.history.pushState({}, '', window.location.pathname);
         }
     }
 
@@ -229,11 +213,18 @@
 
         setupUI();
         
-        await set(ref(db, "parties/" + partyCode), {
+        // Initial setup - ensures we don't wipe players if the node already exists
+        await update(ref(db, "parties/" + partyCode), {
             created: serverTimestamp(),
             hostId: currentUser.uid,
-            hostActive: true,
-            gameData: { status: "lobby", syllable: "LOBBY" }
+            hostActive: true
+        });
+
+        // Set gameData separately to be safe
+        await set(ref(db, `parties/${partyCode}/gameData`), { 
+            status: "lobby", 
+            syllable: "LOBBY",
+            redirect: false 
         });
 
         setupHostPresence();
@@ -310,18 +301,24 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> LAUNCHING...`;
         lucide.createIcons();
 
-        // ONLY remove game-specific player progress, NOT the player connection list
-        await remove(ref(db, `parties/${partyCode}/playersData`));
-        
-        // Update game status to trigger player redirect
+        // Check if we have players before moving
+        const pSnap = await get(ref(db, `parties/${partyCode}/players`));
+        if (!pSnap.exists()) {
+            alert("No players found!");
+            startBtn.disabled = false;
+            startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
+            return;
+        }
+
+        // Surgical Update: Trigger the redirect and set status to playing
+        // We DO NOT touch the /players node here.
         await update(ref(db, `parties/${partyCode}/gameData`), { 
-            status: "playing" 
+            status: "playing",
+            redirect: false // Ensure we don't trigger lobby redirect immediately
         });
 
-        // Slight delay to ensure Firebase finishes the write
-        setTimeout(() => {
-            window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
-        }, 600);
+        // Redirect to the Game Arena
+        window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
     }
 
     lucide.createIcons();
