@@ -196,6 +196,13 @@
     let selectedColor = "#ff5e62"; 
     const profileColors = ["#ff5e62", "#2ecc71", "#3498db", "#f1c40f", "#9b59b6", "#e67e22"];
 
+    // Check for URL code to auto-fill
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('code');
+    if(codeFromUrl) {
+        document.getElementById("partyCode").value = codeFromUrl;
+    }
+
     const cp = document.getElementById("colorPicker");
     profileColors.forEach(color => {
         let div = document.createElement("div");
@@ -268,36 +275,30 @@
             const playerPath = `parties/${code}/players/${currentUser.uid}`;
             const playerRef = ref(db, playerPath);
             
-            // 1. Add player to DB
             await set(playerRef, {
                 name: userData.username,
                 color: userData.profileColor,
                 joinedAt: serverTimestamp()
             });
 
-            // 2. Initial Disconnect setup (for if they close the tab now)
             let disconnectRef = onDisconnect(playerRef);
             await disconnectRef.remove();
 
-            // 3. UI Switch
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("setBtn").style.display = "none";
             document.getElementById("partyScreen").style.display = "block";
             document.getElementById("partyTitle").innerText = "Party: " + code;
 
-            // 4. Listen for Game Start
-            onValue(ref(db, `parties/${code}/gameState`), async (gSnap) => {
-                if (gSnap.exists() && gSnap.val().status === "playing") {
-                    console.log("🚀 Redirecting... cancelling auto-remove.");
-                    
-                    // --- CRITICAL FIX ---
-                    // Cancel the disconnect trigger so the data survives the page hop
-                    await disconnectRef.cancel(); 
-                    
-                    // Small delay to ensure Firebase processes the cancel before redirect
-                    setTimeout(() => {
-                        window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
-                    }, 300);
+            // --- FIXED PATH: Listening to gameData instead of gameState ---
+            onValue(ref(db, `parties/${code}/gameData`), async (gSnap) => {
+                if (gSnap.exists()) {
+                    const status = gSnap.val().status;
+                    if (status === "playing") {
+                        await disconnectRef.cancel(); 
+                        setTimeout(() => {
+                            window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
+                        }, 300);
+                    }
                 }
             });
         } else {
