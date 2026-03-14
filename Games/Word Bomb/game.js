@@ -22,6 +22,7 @@ let myUid;
 let isHost = false;
 let gameActive = false;
 let timerInterval = null;
+let usedWords = [];
 
 const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE", "PRE", "VER", "TION", "IC", "AL", "OUS", "ABLE", "MENT"];
 
@@ -37,9 +38,9 @@ onAuthStateChanged(auth, async (user) => {
         const partyData = partySnap.val();
         if (partyData.hostId === myUid) {
             isHost = true;
-            console.log("Host session active.");
+            // Clean up old actions on load
+            await remove(ref(db, `parties/${partyCode}/action`));
             
-            // Auto-initiate if coming from lobby
             const gameData = partyData.gameData || {};
             if (gameData.status !== "playing") {
                 prepareGame();
@@ -57,16 +58,7 @@ onAuthStateChanged(auth, async (user) => {
 async function prepareGame() {
     const pRef = ref(db, `parties/${partyCode}/players`);
     const pSnap = await get(pRef);
-    
-    if (pSnap.exists()) {
-        forceInit(pSnap.val());
-    } else {
-        // Retry loop for slow connections
-        setTimeout(async () => {
-            const retrySnap = await get(pRef);
-            if (retrySnap.exists()) forceInit(retrySnap.val());
-        }, 1500);
-    }
+    if (pSnap.exists()) forceInit(pSnap.val());
 }
 
 async function forceInit(playersObj) {
@@ -75,6 +67,7 @@ async function forceInit(playersObj) {
     if (playerIds.length === 0) return;
 
     gameActive = true;
+    usedWords = [];
     let startData = {};
     playerIds.forEach(uid => { 
         startData[uid] = { 
@@ -86,6 +79,7 @@ async function forceInit(playersObj) {
 
     const updates = {};
     updates[`parties/${partyCode}/playersData`] = startData;
+    updates[`parties/${partyCode}/usedWords`] = [];
     updates[`parties/${partyCode}/gameData`] = {
         syllable: "READY?",
         timer: 10,
@@ -110,8 +104,8 @@ async function updateTurn(idx) {
     const pData = pSnap.val();
     const playerIds = Object.keys(pData);
     let nextIdx = idx % playerIds.length;
-    let attempts = 0;
     
+    let attempts = 0;
     while (pData[playerIds[nextIdx]].lives <= 0 && attempts < playerIds.length) {
         nextIdx = (nextIdx + 1) % playerIds.length;
         attempts++;
@@ -152,6 +146,11 @@ function listenToGame() {
         }
     });
 
+    // Keep used words synced
+    onValue(ref(db, `parties/${partyCode}/usedWords`), (snap) => {
+        usedWords = snap.val() || [];
+    });
+
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
         if (!snap.exists()) return;
         const data = snap.val();
@@ -170,10 +169,7 @@ function listenToGame() {
             display.appendChild(card);
         });
 
-        if (isHost) {
-            gameActive = true;
-            checkWinner(data);
-        }
+        if (isHost) checkWinner(data);
     });
 }
 
@@ -219,15 +215,19 @@ window.changeGame = async () => {
 };
 
 async function isValidWord(word) {
+    const cleanWord = word.toLowerCase().trim();
+    // Check if used before
+    if (usedWords.includes(cleanWord)) return false;
+
     try {
-        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
         return response.ok;
     } catch { return false; }
 }
 
 function listenForControllerInput() {
     onValue(ref(db, `parties/${partyCode}/action`), async (snap) => {
-        if (!snap.exists()) return;
+        if (!snap.exists() || !isHost) return; // ONLY host processes word logic
         const action = snap.val();
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
         const gameData = gSnap.val();
@@ -237,7 +237,12 @@ function listenForControllerInput() {
             if (word.includes(gameData.syllable)) {
                 const valid = await isValidWord(word);
                 if (valid) {
-                    await update(ref(db, `parties/${partyCode}/gameData`), { lastWord: word });
+                    usedWords.push(word.toLowerCase());
+                    await update(ref(db, `parties/${partyCode}`), { 
+                        "gameData/lastWord": word,
+                        "usedWords": usedWords
+                    });
+                    
                     if (window.confetti) confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
                     
                     const pSnap = await get(ref(db, `parties/${partyCode}/playersData`));
@@ -260,7 +265,6 @@ function startHostTimer() {
 
         if (d.status === "playing" && !["READY?", "WAITING"].includes(d.syllable)) {
             if (d.timer > 0) {
-                // Corrected path reference
                 update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
             } else {
                 const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);

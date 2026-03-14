@@ -105,7 +105,7 @@
 
         .create-btn { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(108,92,231,0.2); }
         .start-btn { background: var(--success); color: white; margin-top: 10px; box-shadow: 0 10px 20px rgba(0,184,148,0.2); }
-        .kick-btn { width: auto; padding: 6px; background: none; color: var(--danger); }
+        .kick-btn { width: auto; padding: 6px; background: none; color: var(--danger); border: none; cursor: pointer; }
         
         button:active { transform: scale(0.96); }
         button:disabled { background: #dfe6e9; color: #b2bec3; cursor: not-allowed; }
@@ -193,10 +193,9 @@
         const snapshot = await get(ref(db, `parties/${partyCode}`));
         if(snapshot.exists()) {
             setupUI();
-            // Single update to reset lobby state without touching players
+            // Reset redirect and status so players don't get kicked instantly
             await update(ref(db, `parties/${partyCode}/gameData`), { 
                 status: "lobby", 
-                syllable: "LOBBY",
                 redirect: false 
             });
             setupHostPresence();
@@ -211,14 +210,12 @@
         if (!currentUser) return;
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         
-        // Update URL
         const newurl = window.location.origin + window.location.pathname + '?code=' + partyCode;
         window.history.pushState({path:newurl},'',newurl);
 
         setupUI();
         
-        // COMBINED UPDATE: Create everything in one go.
-        // This prevents race conditions where players join before gameData exists.
+        // Using set() for creation is fine as it's a new node
         const initialData = {
             created: serverTimestamp(),
             hostId: currentUser.uid,
@@ -230,7 +227,7 @@
             }
         };
 
-        await update(ref(db, "parties/" + partyCode), initialData);
+        await set(ref(db, "parties/" + partyCode), initialData);
 
         setupHostPresence();
         listenPlayers();
@@ -269,7 +266,7 @@
                     li.innerHTML = `
                         <div class="mini-avatar" style="background:${p.color || '#6c5ce7'}">${char}</div>
                         <span class="player-name">${p.name}</span>
-                        <button class="kick-btn" title="Kick Player" onclick="kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>
+                        <button class="kick-btn" onclick="window.kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>
                     `;
                     list.appendChild(li);
                 });
@@ -278,7 +275,6 @@
             countLabel.innerText = count;
             lucide.createIcons();
 
-            // Only show Start button if there are players
             if (count >= 1) { 
                 startBtn.classList.remove("hidden");
                 msg.classList.add("hidden");
@@ -309,28 +305,21 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> INITIALIZING...`;
         lucide.createIcons();
 
-        // 1. Final check for players
-        const pSnap = await get(ref(db, `parties/${partyCode}/players`));
-        if (!pSnap.exists()) {
-            alert("Waiting for players to join...");
-            startBtn.disabled = false;
-            startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
-            return;
-        }
-
-        // 2. Clear old game state (NOT player list) to ensure a fresh start
+        // 1. Clear old data from PREVIOUS rounds (leaves the joined players list alone)
         await remove(ref(db, `parties/${partyCode}/playersData`));
+        await remove(ref(db, `parties/${partyCode}/action`));
+        await remove(ref(db, `parties/${partyCode}/usedWords`));
 
-        // 3. Set status to playing. This triggers the player's game.js to react.
+        // 2. Set status to playing
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             redirect: false 
         });
 
-        // 4. Smooth transition to the Game screen
+        // 3. Small delay to let Firebase sync, then redirect host
         setTimeout(() => {
             window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
-        }, 500);
+        }, 800);
     }
 
     lucide.createIcons();
