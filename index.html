@@ -345,7 +345,9 @@
 
     // Helper: HSL to HEX for display
     function hslToHex(hsl) {
-        let [h, s, l] = hsl.match(/\d+/g).map(Number);
+        let match = hsl.match(/\d+/g);
+        if(!match) return "#6c5ce7";
+        let [h, s, l] = match.map(Number);
         l /= 100;
         const a = s * Math.min(l, 1 - l) / 100;
         const f = n => {
@@ -410,19 +412,25 @@
 
         if (snap.exists()) {
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
+            
+            // --- FIXED: DISCONNECT PROTECTION ---
+            const presence = onDisconnect(playerRef);
+            presence.remove(); // Default: remove if they quit lobby
+
             await set(playerRef, { 
                 name: document.getElementById("usernameInput").value, 
                 color: selectedColor, 
                 joinedAt: serverTimestamp() 
             });
-            onDisconnect(playerRef).remove();
             
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("displayRoomCode").innerText = code;
             document.getElementById("partyScreen").classList.remove("hidden");
 
-            onValue(ref(db, `parties/${code}/gameData`), (gsnap) => {
-                if(gsnap.exists() && gsnap.val().status === "playing") {
+            // Listen for status: if game starts, CANCEL the disconnect removal
+            onValue(ref(db, `parties/${code}/gameData/status`), (gsnap) => {
+                if(gsnap.exists() && gsnap.val() === "playing") {
+                    presence.cancel(); // Don't delete player, they are moving to game.html
                     window.location.href = `Games/Word Bomb/game.html?code=${code}`;
                 }
             });
