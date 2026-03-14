@@ -9,6 +9,7 @@
             --danger: #ff4757;
             --accent: #f1c40f;
             --success: #2ecc71;
+            --primary: #6c5ce7;
         }
 
         body {
@@ -33,7 +34,6 @@
             font-weight: bold;
         }
 
-        /* --- Center Game Area --- */
         .main-arena {
             flex-grow: 1;
             display: flex;
@@ -43,231 +43,249 @@
         }
 
         #bomb {
-            font-size: 120px;
+            font-size: 100px;
             margin: 0;
             filter: drop-shadow(0 0 30px rgba(0,0,0,0.8));
             line-height: 1;
         }
 
         #timer {
-            font-size: 100px;
+            font-size: 80px;
             font-weight: 900;
             color: var(--danger);
             font-family: 'Courier New', monospace;
             text-shadow: 0 0 30px rgba(255, 71, 87, 0.6);
-            margin: -10px 0 10px 0;
+            margin: 10px 0;
         }
 
         #syllable-box {
             background: var(--accent);
             color: black;
-            padding: 10px 60px;
-            font-size: 60px;
+            padding: 10px 40px;
+            font-size: 45px;
             font-weight: 900;
             border-radius: 20px;
-            box-shadow: 0 0 50px rgba(241, 196, 15, 0.4);
+            box-shadow: 0 0 40px rgba(241, 196, 15, 0.3);
             text-transform: uppercase;
-            min-width: 200px;
+            min-width: 180px;
         }
 
-        #word-display {
-            height: 60px;
-            font-size: 40px;
-            font-weight: bold;
+        #word-input {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            padding: 15px;
+            font-size: 30px;
             color: white;
+            border-radius: 15px;
+            text-align: center;
             margin-top: 20px;
-            letter-spacing: 5px;
+            outline: none;
             text-transform: uppercase;
-            text-shadow: 0 0 15px rgba(255,255,255,0.5);
         }
 
-        #turn-info {
-            font-size: 28px;
-            font-weight: bold;
-            margin-top: 10px;
-            letter-spacing: 2px;
-        }
+        #word-input:focus { border-color: var(--accent); }
 
-        /* --- Player Cards --- */
         #lives-display {
             display: flex;
             justify-content: center;
-            gap: 25px;
+            gap: 15px;
             padding: 20px;
             flex-wrap: wrap;
-            max-height: 30vh;
         }
 
         .player-card {
             background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 20px;
-            min-width: 140px;
-            border: 3px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 10px;
+            border-radius: 15px;
+            min-width: 100px;
+            border: 2px solid rgba(255,255,255,0.1);
+            transition: 0.3s;
         }
 
         .active-turn {
             border-color: var(--accent);
             background: rgba(241, 196, 15, 0.1);
-            transform: scale(1.1) translateY(-10px);
-            box-shadow: 0 15px 40px rgba(241, 196, 15, 0.2);
+            transform: scale(1.1);
         }
 
         .mini-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            border: 2px solid white;
-            margin-bottom: 8px;
+            width: 35px; height: 35px; border-radius: 50%;
+            margin: 0 auto 5px; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; border: 2px solid white;
         }
 
-        .player-name { font-weight: bold; font-size: 18px; }
-        .hearts { font-size: 22px; margin-top: 5px; }
-        .dead { opacity: 0.3; filter: grayscale(1); }
-
-        /* --- Victory Overlay --- */
         #victory-overlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 2000;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(10px);
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000; flex-direction: column;
+            justify-content: center; align-items: center; backdrop-filter: blur(10px);
         }
 
-        .winner-container {
-            position: relative;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        .crown {
-            font-size: 80px;
-            position: absolute;
-            top: -70px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation: rotateCrown 5s linear infinite;
-        }
-
-        .winner-banner {
-            background: var(--accent);
-            color: black;
-            font-weight: 900;
-            padding: 5px 20px;
-            border-radius: 10px;
-            position: absolute;
-            top: -20px;
-            width: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 14px;
-        }
-
-        .victory-buttons {
-            margin-top: 50px;
-            display: flex;
-            gap: 20px;
-        }
-
-        .vic-btn {
-            padding: 15px 30px;
-            border-radius: 15px;
-            font-size: 20px;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .vic-btn:hover { transform: scale(1.1); }
+        .vic-btn { padding: 15px 30px; border-radius: 15px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; margin: 10px; }
         .btn-again { background: var(--success); color: white; }
-        .btn-change { background: #3498db; color: white; }
-
-        /* Animations */
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
-        @keyframes rotateCrown {
-            0% { transform: translateX(-50%) rotateY(0deg); }
-            100% { transform: translateX(-50%) rotateY(360deg); }
-        }
+        .btn-lobby { background: var(--primary); color: white; }
 
         .shake-slow { animation: shake 0.5s infinite; }
         .shake-fast { animation: shake 0.15s infinite; color: var(--danger); }
-
         @keyframes shake {
-            0% { transform: rotate(0deg); }
-            25% { transform: rotate(-2deg) translate(-2px, 0); }
-            75% { transform: rotate(2deg) translate(2px, 0); }
-            100% { transform: rotate(0deg); }
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-2deg); }
+            75% { transform: rotate(2deg); }
         }
     </style>
 </head>
 <body>
 
-    <h2 id="partyId">SYNCING...</h2>
+    <h2 id="partyId">ROOM: ----</h2>
 
     <div class="main-arena">
         <div id="bomb" class="shake-slow">💣</div>
-        <div id="timer">--</div>
+        <div id="timer">15</div>
 
-        <p style="color: #888; margin: 0;">SYLLABLE:</p>
+        <p style="color: #888; margin: 0;">CONTAINING:</p>
         <div id="syllable-box">
-            <span id="syllable">WAITING</span>
+            <span id="syllable">WAIT</span>
         </div>
 
-        <div id="word-display"></div> 
-        <div id="turn-info">WAITING FOR PLAYERS...</div>
+        <input type="text" id="word-input" placeholder="TYPE HERE..." autocomplete="off" disabled>
+        <div id="turn-info" style="margin-top:15px; font-weight:bold; color:var(--accent);">WAITING...</div>
     </div>
 
     <div id="lives-display"></div>
 
     <div id="victory-overlay">
-        <div class="winner-container">
-            <div class="crown">👑</div>
-            <div class="winner-banner">PLAYER WON</div>
-            <div id="winner-card-slot">
-                </div>
-        </div>
-        
-        <div class="victory-buttons" id="host-controls" style="display: none;">
+        <h1 id="winner-text">PLAYER WINS!</h1>
+        <div id="host-controls" style="display: none;">
             <button class="vic-btn btn-again" onclick="resetGame()">PLAY AGAIN</button>
-            <button class="vic-btn btn-change" onclick="changeGame()">CHANGE GAME</button>
+            <button class="vic-btn btn-lobby" onclick="backToLobby()">BACK TO LOBBY</button>
         </div>
+        <p id="player-msg" style="color: #888;">Waiting for host to restart...</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script type="module" src="game.js"></script>
 
-    <script>
-        const timerObs = document.getElementById('timer');
-        const bombObs = document.getElementById('bomb');
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, update, serverTimestamp, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const observer = new MutationObserver(() => {
-            const timeLeft = parseInt(timerObs.innerText);
-            if (timerObs.innerText === "GAME OVER") {
-                bombObs.innerText = "💥";
-                bombObs.className = "";
-            } else if (!isNaN(timeLeft)) {
-                bombObs.innerText = "💣";
-                bombObs.className = timeLeft <= 5 ? "shake-fast" : "shake-slow";
+        const firebaseConfig = {
+            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+            authDomain: "syncplay-17b6e.firebaseapp.com",
+            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+            projectId: "syncplay-17b6e",
+            storageBucket: "syncplay-17b6e.firebasestorage.app",
+            messagingSenderId: "86016195929",
+            appId: "1:86016195929:web:40262a28786f2ead712048"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const partyCode = urlParams.get('code');
+        let currentUser, isHost = false;
+
+        if (!partyCode) { window.location.href = "../../index.html"; }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('partyId').innerText = `ROOM: ${partyCode}`;
+                
+                // Check if user is Host
+                const partySnap = await get(ref(db, `parties/${partyCode}`));
+                if (partySnap.exists()) {
+                    isHost = partySnap.val().hostId === user.uid;
+                    if (isHost) {
+                        document.getElementById('host-controls').style.display = 'block';
+                        document.getElementById('player-msg').style.display = 'none';
+                        initGame();
+                    }
+                }
+                listenToGame();
             }
         });
 
-        observer.observe(timerObs, { childList: true });
+        // --- GAME LOGIC ---
+        function listenToGame() {
+            // Listen for players to build cards
+            onValue(ref(db, `parties/${partyCode}/players`), (snap) => {
+                const container = document.getElementById('lives-display');
+                container.innerHTML = "";
+                const players = snap.val() || {};
+                Object.keys(players).forEach(uid => {
+                    const p = players[uid];
+                    const div = document.createElement('div');
+                    div.className = `player-card ${p.isTurn ? 'active-turn' : ''}`;
+                    div.innerHTML = `
+                        <div class="mini-avatar" style="background:${p.color}">${p.name[0]}</div>
+                        <div style="font-size:12px; font-weight:bold">${p.name}</div>
+                        <div style="color:var(--danger)">${'❤'.repeat(p.lives || 3)}</div>
+                    `;
+                    container.appendChild(div);
+
+                    // If it's MY turn, enable input
+                    if (uid === currentUser.uid && p.isTurn && (p.lives > 0)) {
+                        document.getElementById('word-input').disabled = false;
+                        document.getElementById('word-input').focus();
+                        document.getElementById('turn-info').innerText = "YOUR TURN!";
+                    } else if (uid === currentUser.uid) {
+                        document.getElementById('word-input').disabled = true;
+                        document.getElementById('turn-info').innerText = p.isTurn ? "WAITING..." : "OTHER PLAYER'S TURN";
+                    }
+                });
+            });
+
+            // Listen for Syllable & Timer
+            onValue(ref(db, `parties/${partyCode}/gameData`), (snap) => {
+                const data = snap.val();
+                if (!data) return;
+                document.getElementById('syllable').innerText = data.syllable || "WAIT";
+                document.getElementById('timer').innerText = data.timer || "15";
+                
+                if (data.status === "lobby") {
+                    window.location.href = `../../host.html?code=${partyCode}`;
+                }
+            });
+        }
+
+        // Host initializes or resets game
+        async function initGame() {
+            const snap = await get(ref(db, `parties/${partyCode}/players`));
+            const players = snap.val();
+            const updates = {};
+            const ids = Object.keys(players);
+            
+            ids.forEach((id, index) => {
+                updates[`players/${id}/lives`] = 3;
+                updates[`players/${id}/isTurn`] = (index === 0);
+            });
+            
+            updates['gameData/syllable'] = "EN";
+            updates['gameData/timer'] = 15;
+            updates['gameData/status'] = "playing";
+            
+            await update(ref(db, `parties/${partyCode}`), updates);
+        }
+
+        // Basic Word Input Logic
+        document.getElementById('word-input').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const word = e.target.value.toUpperCase();
+                const syl = document.getElementById('syllable').innerText;
+                
+                if (word.includes(syl)) {
+                    // Logic to pass turn (Host or Cloud Function would normally handle timer)
+                    e.target.value = "";
+                    // Note: For a real game, you'd trigger a Turn Switch here in DB
+                }
+            }
+        });
+
+        window.resetGame = () => initGame();
+        window.backToLobby = () => update(ref(db, `parties/${partyCode}/gameData`), { status: "lobby" });
+
     </script>
 </body>
 </html>

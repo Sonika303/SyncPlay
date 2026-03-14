@@ -37,14 +37,13 @@ onAuthStateChanged(auth, async (user) => {
         if (partyData.hostId === myUid) {
             isHost = true;
             
-            // If the game status is lobby or playersData is missing, initialize it!
-            if (!partyData.playersData || (partyData.gameData && partyData.gameData.status === "lobby")) {
+            // FIX: Only initialize if the game hasn't actually started yet
+            // This prevents the host from wiping the game on a page refresh
+            if (partyData.gameData?.status !== "playing" || !partyData.playersData) {
                 const pRef = ref(db, `parties/${partyCode}/players`);
                 const pSnap = await get(pRef);
                 if (pSnap.exists()) {
                     forceInit(pSnap.val());
-                } else {
-                    console.error("No players found to start the game.");
                 }
             }
         }
@@ -68,16 +67,19 @@ async function forceInit(playersObj) {
         }; 
     });
 
-    // Push fresh game state
-    await set(ref(db, `parties/${partyCode}/playersData`), startData);
-    await set(ref(db, `parties/${partyCode}/gameData`), {
+    // CRITICAL FIX: Use update() instead of set() to prevent connection drops
+    const updates = {};
+    updates[`parties/${partyCode}/playersData`] = startData;
+    updates[`parties/${partyCode}/gameData`] = {
         syllable: "READY?",
         timer: 10,
         turn: players[0],
         status: "playing",
         lastWord: "",
         redirect: false 
-    });
+    };
+
+    await update(ref(db), updates);
     
     document.getElementById("victory-overlay").style.display = "none";
     setTimeout(() => updateTurn(0), 2000);
@@ -92,7 +94,7 @@ async function updateTurn(idx) {
 
     let nextIdx = idx % players.length;
     let attempts = 0;
-    // Skip dead players
+    
     while (pData[players[nextIdx]] && pData[players[nextIdx]].lives <= 0 && attempts < players.length) {
         nextIdx = (nextIdx + 1) % players.length;
         attempts++;
@@ -105,6 +107,7 @@ async function updateTurn(idx) {
         timer: 10,
         lastWord: "" 
     });
+    // Cleanup previous action
     await remove(ref(db, `parties/${partyCode}/action`));
 }
 
@@ -113,18 +116,18 @@ function listenToGame() {
         if (!snap.exists()) return;
         const data = snap.val();
         
-        // Only update UI if we are actually playing
         if (data.status === "playing" || data.status === "finished") {
             document.getElementById("syllable").innerText = data.syllable || "---";
             document.getElementById("timer").innerText = data.timer ?? "0";
             document.getElementById("word-display").innerText = data.lastWord || "";
 
+            const timerEl = document.getElementById("timer");
             if (data.timer <= 3 && data.status === "playing") {
-                document.getElementById("timer").style.color = "#ff0000";
-                document.getElementById("timer").style.transform = "scale(1.2)";
+                timerEl.style.color = "#ff4757";
+                timerEl.classList.add("shake-fast");
             } else {
-                document.getElementById("timer").style.color = "";
-                document.getElementById("timer").style.transform = "";
+                timerEl.style.color = "";
+                timerEl.classList.remove("shake-fast");
             }
 
             if (data.status === "finished") {
@@ -143,30 +146,33 @@ function listenToGame() {
                 }
             }
         }
-
-        document.querySelectorAll('.player-card').forEach(card => {
-            card.classList.toggle('active-turn', card.dataset.uid === data.turn);
-        });
     });
 
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
         if (!snap.exists()) return;
         const data = snap.val();
         const display = document.getElementById("lives-display");
+        const currentGameData = ref(db, `parties/${partyCode}/gameData`);
+        
         display.innerHTML = "";
         
-        Object.keys(data).forEach(uid => {
-            const p = data[uid];
-            const card = document.createElement("div");
-            card.className = `player-card ${p.lives <= 0 ? 'dead' : ''}`;
-            card.dataset.uid = uid;
-            card.innerHTML = `
-                <div class="mini-avatar" style="background:${p.color}">${(p.name || "P").charAt(0).toUpperCase()}</div>
-                <div class="player-name">${p.name || "Player"}</div>
-                <div class="hearts">${p.lives > 0 ? "❤️".repeat(p.lives) : "💀"}</div>
-            `;
-            display.appendChild(card);
+        // Get current turn to highlight card
+        get(currentGameData).then(gameSnap => {
+            const currentTurn = gameSnap.exists() ? gameSnap.val().turn : null;
+
+            Object.keys(data).forEach(uid => {
+                const p = data[uid];
+                const card = document.createElement("div");
+                card.className = `player-card ${p.lives <= 0 ? 'dead' : ''} ${uid === currentTurn ? 'active-turn' : ''}`;
+                card.innerHTML = `
+                    <div class="mini-avatar" style="background:${p.color}">${(p.name || "P").charAt(0).toUpperCase()}</div>
+                    <div class="player-name">${p.name || "Player"}</div>
+                    <div class="hearts">${p.lives > 0 ? "❤️".repeat(p.lives) : "💀"}</div>
+                `;
+                display.appendChild(card);
+            });
         });
+
         if (isHost) {
             gameActive = true;
             checkWinner(data);
@@ -236,12 +242,12 @@ function listenForControllerInput() {
             const word = (action.word || "").toUpperCase().trim();
             const syl = (gameData.syllable || "").toUpperCase();
             
-            if (!word) return;
-            await update(ref(db, `parties/${partyCode}/gameData`), { lastWord: word });
-
-            if (word.includes(syl) && word.length > syl.length) {
+            if (!word || word.length <= syl.length) return;
+            
+            if (word.includes(syl)) {
                 const valid = await isValidWord(word);
                 if (valid) {
+                    await update(ref(db, `parties/${partyCode}/gameData`), { lastWord: word });
                     if (typeof confetti === 'function') confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
                     updateTurn(players.indexOf(action.uid) + 1);
                 }
@@ -250,20 +256,22 @@ function listenForControllerInput() {
     });
 }
 
+// Host-only Game Loop
 setInterval(async () => {
     if (isHost && gameActive) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
         if (!snap.exists()) return;
         const d = snap.val();
 
-        if (d.status === "playing" && !["READY?", "Choosing...", "LOBBY"].includes(d.syllable)) {
+        if (d.status === "playing" && !["READY?", "WAITING", "LOBBY"].includes(d.syllable)) {
             if (d.timer > 0) {
                 update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
             } else {
                 const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
                 const pSnap = await get(pRef);
                 if (pSnap.exists()) {
-                    await update(pRef, { lives: Math.max(0, pSnap.val().lives - 1) });
+                    const currentLives = pSnap.val().lives;
+                    await update(pRef, { lives: Math.max(0, currentLives - 1) });
                     updateTurn(players.indexOf(d.turn) + 1);
                 }
             }
