@@ -118,7 +118,7 @@
             color: #b2bec3; margin-top: 20px;
         }
 
-        .spin { animation: rotate 1s linear infinite; }
+        .spin { animation: rotate 1s linear infinite; display: inline-block; }
         @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -179,10 +179,12 @@
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
-            document.getElementById("statusMsg").innerText = "Host Logged In";
+            document.getElementById("statusMsg").innerText = "Logged in as Host";
             const urlParams = new URLSearchParams(window.location.search);
             const existingCode = urlParams.get('code');
             if (existingCode) rejoinLobby(existingCode);
+        } else {
+            document.getElementById("statusMsg").innerText = "Authentication Required";
         }
     });
 
@@ -191,7 +193,7 @@
         const snapshot = await get(ref(db, `parties/${partyCode}`));
         if(snapshot.exists()) {
             setupUI();
-            // NEVER use set() here, only update gameData status
+            // Single update to reset lobby state without touching players
             await update(ref(db, `parties/${partyCode}/gameData`), { 
                 status: "lobby", 
                 syllable: "LOBBY",
@@ -200,7 +202,8 @@
             setupHostPresence();
             listenPlayers();
         } else {
-            document.getElementById("statusMsg").innerText = "Invalid Room Code";
+            document.getElementById("statusMsg").innerText = "Session Not Found";
+            window.history.pushState({}, '', window.location.pathname);
         }
     }
 
@@ -208,24 +211,26 @@
         if (!currentUser) return;
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         
+        // Update URL
         const newurl = window.location.origin + window.location.pathname + '?code=' + partyCode;
         window.history.pushState({path:newurl},'',newurl);
 
         setupUI();
         
-        // Initial setup - ensures we don't wipe players if the node already exists
-        await update(ref(db, "parties/" + partyCode), {
+        // COMBINED UPDATE: Create everything in one go.
+        // This prevents race conditions where players join before gameData exists.
+        const initialData = {
             created: serverTimestamp(),
             hostId: currentUser.uid,
-            hostActive: true
-        });
+            hostActive: true,
+            gameData: {
+                status: "lobby",
+                syllable: "LOBBY",
+                redirect: false
+            }
+        };
 
-        // Set gameData separately to be safe
-        await set(ref(db, `parties/${partyCode}/gameData`), { 
-            status: "lobby", 
-            syllable: "LOBBY",
-            redirect: false 
-        });
+        await update(ref(db, "parties/" + partyCode), initialData);
 
         setupHostPresence();
         listenPlayers();
@@ -264,7 +269,7 @@
                     li.innerHTML = `
                         <div class="mini-avatar" style="background:${p.color || '#6c5ce7'}">${char}</div>
                         <span class="player-name">${p.name}</span>
-                        <button class="kick-btn" onclick="kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>
+                        <button class="kick-btn" title="Kick Player" onclick="kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>
                     `;
                     list.appendChild(li);
                 });
@@ -273,6 +278,7 @@
             countLabel.innerText = count;
             lucide.createIcons();
 
+            // Only show Start button if there are players
             if (count >= 1) { 
                 startBtn.classList.remove("hidden");
                 msg.classList.add("hidden");
@@ -292,33 +298,39 @@
     };
 
     window.kickPlayer = (uid) => {
-        if(confirm("Kick this player?")) remove(ref(db, `parties/${partyCode}/players/${uid}`));
+        if(confirm("Kick this player?")) {
+            remove(ref(db, `parties/${partyCode}/players/${uid}`));
+        }
     };
 
     window.startGame = async function() {
         const startBtn = document.getElementById("startBtn");
         startBtn.disabled = true;
-        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> LAUNCHING...`;
+        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> INITIALIZING...`;
         lucide.createIcons();
 
-        // Check if we have players before moving
+        // 1. Final check for players
         const pSnap = await get(ref(db, `parties/${partyCode}/players`));
         if (!pSnap.exists()) {
-            alert("No players found!");
+            alert("Waiting for players to join...");
             startBtn.disabled = false;
             startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
             return;
         }
 
-        // Surgical Update: Trigger the redirect and set status to playing
-        // We DO NOT touch the /players node here.
+        // 2. Clear old game state (NOT player list) to ensure a fresh start
+        await remove(ref(db, `parties/${partyCode}/playersData`));
+
+        // 3. Set status to playing. This triggers the player's game.js to react.
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
-            redirect: false // Ensure we don't trigger lobby redirect immediately
+            redirect: false 
         });
 
-        // Redirect to the Game Arena
-        window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
+        // 4. Smooth transition to the Game screen
+        setTimeout(() => {
+            window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
+        }, 500);
     }
 
     lucide.createIcons();
