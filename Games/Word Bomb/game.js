@@ -116,7 +116,9 @@ function listenToGame() {
         
         document.getElementById("syllable").innerText = data.syllable;
         document.getElementById("timer").innerText = data.timer;
-        document.getElementById("word-display").innerText = data.lastWord || "";
+        
+        const wordBox = document.getElementById("word-display");
+        if (wordBox) wordBox.innerText = data.lastWord || "";
 
         get(ref(db, `parties/${partyCode}/playersData/${data.turn}`)).then(s => {
             if(s.exists()){
@@ -133,6 +135,13 @@ function listenToGame() {
             document.getElementById("timer").innerText = "🏆";
             if (isHost) document.getElementById("resetBtn").style.display = "block";
         }
+
+        document.querySelectorAll('.player-card').forEach(card => {
+            card.classList.remove('active-turn');
+            if (card.dataset.uid === data.turn) {
+                card.classList.add('active-turn');
+            }
+        });
     });
 
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
@@ -159,11 +168,11 @@ function listenToGame() {
     });
 }
 
-// --- NEW: Dictionary Validation ---
+// Word validation using Free Dictionary API
 async function isValidWord(word) {
     try {
-        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-        return response.ok; // If status is 200, word exists.
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
+        return response.ok;
     } catch (e) {
         return false;
     }
@@ -177,48 +186,47 @@ function listenForControllerInput() {
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
         const gameData = gSnap.val();
         
-        if (action.uid === gameData.turn && gameData.syllable !== "Choosing...") {
+        if (action.uid === gameData.turn && gameData.syllable !== "Choosing..." && gameData.syllable !== "READY?") {
             const word = action.word.toUpperCase().trim();
             const syl = gameData.syllable.toUpperCase();
 
-            // Instant visual feedback
             await update(ref(db, `parties/${partyCode}/gameData`), { lastWord: word });
 
-            // Only validate if it's longer than the syllable itself to avoid "STA" = "STA"
+            // Word must contain syllable AND be longer than syllable AND be a real word
             if (word.includes(syl) && word.length > syl.length) {
-                const realWord = await isValidWord(word.toLowerCase());
-                if (realWord) {
-                    console.log("✅ Real Word Accepted:", word);
+                const valid = await isValidWord(word);
+                if (valid) {
                     await remove(ref(db, `parties/${partyCode}/action`));
                     updateTurn(players.indexOf(action.uid) + 1);
-                } else {
-                    console.warn("❌ Fake Word Rejected:", word);
                 }
             }
         }
     });
 }
 
-// Host Timer Logic - Fixed the "Pausing at 0" bug
+// CRITICAL: HARDENED HOST TIMER
 setInterval(async () => {
     if (isHost && gameActive) {
         const snap = await get(ref(db, `parties/${partyCode}/gameData`));
-        if (snap.exists()) {
-            let d = snap.val();
-            if (d.syllable !== "Choosing..." && d.syllable !== "READY?" && d.status === "playing") {
-                if (d.timer > 0) {
-                    update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
-                } else {
-                    // TIMER IS 0 - KILL PLAYER
-                    console.log("⏰ BOOM! Time's up for", d.turn);
-                    const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
-                    const pSnap = await get(pRef);
-                    if (pSnap.exists()) {
-                        const newLives = pSnap.val().lives - 1;
-                        await update(pRef, { lives: newLives });
-                        // Move to next turn immediately
-                        updateTurn(players.indexOf(d.turn) + 1);
-                    }
+        if (!snap.exists()) return;
+        
+        let d = snap.val();
+        if (d.syllable !== "Choosing..." && d.syllable !== "READY?" && d.status === "playing") {
+            if (d.timer > 0) {
+                // Keep counting down
+                update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
+            } else {
+                // TIMER IS 0: FORCE LIFE LOSS
+                console.log("BOOM: Player timed out.");
+                const pRef = ref(db, `parties/${partyCode}/playersData/${d.turn}`);
+                const pSnap = await get(pRef);
+                
+                if (pSnap.exists()) {
+                    const currentLives = pSnap.val().lives;
+                    // Deduct life and push update
+                    await update(pRef, { lives: Math.max(0, currentLives - 1) });
+                    // Immediately skip to next turn
+                    updateTurn(players.indexOf(d.turn) + 1);
                 }
             }
         }
