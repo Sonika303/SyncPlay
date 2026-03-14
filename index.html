@@ -37,7 +37,6 @@
             transition: transform 0.3s ease;
         }
 
-        /* WhatsApp Style Avatar */
         .avatar {
             width: 80px;
             height: 80px;
@@ -85,9 +84,9 @@
             box-sizing: border-box;
             background: rgba(255,255,255,0.9);
             font-size: 16px;
+            color: #333;
         }
 
-        /* Overlay Settings Panel */
         #settings {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -151,6 +150,7 @@
         <h2 id="partyTitle">Lobby</h2>
         <p>Waiting for the host to ignite the bomb...</p>
         <div style="margin: 20px auto;" class="avatar" id="lobbyAvatar">?</div>
+        <p id="lobbyStatus" style="font-size: 12px; opacity: 0.7;">Connected to Server</p>
     </div>
 </div>
 
@@ -163,8 +163,7 @@
         <input id="usernameInput" type="text" placeholder="Username">
 
         <label>Profile Color</label>
-        <div class="color-picker" id="colorPicker">
-            </div>
+        <div class="color-picker" id="colorPicker"></div>
 
         <button class="btn-join" onclick="saveSettings()">Save Changes</button>
         <button style="background:#eee; color:#333" onclick="toggleSettings()">Cancel</button>
@@ -194,10 +193,11 @@
     const provider = new GoogleAuthProvider();
 
     let currentUser;
-    let selectedColor = "#ff5e62"; // Default
+    let selectedColor = "#ff5e62"; 
     const profileColors = ["#ff5e62", "#2ecc71", "#3498db", "#f1c40f", "#9b59b6", "#e67e22"];
 
-    // Initialize Color Picker
+    console.log("🛠️ App Loaded. Firebase initialized.");
+
     const cp = document.getElementById("colorPicker");
     profileColors.forEach(color => {
         let div = document.createElement("div");
@@ -213,10 +213,14 @@
         element.classList.add("active");
     }
 
-    window.googleLogin = () => signInWithPopup(auth, provider);
+    window.googleLogin = () => {
+        console.log("🔑 Initiating Google Login...");
+        signInWithPopup(auth, provider).catch(e => console.error("Login Error:", e));
+    };
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
+            console.log("✅ User Authenticated:", user.uid);
             currentUser = user;
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
@@ -232,11 +236,11 @@
                 const data = snap.val();
                 username = data.username || username;
                 color = data.profileColor || color;
+                console.log("📂 Existing user data found.");
             }
 
             selectedColor = color;
 
-            // Update user in DB with professional structure
             await update(userRef, {
                 username: username,
                 email: user.email,
@@ -250,67 +254,77 @@
 
     function updateUI(name, color) {
         const initials = name.charAt(0).toUpperCase();
-        const avatar = document.getElementById("avatarCircle");
-        const lobbyAvatar = document.getElementById("lobbyAvatar");
-        
-        avatar.innerText = initials;
-        avatar.style.background = color;
-        lobbyAvatar.innerText = initials;
-        lobbyAvatar.style.background = color;
-
+        document.getElementById("avatarCircle").innerText = initials;
+        document.getElementById("avatarCircle").style.background = color;
+        document.getElementById("lobbyAvatar").innerText = initials;
+        document.getElementById("lobbyAvatar").style.background = color;
         document.getElementById("welcome").innerText = "Hey, " + name;
         document.getElementById("usernameInput").value = name;
         document.getElementById("emailDisplay").innerText = currentUser.email;
     }
 
-    window.saveSettings = async () => {
-        const name = document.getElementById("usernameInput").value;
-        if (!name) return;
-
-        await update(ref(db, "users/" + currentUser.uid), {
-            username: name,
-            profileColor: selectedColor
-        });
-
-        updateUI(name, selectedColor);
-        toggleSettings();
-        alert("Profile Sync'd!");
-    };
-
     window.joinParty = async () => {
-        const code = document.getElementById("partyCode").value;
-        if (!code) return;
+        const code = document.getElementById("partyCode").value.trim();
+        if (!code) {
+            alert("Please enter a 4-digit code.");
+            return;
+        }
 
+        console.log(`🔍 Checking for Party: ${code}...`);
         const partyRef = ref(db, "parties/" + code);
         const snap = await get(partyRef);
 
         if (snap.exists()) {
+            console.log("✅ Party Found. Joining...");
             const userSnap = await get(ref(db, "users/" + currentUser.uid));
             const userData = userSnap.val();
 
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
             
+            // JOIN DATA
             await set(playerRef, {
                 name: userData.username,
-                color: userData.profileColor
+                color: userData.profileColor,
+                joinedAt: serverTimestamp()
             });
 
-            // Cleanup if they leave
+            // Disconnect cleanup
             onDisconnect(playerRef).remove();
 
+            // SWITCH UI
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("setBtn").style.display = "none";
             document.getElementById("partyScreen").style.display = "block";
             document.getElementById("partyTitle").innerText = "Party: " + code;
 
+            // WATCH FOR START
+            console.log("👂 Watching for GameState status change...");
             onValue(ref(db, `parties/${code}/gameState`), (gSnap) => {
-                if (gSnap.exists() && gSnap.val().status === "playing") {
-                    window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
+                if (gSnap.exists()) {
+                    const status = gSnap.val().status;
+                    console.log("📡 Current Game Status:", status);
+                    if (status === "playing") {
+                        console.log("🚀 LETS GO! Redirecting to Controller.");
+                        window.location.href = `Games/Word%20Bomb/controller.html?code=${code}`;
+                    }
                 }
             });
         } else {
-            alert("Invalid Party Code");
+            console.error("❌ Party Not Found in DB.");
+            alert("Invalid Party Code. Check if the host has created it!");
         }
+    };
+
+    window.saveSettings = async () => {
+        const name = document.getElementById("usernameInput").value;
+        if (!name) return;
+        await update(ref(db, "users/" + currentUser.uid), {
+            username: name,
+            profileColor: selectedColor
+        });
+        updateUI(name, selectedColor);
+        toggleSettings();
+        console.log("💾 Settings Saved.");
     };
 
     window.toggleSettings = () => {
@@ -319,7 +333,10 @@
     };
 
     window.logout = () => signOut(auth).then(() => location.reload());
-    window.createParty = () => window.location.href = "host.html";
+    window.createParty = () => {
+        console.log("➡️ Moving to Host Page...");
+        window.location.href = "host.html";
+    };
 
 </script>
 </body>
