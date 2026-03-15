@@ -26,31 +26,44 @@ let players = {};
 let apple = {gx: 10, gy: 10, isGold: false};
 
 function init() {
+    // 1. SAFETY CHECK: If no code, don't just stay black, show an error
+    if (!partyCode) {
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("ERROR: NO ROOM CODE FOUND", canvas.width/2, canvas.height/2);
+        return;
+    }
+
     resize();
     window.addEventListener('resize', resize);
     
-    // Listen for Player Data from Firebase
+    // 2. LISTEN FOR PLAYER DATA
     onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
         const data = snapshot.val();
         if (!data) return;
         
         Object.keys(data).forEach(uid => {
             if (!players[uid]) {
-                // NEW PLAYER JOINED
+                // NEW PLAYER JOINED - Randomize start position
                 players[uid] = {
                     name: data[uid].name || "Player",
                     color: data[uid].color || "#6c5ce7",
-                    parts: [{gx: 5, gy: 5}, {gx: 4, gy: 5}, {gx: 3, gy: 5}],
+                    parts: [
+                        {gx: Math.floor(cols/2), gy: Math.floor(rows/2)}, 
+                        {gx: Math.floor(cols/2)-1, gy: Math.floor(rows/2)}, 
+                        {gx: Math.floor(cols/2)-2, gy: Math.floor(rows/2)}
+                    ],
                     dir: {x: 1, y: 0},
                     nextDir: {x: 1, y: 0},
                     moveProgress: 0
                 };
             } else {
-                // UPDATE EXISTING PLAYER DIRECTION
+                // UPDATE DIRECTION FROM FIREBASE
                 if (data[uid].dir) {
-                    // Prevent 180-degree turns
                     const newD = data[uid].dir;
                     const currD = players[uid].dir;
+                    // Prevent 180-degree turns
                     if (!(newD.x === -currD.x && newD.y === -currD.y)) {
                         players[uid].nextDir = newD;
                     }
@@ -70,60 +83,49 @@ function resize() {
     rows = Math.floor(canvas.height / gridSize);
 }
 
-function getBiome(gx, gy) {
-    // Simplified biome logic for current screen
-    if(gx < cols/2 && gy < rows/2) return { name: 'Forest', c1: '#059669', c2: '#047857', color: '#10b981' };
-    return { name: 'Jungle', c1: '#065f46', c2: '#064e3b', color: '#059669' };
-}
-
 function drawPlayer(uid, p) {
-    const h = p.parts[0];
-    // Smooth interpolation
-    const rx = (h.gx + p.dir.x * (p.moveProgress - 1)) * gridSize + gridSize/2;
-    const ry = (h.gy + p.dir.y * (p.moveProgress - 1)) * gridSize + gridSize/2;
-
-    // Draw Body
+    const head = p.parts[0];
+    
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     
+    // Draw Body Segments
     p.parts.forEach((part, i) => {
-        let sx = part.gx * gridSize + gridSize/2;
-        let sy = part.gy * gridSize + gridSize/2;
-
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 25 - (i * 0.5); // Tapered tail
+        if (i === 0) return; // Skip head for now
         
-        if (i === 0) {
-            // Head is drawn separately for rotation
-        } else {
-            const prev = p.parts[i-1];
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(prev.gx * gridSize + gridSize/2, prev.gy * gridSize + gridSize/2);
-            ctx.stroke();
-        }
+        const prev = p.parts[i-1];
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = Math.max(10, 25 - (i * 0.8));
+        
+        ctx.beginPath();
+        ctx.moveTo(part.gx * gridSize + gridSize/2, part.gy * gridSize + gridSize/2);
+        ctx.lineTo(prev.gx * gridSize + gridSize/2, prev.gy * gridSize + gridSize/2);
+        ctx.stroke();
     });
 
-    // Draw Head
-    const headX = h.gx * gridSize + gridSize/2;
-    const headY = h.gy * gridSize + gridSize/2;
+    // Draw Head with Glow
+    const headX = head.gx * gridSize + gridSize/2;
+    const headY = head.gy * gridSize + gridSize/2;
     
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = p.color;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(headX, headY, 20, 0, Math.PI*2);
+    ctx.arc(headX, headY, 22, 0, Math.PI*2);
     ctx.fill();
+    ctx.shadowBlur = 0;
     
     // Name Tag
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 14px sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name, headX, headY - 30);
+    ctx.fillText(p.name, headX, headY - 35);
 }
 
 function updatePlayers() {
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        p.moveProgress += 0.15; // Speed
+        p.moveProgress += 0.15; // Animation Speed
 
         if (p.moveProgress >= 1) {
             p.moveProgress = 0;
@@ -132,14 +134,15 @@ function updatePlayers() {
             let ngx = p.parts[0].gx + p.dir.x;
             let ngy = p.parts[0].gy + p.dir.y;
 
-            // Proper Wrap around
+            // Screen Wrapping
             if(ngx < 0) ngx = cols - 1; else if(ngx >= cols) ngx = 0;
             if(ngy < 0) ngy = rows - 1; else if(ngy >= rows) ngy = 0;
 
-            // Apple Check
+            // Apple Collision
             if(ngx === apple.gx && ngy === apple.gy) {
                 spawnApple();
-                document.getElementById('s-norm').innerText = parseInt(document.getElementById('s-norm').innerText) + 1;
+                const scoreEl = document.getElementById('s-norm');
+                if(scoreEl) scoreEl.innerText = parseInt(scoreEl.innerText) + 1;
             } else {
                 p.parts.pop();
             }
@@ -154,10 +157,11 @@ function spawnApple() {
 }
 
 function gameLoop() {
+    // Background
     ctx.fillStyle = '#010409';
     ctx.fillRect(0,0,canvas.width,canvas.height);
     
-    // Draw Grid
+    // Checkerboard Grid
     for(let r=0; r<rows; r++) {
         for(let c=0; c<cols; c++) {
             ctx.fillStyle = (r+c)%2===0 ? '#0d1117' : '#161b22';
@@ -168,14 +172,12 @@ function gameLoop() {
     // Draw Apple
     const ax = apple.gx * gridSize + gridSize/2;
     const ay = apple.gy * gridSize + gridSize/2;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#ef4444';
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(ax, ay, 15, 0, Math.PI*2);
+    ctx.arc(ax, ay, 18, 0, Math.PI*2);
     ctx.fill();
-    // Glow
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = '#ef4444';
-    ctx.stroke();
     ctx.shadowBlur = 0;
 
     updatePlayers();
@@ -184,4 +186,5 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// Start the game
 init();

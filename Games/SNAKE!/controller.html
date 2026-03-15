@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Snake Controller</title>
     <style>
@@ -26,6 +27,7 @@
             font-size: 24px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(108, 92, 231, 0.3);
         }
 
         .dpad { 
@@ -46,12 +48,11 @@
             cursor: pointer;
             transition: all 0.1s ease;
             -webkit-tap-highlight-color: transparent;
+            touch-action: none; /* Prevents scrolling while playing */
         }
 
-        /* Using touch-action none to prevent browser zoom/delay */
-        .btn { touch-action: none; }
-
-        .btn:active { 
+        /* The 'Active' class is triggered on tap */
+        .btn:active, .btn.pressing { 
             background: #6c5ce7; 
             border-color: #a29bfe; 
             transform: scale(0.92); 
@@ -89,6 +90,7 @@
         import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
             authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -107,27 +109,44 @@
         const partyCode = urlParams.get('code');
         let myUid;
 
+        // AUTH & UI UPDATE
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 myUid = user.uid;
-                onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (s) => {
-                    if(s.exists()) {
-                        document.getElementById('nameDisp').innerText = s.val().name;
-                        document.getElementById('nameDisp').style.color = s.val().color || "#6c5ce7";
+                // Grab player name and color from the party
+                onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (snapshot) => {
+                    if(snapshot.exists()) {
+                        const data = snapshot.val();
+                        const disp = document.getElementById('nameDisp');
+                        disp.innerText = data.name;
+                        disp.style.color = data.color || "#6c5ce7";
                     }
                 });
+            } else {
+                document.getElementById('nameDisp').innerText = "AUTH ERROR";
             }
         });
 
+        // INPUT LOGIC
         window.sendDir = (x, y) => {
             if(!myUid || !partyCode) return;
             
-            // Haptic Feedback for better feel
-            if (navigator.vibrate) navigator.vibrate(10);
+            // Haptic Feedback for mobile
+            if (navigator.vibrate) navigator.vibrate(15);
 
-            update(ref(db, `parties/${partyCode}/players/${myUid}`), {
+            // Immediate update to Firebase
+            // We update the direction inside the player's object
+            const playerRef = ref(db, `parties/${partyCode}/players/${myUid}`);
+            update(playerRef, {
                 dir: { x: x, y: y }
-            });
+            }).catch(err => console.error("Firebase Update Failed:", err));
+        };
+
+        // Prevent context menu (right click) on long press for mobile
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
         };
     </script>
 </body>
