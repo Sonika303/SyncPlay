@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SyncPlay | Word Bomb</title>
+    <title>SyncPlay | Arena</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
@@ -173,7 +173,7 @@
     </button>
     
     <h1>SyncPlay</h1>
-    <p>Word Bomb Arena</p>
+    <p>Ultimate Party Arena</p>
 
     <div id="login">
         <button class="btn-google" onclick="googleLogin()">
@@ -196,6 +196,9 @@
     <div id="partyScreen" class="hidden">
         <div class="avatar" id="lobbyAvatar">?</div>
         <h2 id="lobbyStatus" style="color: var(--user-color);">Waiting for Host...</h2>
+        <div style="margin: 20px 0;">
+             <i data-lucide="loader" class="spin" style="animation: rotate 2s linear infinite; display: inline-block;"></i>
+        </div>
         <p>Code: <span id="displayRoomCode" style="color:#2d3436; font-weight:800;">----</span></p>
     </div>
 </div>
@@ -205,7 +208,6 @@
         <h2 style="font-weight: 800; margin:0;">Edit Profile</h2>
         <button onclick="toggleSettings()" style="width: auto; height:auto; padding: 12px 20px; background: #f1f2f6; color: #2d3436; border-radius:15px;">Done</button>
     </div>
-
     <div style="max-width: 450px; margin: 0 auto; width: 100%;">
         <div class="preview-card">
             <div style="font-size: 12px; font-weight: 800; color: #b2bec3; margin-bottom: 15px; letter-spacing: 1px;">LIVE PREVIEW</div>
@@ -213,17 +215,13 @@
             <div id="previewName" style="font-weight: 800; font-size: 20px; color: #2d3436;">Your Name</div>
             <div id="hexDisplay" class="hex-tag">#6C5CE7</div>
         </div>
-        
         <div class="input-group">
             <i data-lucide="user"></i>
             <input id="usernameInput" type="text" placeholder="Display Name" oninput="updatePreview()">
         </div>
-
-        <div style="text-align: left; margin: 30px 0 10px 10px; font-weight: 800; color: #b2bec3; font-size: 12px; letter-spacing: 1px;">CUSTOMIZE</div>
-        
         <div class="subcat-btn" onclick="toggleColorPage()">
             <div style="display:flex; align-items:center; gap:15px;">
-                <div style="background:var(--user-color); color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center; box-shadow: 0 8px 15px -5px var(--user-color);">
+                <div style="background:var(--user-color); color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center;">
                     <i data-lucide="palette"></i>
                 </div>
                 <div style="text-align:left;">
@@ -233,23 +231,20 @@
             </div>
             <i data-lucide="chevron-right" style="color:#b2bec3"></i>
         </div>
-
-        <button class="btn-join" onclick="saveSettings()" style="margin-top:10px;">Save Profile</button>
+        <button class="btn-join" onclick="saveSettings()">Save Profile</button>
         <button style="background:none; color:var(--danger); margin-top:10px;" onclick="logout()">Sign Out</button>
     </div>
 </div>
 
 <div id="colorSubPage">
     <div class="settings-header">
-        <button onclick="toggleColorPage()" style="width:auto; height:auto; padding:10px; background:none; color:#2d3436;">
-            <i data-lucide="arrow-left"></i>
-        </button>
+        <button onclick="toggleColorPage()" style="width:auto; height:auto; padding:10px; background:none; color:#2d3436;"><i data-lucide="arrow-left"></i></button>
         <h2 style="font-weight: 800; margin:0;">Color Vault</h2>
         <div style="width:40px;"></div>
     </div>
     <div style="max-width: 450px; margin: 0 auto; width: 100%;">
         <div class="custom-picker-box">
-            <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:60px; height:60px; border-radius:15px; border:none; background:none; cursor:pointer; padding:0;">
+            <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:60px; height:60px; border-radius:15px; border:none; cursor:pointer;">
             <div style="text-align:left;">
                 <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">CUSTOM SLIDER</div>
                 <div style="font-size: 15px; font-weight: 700;">Pick a unique hex</div>
@@ -281,12 +276,10 @@
 
     let currentUser;
     let selectedColor = "#6c5ce7";
-    
-    // Check for room code in URL (if player was sent back from controller)
     const urlParams = new URLSearchParams(window.location.search);
     const autoRoomCode = urlParams.get('code');
 
-    // UI Setup for Palette
+    // Setup color grid
     const palette = [];
     for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
     const grid = document.getElementById("colorGrid");
@@ -313,17 +306,14 @@
         page.style.display = (page.style.display === "flex") ? "none" : "flex";
     };
 
-    window.pickCustomColor = (hex) => {
-        selectedColor = hex;
-        updatePreview();
-    };
+    window.pickCustomColor = (hex) => { selectedColor = hex; updatePreview(); };
 
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "Player";
         document.getElementById("previewAvatar").innerText = name.charAt(0).toUpperCase();
         document.getElementById("previewAvatar").style.background = selectedColor;
         document.getElementById("previewName").innerText = name;
-        document.getElementById("hexDisplay").innerText = selectedColor.startsWith('hsl') ? "HSL COLOR" : selectedColor.toUpperCase();
+        document.getElementById("hexDisplay").innerText = selectedColor.toUpperCase();
         document.documentElement.style.setProperty('--user-color', selectedColor);
     };
 
@@ -342,8 +332,6 @@
                 selectedColor = snap.val().profileColor || selectedColor;
             }
             updateUI(username, selectedColor);
-
-            // If we came back from a game, re-join the lobby automatically
             if(autoRoomCode) {
                 document.getElementById("partyCode").value = autoRoomCode;
                 joinParty();
@@ -377,7 +365,6 @@
         if (!code || !currentUser) return;
         
         const snap = await get(ref(db, "parties/" + code));
-
         if (snap.exists()) {
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
             const name = document.getElementById("usernameInput").value || "Player";
@@ -393,22 +380,21 @@
             document.getElementById("displayRoomCode").innerText = code;
             document.getElementById("partyScreen").classList.remove("hidden");
 
-            // --- REDIRECT LISTENER ---
-            // Fix path to match your folder structure exactly
+            // --- THE FIX: DYNAMIC REDIRECT LISTENER ---
             onValue(ref(db, `parties/${code}/gameData/redirect`), (gsnap) => {
-                const val = gsnap.val();
-                if(val === "controller") {
-                    window.location.href = `Games/Word Bomb/controller.html?code=${code}`;
+                const redirectPath = gsnap.val();
+                // If redirectPath is a string like "Games/SNAKE!/controller.html"
+                if(redirectPath && redirectPath !== "" && redirectPath !== false) {
+                    console.log("Redirecting player to: ", redirectPath);
+                    window.location.href = redirectPath + `?code=${code}`;
                 }
             });
 
-            // Heartbeat
             setInterval(() => {
                 update(ref(db, `parties/${code}/players/${currentUser.uid}`), {
                     lastPing: serverTimestamp()
                 });
             }, 20000);
-
         } else { alert("Room not found!"); }
     };
 
