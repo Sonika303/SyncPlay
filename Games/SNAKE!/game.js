@@ -25,7 +25,6 @@ let cols, rows;
 let players = {}; 
 let apple = {gx: 10, gy: 10, isGold: false};
 
-// Initialize Game
 function init() {
     resize();
     window.addEventListener('resize', resize);
@@ -35,24 +34,32 @@ function init() {
         const data = snapshot.val();
         if (!data) return;
         
-        // Update our local players object
         Object.keys(data).forEach(uid => {
             if (!players[uid]) {
-                // Initialize new player snake locally
+                // NEW PLAYER JOINED
                 players[uid] = {
-                    ...data[uid],
+                    name: data[uid].name || "Player",
+                    color: data[uid].color || "#6c5ce7",
                     parts: [{gx: 5, gy: 5}, {gx: 4, gy: 5}, {gx: 3, gy: 5}],
                     dir: {x: 1, y: 0},
+                    nextDir: {x: 1, y: 0},
                     moveProgress: 0
                 };
             } else {
-                // Update direction from Firebase (controller input)
-                players[uid].nextDir = data[uid].dir || {x: 1, y: 0};
-                players[uid].name = data[uid].name;
+                // UPDATE EXISTING PLAYER DIRECTION
+                if (data[uid].dir) {
+                    // Prevent 180-degree turns
+                    const newD = data[uid].dir;
+                    const currD = players[uid].dir;
+                    if (!(newD.x === -currD.x && newD.y === -currD.y)) {
+                        players[uid].nextDir = newD;
+                    }
+                }
             }
         });
     });
 
+    spawnApple();
     requestAnimationFrame(gameLoop);
 }
 
@@ -64,68 +71,75 @@ function resize() {
 }
 
 function getBiome(gx, gy) {
-    const mx = Math.floor(gx / cols), my = Math.floor(gy / rows);
-    if(mx === 0 && my === 0) return { name: 'Forest', c1: '#059669', c2: '#047857', color: '#10b981' };
-    if(mx === 1 && my === 0) return { name: 'Tundra', c1: '#f1f5f9', c2: '#cbd5e1', color: '#94a3b8' };
-    if(mx === 0 && my === 1) return { name: 'Desert', c1: '#fbbf24', c2: '#d97706', color: '#f59e0b' };
-    return { name: 'Sea', c1: '#0ea5e9', c2: '#0369a1', color: '#38bdf8' };
+    // Simplified biome logic for current screen
+    if(gx < cols/2 && gy < rows/2) return { name: 'Forest', c1: '#059669', c2: '#047857', color: '#10b981' };
+    return { name: 'Jungle', c1: '#065f46', c2: '#064e3b', color: '#059669' };
 }
 
 function drawPlayer(uid, p) {
     const h = p.parts[0];
-    const biome = getBiome(h.gx, h.gy);
-    const rx = (h.gx % cols + p.dir.x * p.moveProgress) * gridSize + gridSize/2;
-    const ry = (h.gy % rows + p.dir.y * p.moveProgress) * gridSize + gridSize/2;
+    // Smooth interpolation
+    const rx = (h.gx + p.dir.x * (p.moveProgress - 1)) * gridSize + gridSize/2;
+    const ry = (h.gy + p.dir.y * (p.moveProgress - 1)) * gridSize + gridSize/2;
 
     // Draw Body
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    
     p.parts.forEach((part, i) => {
-        if(Math.floor(part.gx/cols) !== Math.floor(h.gx/cols) || Math.floor(part.gy/rows) !== Math.floor(h.gy/rows)) return;
-        let sx = (part.gx % cols) * gridSize + gridSize/2;
-        let sy = (part.gy % rows) * gridSize + gridSize/2;
+        let sx = part.gx * gridSize + gridSize/2;
+        let sy = part.gy * gridSize + gridSize/2;
 
-        ctx.strokeStyle = p.color || '#34d399';
-        ctx.lineWidth = 22 + ((p.parts.length - i) / p.parts.length) * 15;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        if(i === 0) { ctx.moveTo(sx, sy); ctx.lineTo(rx, ry); }
-        else {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 25 - (i * 0.5); // Tapered tail
+        
+        if (i === 0) {
+            // Head is drawn separately for rotation
+        } else {
             const prev = p.parts[i-1];
-            ctx.moveTo(sx, sy); 
-            ctx.lineTo((prev.gx % cols)*gridSize+gridSize/2, (prev.gy % rows)*gridSize+gridSize/2);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(prev.gx * gridSize + gridSize/2, prev.gy * gridSize + gridSize/2);
+            ctx.stroke();
         }
-        ctx.stroke();
     });
 
-    // Draw Head & Name
+    // Draw Head
+    const headX = h.gx * gridSize + gridSize/2;
+    const headY = h.gy * gridSize + gridSize/2;
+    
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(headX, headY, 20, 0, Math.PI*2);
+    ctx.fill();
+    
+    // Name Tag
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 16px Plus Jakarta Sans';
+    ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name.toUpperCase(), rx, ry - 40); // SHOW USERNAME
-
-    ctx.save(); ctx.translate(rx, ry); ctx.rotate(Math.atan2(p.dir.y, p.dir.x));
-    ctx.fillStyle = '#064e3b'; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
+    ctx.fillText(p.name, headX, headY - 30);
 }
 
 function updatePlayers() {
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        p.moveProgress += 0.15;
+        p.moveProgress += 0.15; // Speed
 
         if (p.moveProgress >= 1) {
             p.moveProgress = 0;
-            if (p.nextDir) p.dir = p.nextDir;
+            p.dir = p.nextDir;
 
             let ngx = p.parts[0].gx + p.dir.x;
             let ngy = p.parts[0].gy + p.dir.y;
 
-            // Wrap around
-            if(ngx < 0) ngx = cols*2-1; else if(ngx >= cols*2) ngx = 0;
-            if(ngy < 0) ngy = rows*2-1; else if(ngy >= rows*2) ngy = 0;
+            // Proper Wrap around
+            if(ngx < 0) ngx = cols - 1; else if(ngx >= cols) ngx = 0;
+            if(ngy < 0) ngy = rows - 1; else if(ngy >= rows) ngy = 0;
 
-            // Collision with Apple
+            // Apple Check
             if(ngx === apple.gx && ngy === apple.gy) {
                 spawnApple();
+                document.getElementById('s-norm').innerText = parseInt(document.getElementById('s-norm').innerText) + 1;
             } else {
                 p.parts.pop();
             }
@@ -135,29 +149,35 @@ function updatePlayers() {
 }
 
 function spawnApple() {
-    apple.gx = Math.floor(Math.random()*(cols*2));
-    apple.gy = Math.floor(Math.random()*(rows*2));
+    apple.gx = Math.floor(Math.random() * cols);
+    apple.gy = Math.floor(Math.random() * rows);
 }
 
 function gameLoop() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#010409';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
     
-    // Draw background based on first player's biome (or default)
-    const firstPlayer = Object.values(players)[0];
-    const biome = firstPlayer ? getBiome(firstPlayer.parts[0].gx, firstPlayer.parts[0].gy) : getBiome(0,0);
-    
+    // Draw Grid
     for(let r=0; r<rows; r++) {
         for(let c=0; c<cols; c++) {
-            ctx.fillStyle = (r+c)%2===0 ? biome.c1 : biome.c2;
+            ctx.fillStyle = (r+c)%2===0 ? '#0d1117' : '#161b22';
             ctx.fillRect(c*gridSize, r*gridSize, gridSize, gridSize);
         }
     }
 
     // Draw Apple
-    const ax = (apple.gx%cols)*gridSize+gridSize/2, ay = (apple.gy%rows)*gridSize+gridSize/2;
-    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(ax, ay, 15, 0, Math.PI*2); ctx.fill();
+    const ax = apple.gx * gridSize + gridSize/2;
+    const ay = apple.gy * gridSize + gridSize/2;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(ax, ay, 15, 0, Math.PI*2);
+    ctx.fill();
+    // Glow
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ef4444';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Update and Draw all players
     updatePlayers();
     Object.keys(players).forEach(uid => drawPlayer(uid, players[uid]));
 
