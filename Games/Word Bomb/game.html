@@ -124,7 +124,6 @@
         }
 
         .vic-btn { padding: 15px 30px; border-radius: 15px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; margin: 10px; transition: 0.2s; }
-        .vic-btn:active { transform: scale(0.95); }
         .btn-again { background: var(--success); color: white; }
         .btn-lobby { background: var(--primary); color: white; }
 
@@ -135,12 +134,6 @@
             0%, 100% { transform: rotate(0deg); }
             25% { transform: rotate(-3deg); }
             75% { transform: rotate(3deg); }
-        }
-        
-        .pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop {
-            0% { transform: scale(0.8); }
-            100% { transform: scale(1); }
         }
     </style>
 </head>
@@ -159,157 +152,21 @@
 
         <div id="word-display"></div> 
         
-        <div id="turn-info" style="margin-top:15px; font-weight:bold; color:var(--accent); text-transform: uppercase; letter-spacing: 1px;">WAITING FOR PLAYERS...</div>
+        <div id="turn-info" style="margin-top:15px; font-weight:bold; color:var(--accent); text-transform: uppercase; letter-spacing: 1px;">CONNECTING...</div>
     </div>
 
     <div id="lives-display"></div>
 
     <div id="victory-overlay">
         <h1 id="winner-text" style="font-size: 3rem; margin-bottom: 0;">WINNER!</h1>
-        <div id="winner-card-slot" style="margin: 30px 0;"></div>
         <div id="host-controls" style="display: none; gap: 10px; margin-top: 20px;">
-            <button class="vic-btn btn-again" onclick="window.resetGame()">PLAY AGAIN</button>
-            <button class="vic-btn btn-lobby" onclick="window.backToLobby()">BACK TO LOBBY</button>
+            <button class="vic-btn btn-again" id="btn-reset">PLAY AGAIN</button>
+            <button class="vic-btn btn-lobby" id="btn-lobby">BACK TO LOBBY</button>
         </div>
         <p id="player-msg" style="color: #888; font-weight: bold;">Waiting for host to decide...</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, get, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-            authDomain: "syncplay-17b6e.firebaseapp.com",
-            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-            projectId: "syncplay-17b6e",
-            storageBucket: "syncplay-17b6e.firebasestorage.app",
-            messagingSenderId: "86016195929",
-            appId: "1:86016195929:web:40262a28786f2ead712048"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        document.getElementById('partyId').innerText = `ROOM: ${code}`;
-
-        let isHost = false;
-
-        // Verify Host Status
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                const snap = await get(ref(db, `parties/${code}`));
-                if (snap.exists() && snap.val().hostId === user.uid) {
-                    isHost = true;
-                    document.getElementById('host-controls').style.display = 'flex';
-                    document.getElementById('player-msg').style.display = 'none';
-                    // Start game logic if host
-                    initializeGame();
-                }
-            }
-        });
-
-        function initializeGame() {
-            // This is where your game.js logic would normally kick in
-            // For now, it listens to the database for game state updates
-            onValue(ref(db, `parties/${code}/gameData`), (snapshot) => {
-                const data = snapshot.val();
-                if(!data) return;
-
-                document.getElementById('syllable').innerText = data.syllable || "---";
-                document.getElementById('timer').innerText = data.timer || "15";
-                
-                // Visual feedback for timer
-                const bomb = document.getElementById('bomb');
-                if (data.timer <= 5) {
-                    bomb.className = "shake-fast";
-                    bomb.style.transform = "scale(1.3)";
-                } else {
-                    bomb.className = "shake-slow";
-                    bomb.style.transform = "scale(1)";
-                }
-            });
-
-            // Listen for words being typed in real-time
-            onValue(ref(db, `parties/${code}/gameData/currentWord`), (snapshot) => {
-                document.getElementById('word-display').innerText = snapshot.val() || "";
-            });
-        }
-
-        // Listen for player updates (Lives/Turns)
-        onValue(ref(db, `parties/${code}/players`), (snapshot) => {
-            const players = snapshot.val();
-            const display = document.getElementById('lives-display');
-            display.innerHTML = "";
-            
-            if(!players) return;
-
-            Object.keys(players).forEach(uid => {
-                const p = players[uid];
-                const card = document.createElement('div');
-                card.className = `player-card ${p.isTurn ? 'active-turn' : ''} ${p.lives <= 0 ? 'dead' : ''}`;
-                
-                let hearts = "❤️".repeat(p.lives || 0);
-                if(p.lives <= 0) hearts = "ELIMINATED";
-
-                card.innerHTML = `
-                    <div class="mini-avatar" style="background: ${p.color}">${p.name.charAt(0)}</div>
-                    <div class="player-name">${p.name}</div>
-                    <div class="heart-container">${hearts}</div>
-                `;
-                display.appendChild(card);
-
-                if(p.isTurn) {
-                    document.getElementById('turn-info').innerText = `${p.name}'S TURN`;
-                    document.getElementById('turn-info').style.color = p.color;
-                }
-            });
-        });
-
-        // Listen for Winner
-        onValue(ref(db, `parties/${code}/gameData/status`), (snapshot) => {
-            if(snapshot.val() === "gameOver") {
-                showVictory();
-            } else if (snapshot.val() === "lobby") {
-                // If host moved back to lobby, redirect everyone
-                window.location.href = `../../host.html?code=${code}`;
-            }
-        });
-
-        async function showVictory() {
-            const snap = await get(ref(db, `parties/${code}/gameData/winner`));
-            const winner = snap.val();
-            if(winner) {
-                document.getElementById('winner-text').innerText = `${winner.name.toUpperCase()} WINS!`;
-                document.getElementById('victory-overlay').style.display = 'flex';
-                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-            }
-        }
-
-        window.resetGame = async () => {
-            await update(ref(db, `parties/${code}/gameData`), {
-                status: "playing",
-                timer: 15,
-                currentWord: "",
-                syllable: "START",
-                redirect: "controller"
-            });
-            document.getElementById('victory-overlay').style.display = 'none';
-        };
-
-        window.backToLobby = async () => {
-            await update(ref(db, `parties/${code}/gameData`), {
-                status: "lobby",
-                redirect: false
-            });
-        };
-
-    </script>
+    <script type="module" src="game.js"></script>
 </body>
 </html>
