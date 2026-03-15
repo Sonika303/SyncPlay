@@ -33,13 +33,41 @@
             border-radius: 40px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.15);
             width: 90%;
-            max-width: 450px;
+            max-width: 480px;
             text-align: center;
             border: 4px solid white;
             position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         h1 { font-weight: 800; font-size: 2rem; margin: 0; letter-spacing: -1px; }
+
+        /* Game Menu Styles */
+        .game-selection {
+            margin: 20px 0;
+            display: grid;
+            gap: 10px;
+        }
+
+        .game-card {
+            background: white;
+            padding: 15px;
+            border-radius: 20px;
+            border: 2px solid #f1f2f6;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-align: left;
+        }
+
+        .game-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        .game-card.active { border-color: var(--primary); background: #f0eeff; box-shadow: 0 5px 15px rgba(108,92,231,0.1); }
+
+        .game-card h3 { margin: 0; font-size: 16px; color: #2d3436; }
+        .game-card p { margin: 0; font-size: 12px; color: #636e72; }
 
         #codeContainer {
             background: #f1f2f6;
@@ -65,9 +93,9 @@
             background: white;
             border-radius: 24px;
             border: 2px solid #f1f2f6;
-            margin: 25px 0;
+            margin: 20px 0;
             padding: 20px;
-            max-height: 280px;
+            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -80,12 +108,6 @@
             background: #f8f9fa;
             border-radius: 16px;
             margin-bottom: 8px;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .mini-avatar {
@@ -107,9 +129,6 @@
         .start-btn { background: var(--success); color: white; margin-top: 10px; box-shadow: 0 10px 20px rgba(0,184,148,0.2); }
         .kick-btn { width: auto; padding: 6px; background: none; color: var(--danger); border: none; cursor: pointer; }
         
-        button:active { transform: scale(0.96); }
-        button:disabled { background: #dfe6e9; color: #b2bec3; cursor: not-allowed; }
-
         .hidden { display: none !important; }
         
         .status-pill {
@@ -135,6 +154,23 @@
         <div id="codeContainer" onclick="copyCode()">
             <span class="copy-hint">Click to Copy Code</span>
             <div id="code">----</div>
+        </div>
+
+        <div class="game-selection">
+            <div class="game-card active" onclick="selectGame('SNAKE!', this)">
+                <div class="mini-avatar" style="background:#00b894"><i data-lucide="box"></i></div>
+                <div>
+                    <h3>SNAKE!</h3>
+                    <p>Classic multiplayer snake battle.</p>
+                </div>
+            </div>
+            <div class="game-card" onclick="selectGame('Word Bomb', this)">
+                <div class="mini-avatar" style="background:var(--primary)"><i data-lucide="bomb"></i></div>
+                <div>
+                    <h3>Word Bomb</h3>
+                    <p>Quick thinking word arena.</p>
+                </div>
+            </div>
         </div>
 
         <div class="player-area">
@@ -175,38 +211,23 @@
 
     let partyCode;
     let currentUser;
-    let ghostInterval;
+    let selectedGame = "SNAKE!";
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById("statusMsg").innerText = "Logged in as Host";
             const urlParams = new URLSearchParams(window.location.search);
-            const existingCode = urlParams.get('code');
-            if (existingCode) rejoinLobby(existingCode);
-        } else {
-            document.getElementById("statusMsg").innerText = "Authentication Required";
+            const code = urlParams.get('code');
+            if(code) rejoinLobby(code);
         }
     });
 
-    async function rejoinLobby(code) {
-        partyCode = code;
-        const snapshot = await get(ref(db, `parties/${partyCode}`));
-        if(snapshot.exists()) {
-            setupUI();
-            // Reset status and redirect flag so players don't auto-jump if the host refreshes
-            await update(ref(db, `parties/${partyCode}/gameData`), { 
-                status: "lobby", 
-                redirect: false 
-            });
-            setupHostPresence();
-            listenPlayers();
-            startGhostCleanup();
-        } else {
-            document.getElementById("statusMsg").innerText = "Session Not Found";
-            window.history.pushState({}, '', window.location.pathname);
-        }
-    }
+    window.selectGame = (game, el) => {
+        selectedGame = game;
+        document.querySelectorAll('.game-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+    };
 
     window.createParty = async function() {
         if (!currentUser) return;
@@ -215,106 +236,62 @@
         window.history.pushState({path:newurl},'',newurl);
 
         setupUI();
-        const initialData = {
+        await set(ref(db, "parties/" + partyCode), {
             created: serverTimestamp(),
             hostId: currentUser.uid,
             hostActive: true,
-            gameData: {
-                status: "lobby",
-                syllable: "LOBBY",
-                redirect: false
-            }
-        };
-
-        await set(ref(db, "parties/" + partyCode), initialData);
-        setupHostPresence();
+            gameData: { status: "lobby", redirect: false }
+        });
         listenPlayers();
-        startGhostCleanup();
+    };
+
+    async function rejoinLobby(code) {
+        partyCode = code;
+        const snapshot = await get(ref(db, `parties/${partyCode}`));
+        if(snapshot.exists()) {
+            setupUI();
+            listenPlayers();
+        }
     }
 
     function setupUI() {
         document.getElementById("code").innerText = partyCode;
         document.getElementById("createBtn").classList.add("hidden");
         document.getElementById("lobbyArea").classList.remove("hidden");
-    }
-
-    function setupHostPresence() {
-        const hostRef = ref(db, `parties/${partyCode}/hostActive`);
-        onDisconnect(hostRef).set(false);
-        set(hostRef, true);
-    }
-
-    function startGhostCleanup() {
-        if(ghostInterval) clearInterval(ghostInterval);
-        ghostInterval = setInterval(async () => {
-            const snap = await get(ref(db, `parties/${partyCode}/players`));
-            if(!snap.exists()) return;
-
-            const now = Date.now();
-            const players = snap.val();
-            Object.keys(players).forEach(uid => {
-                const lastSeen = players[uid].lastPing || players[uid].joinedAt || now;
-                // Kick if inactive for 45 seconds
-                if (now - lastSeen > 45000) {
-                    remove(ref(db, `parties/${partyCode}/players/${uid}`));
-                }
-            });
-        }, 10000);
+        lucide.createIcons();
     }
 
     function listenPlayers() {
         onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
             const list = document.getElementById("players");
             const startBtn = document.getElementById("startBtn");
-            const msg = document.getElementById("msg");
             const countLabel = document.getElementById("playerCount");
-            
             list.innerHTML = "";
             let count = 0;
-
             if (snapshot.exists()) {
                 const players = snapshot.val();
                 Object.keys(players).forEach(uid => {
                     count++;
                     const p = players[uid];
-                    const char = p.name ? p.name.charAt(0).toUpperCase() : "?";
-                    
                     const li = document.createElement("li");
                     li.innerHTML = `
-                        <div class="mini-avatar" style="background:${p.color || '#6c5ce7'}">${char}</div>
+                        <div class="mini-avatar" style="background:${p.color || '#6c5ce7'}">${p.name[0].toUpperCase()}</div>
                         <span class="player-name">${p.name}</span>
-                        <button class="kick-btn" onclick="window.kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>
-                    `;
+                        <button class="kick-btn" onclick="window.kickPlayer('${uid}')"><i data-lucide="x-circle"></i></button>`;
                     list.appendChild(li);
                 });
             }
-
             countLabel.innerText = count;
-            lucide.createIcons();
-
-            // Allow start if there's at least 1 player
-            if (count >= 1) { 
+            if (count >= 1) {
                 startBtn.classList.remove("hidden");
-                msg.classList.add("hidden");
+                document.getElementById("msg").classList.add("hidden");
             } else {
                 startBtn.classList.add("hidden");
-                msg.classList.remove("hidden");
+                document.getElementById("msg").classList.remove("hidden");
             }
+            lucide.createIcons();
         });
     }
-
-    window.copyCode = () => {
-        navigator.clipboard.writeText(partyCode);
-        const codeEl = document.getElementById("code");
-        codeEl.innerText = "COPIED!";
-        setTimeout(() => codeEl.innerText = partyCode, 1000);
-    };
-
-    window.kickPlayer = (uid) => {
-        if(confirm("Kick this player?")) {
-            remove(ref(db, `parties/${partyCode}/players/${uid}`));
-        }
-    };
 
     window.startGame = async function() {
         const startBtn = document.getElementById("startBtn");
@@ -322,30 +299,28 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> STARTING...`;
         lucide.createIcons();
 
-        const pSnap = await get(ref(db, `parties/${partyCode}/players`));
-        if (!pSnap.exists()) {
-            alert("Waiting for players...");
-            startBtn.disabled = false;
-            startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
-            return;
-        }
-
-        // 1. Prepare clean game session data
-        await remove(ref(db, `parties/${partyCode}/playersData`));
-        await remove(ref(db, `parties/${partyCode}/usedWords`));
-
-        // 2. IMPORTANT: Set the redirect flag to "controller"
-        // This triggers the index.html logic to send players to their game input screen
+        // Prepare the game state
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
-            redirect: "controller" 
+            currentGame: selectedGame,
+            redirect: "controller" // This tells clients to load controller.html
         });
 
-        // 3. Move the Host to the Big Screen game UI
+        // Small delay to ensure DB updates before moving
         setTimeout(() => {
-            window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
-        }, 1200);
+            window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
+        }, 800);
     }
+
+    window.copyCode = () => {
+        navigator.clipboard.writeText(partyCode);
+        document.getElementById("code").innerText = "COPIED!";
+        setTimeout(() => document.getElementById("code").innerText = partyCode, 1000);
+    };
+
+    window.kickPlayer = (uid) => {
+        if(confirm("Kick player?")) remove(ref(db, `parties/${partyCode}/players/${uid}`));
+    };
 
     lucide.createIcons();
 </script>

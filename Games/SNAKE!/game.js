@@ -1,0 +1,274 @@
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const mCanvas = document.getElementById('minimap');
+const mCtx = mCanvas.getContext('2d');
+
+// Config
+let gridSize = 65;
+let cols, rows;
+let score = 0, goldScore = 0;
+let weatherTimer = 60, currentWeather = 'sunny';
+let isShopOpen = false, hasCompass = false;
+let magnet = null, magnetTicks = 0;
+let particles = [];
+
+// Snake setup
+let snake = {
+    parts: [{gx: 5, gy: 5}, {gx: 4, gy: 5}, {gx: 3, gy: 5}],
+    dir: {x: 1, y: 0}, nextDir: {x: 1, y: 0},
+    moveProgress: 0, speed: 0.15 
+};
+let apple = {gx: 10, gy: 10, isGold: false};
+
+// Biome Assets
+let trees = [];
+function init() {
+    resize();
+    window.addEventListener('resize', resize);
+    spawnApple();
+    generateTrees();
+    setInterval(tick, 1000);
+    loop();
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.floor(canvas.width / gridSize);
+    rows = Math.floor(canvas.height / gridSize);
+}
+
+function generateTrees() {
+    trees = [];
+    for(let i=0; i<40; i++) {
+        trees.push({
+            gx: Math.floor(Math.random()*(cols*2)),
+            gy: Math.floor(Math.random()*(rows*2)),
+            offset: Math.random() * Math.PI,
+            size: 0.8 + Math.random() * 0.4
+        });
+    }
+}
+
+function getBiome(gx, gy) {
+    const mx = Math.floor(gx / cols), my = Math.floor(gy / rows);
+    if(mx === 0 && my === 0) return { name: 'Forest', c1: '#059669', c2: '#047857', color: '#10b981' };
+    if(mx === 1 && my === 0) return { name: 'Tundra', c1: '#f1f5f9', c2: '#cbd5e1', color: '#94a3b8' };
+    if(mx === 0 && my === 1) return { name: 'Desert', c1: '#fbbf24', c2: '#d97706', color: '#f59e0b' };
+    return { name: 'Sea', c1: '#0ea5e9', c2: '#0369a1', color: '#38bdf8' };
+}
+
+function drawWaterfall() {
+    // Static Mountain with Animated Waterfall in Forest (Top Left)
+    const head = snake.parts[0];
+    if(Math.floor(head.gx/cols) === 0 && Math.floor(head.gy/rows) === 0) {
+        const x = 200, y = 100;
+        ctx.fillStyle = '#475569';
+        ctx.beginPath(); ctx.moveTo(x, y+200); ctx.lineTo(x+150, y); ctx.lineTo(x+300, y+200); ctx.fill();
+        // Waterfall
+        ctx.fillStyle = '#bae6fd';
+        const flow = (Date.now() % 500) / 5;
+        ctx.fillRect(x+140, y+40 + flow, 20, 160);
+        ctx.fillStyle = 'white'; ctx.globalAlpha = 0.5;
+        ctx.fillRect(x+145, y+50 + (flow*1.5)%150, 5, 30);
+        ctx.globalAlpha = 1;
+    }
+}
+
+function drawSnake() {
+    const h = snake.parts[0];
+    const biome = getBiome(h.gx, h.gy);
+    const isSwimming = biome.name === 'Sea';
+    const rx = (h.gx % cols + snake.dir.x * snake.moveProgress) * gridSize + gridSize/2;
+    const ry = (h.gy % rows + snake.dir.y * snake.moveProgress) * gridSize + gridSize/2;
+
+    // Body
+    snake.parts.forEach((p, i) => {
+        if(Math.floor(p.gx/cols) !== Math.floor(h.gx/cols) || Math.floor(p.gy/rows) !== Math.floor(h.gy/rows)) return;
+        let sx = (p.gx % cols) * gridSize + gridSize/2;
+        let sy = (p.gy % rows) * gridSize + gridSize/2;
+
+        if(isSwimming) {
+            const wave = Math.sin(Date.now()*0.008 + i*0.8) * 20;
+            if(snake.dir.x !== 0) sy += wave; else sx += wave;
+        }
+
+        ctx.strokeStyle = '#34d399'; // Emerald Green
+        ctx.lineWidth = 22 + ((snake.parts.length - i) / snake.parts.length) * 15;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        if(i === 0) { ctx.moveTo(sx, sy); ctx.lineTo(rx, ry); }
+        else {
+            const prev = snake.parts[i-1];
+            let psx = (prev.gx % cols)*gridSize+gridSize/2;
+            let psy = (prev.gy % rows)*gridSize+gridSize/2;
+            if(isSwimming) {
+                const pWave = Math.sin(Date.now()*0.008 + (i-1)*0.8) * 20;
+                if(snake.dir.x !== 0) psy += pWave; else psx += pWave;
+            }
+            ctx.moveTo(sx, sy); ctx.lineTo(psx, psy);
+        }
+        ctx.stroke();
+    });
+
+    // Head
+    ctx.save(); ctx.translate(rx, ry); ctx.rotate(Math.atan2(snake.dir.y, snake.dir.x));
+    ctx.fillStyle = '#064e3b'; ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(12,-12,8,0,Math.PI*2); ctx.arc(12,12,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(15,-12,4,0,Math.PI*2); ctx.arc(15,12,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // Compass
+    if(hasCompass) {
+        const angle = Math.atan2(apple.gy - h.gy, apple.gx - h.gx);
+        ctx.save(); ctx.translate(rx, ry - 80); ctx.rotate(angle);
+        ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.moveTo(30,0); ctx.lineTo(0,-12); ctx.lineTo(0,12); ctx.fill();
+        ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.stroke(); ctx.restore();
+    }
+}
+
+function drawEnvironment() {
+    const h = snake.parts[0];
+    const mx = Math.floor(h.gx/cols), my = Math.floor(h.gy/rows);
+    const biome = getBiome(h.gx, h.gy);
+    
+    // Tiles
+    for(let r=0; r<rows; r++) {
+        for(let c=0; c<cols; c++) {
+            ctx.fillStyle = (r+c)%2===0 ? biome.c1 : biome.c2;
+            ctx.fillRect(c*gridSize, r*gridSize, gridSize, gridSize);
+        }
+    }
+    
+    drawWaterfall();
+
+    // Trees with Wind Animation
+    trees.forEach(t => {
+        if(Math.floor(t.gx/cols) === mx && Math.floor(t.gy/rows) === my) {
+            if(biome.name === 'Sea') return;
+            const tx = (t.gx%cols)*gridSize+gridSize/2;
+            const ty = (t.gy%rows)*gridSize+gridSize/2;
+            const wind = Math.sin(Date.now()*0.002 + t.offset) * 10;
+            ctx.fillStyle = '#422006'; ctx.fillRect(tx-5, ty, 10, 20);
+            ctx.fillStyle = biome.name === 'Tundra' ? '#94a3b8' : '#065f46';
+            ctx.beginPath(); ctx.arc(tx + wind, ty-15, 20*t.size, 0, Math.PI*2); ctx.fill();
+        }
+    });
+}
+
+function update() {
+    if(isShopOpen) return;
+    const biome = getBiome(snake.parts[0].gx, snake.parts[0].gy);
+    let currentSpeed = snake.speed;
+    if(biome.name === 'Sea') currentSpeed *= 0.7;
+    if(biome.name === 'Tundra') currentSpeed *= 1.3;
+
+    snake.moveProgress += currentSpeed;
+    if(snake.moveProgress >= 1) {
+        snake.moveProgress = 0; snake.dir = snake.nextDir;
+        let ngx = snake.parts[0].gx + snake.dir.x;
+        let ngy = snake.parts[0].gy + snake.dir.y;
+
+        if(ngx < 0) ngx = cols*2-1; else if(ngx >= cols*2) ngx = 0;
+        if(ngy < 0) ngy = rows*2-1; else if(ngy >= rows*2) ngy = 0;
+
+        // Magnet
+        if(magnetTicks > 0) {
+            magnetTicks--;
+            if(Math.abs(ngx-apple.gx) < 5 && Math.abs(ngy-apple.gy) < 5) { apple.gx = ngx; apple.gy = ngy; }
+        }
+
+        if(ngx === apple.gx && ngy === apple.gy) {
+            if(apple.isGold) goldScore++; else score++;
+            updateUI(); spawnApple();
+        } else { snake.parts.pop(); }
+
+        if(magnet && ngx === magnet.gx && ngy === magnet.gy) { magnetTicks = 200; magnet = null; }
+        snake.parts.unshift({gx: ngx, gy: ngy});
+    }
+}
+
+function updateUI() {
+    document.getElementById('s-norm').innerText = score;
+    document.getElementById('s-gold').innerText = goldScore;
+    const container = document.getElementById('effects-container');
+    container.innerHTML = "";
+    if(magnetTicks > 0) container.innerHTML += `<div class="effect-tag">🧲 MAGNET: ${Math.ceil(magnetTicks/10)}s</div>`;
+    const b = getBiome(snake.parts[0].gx, snake.parts[0].gy);
+    if(b.name === 'Sea') container.innerHTML += `<div class="effect-tag" style="border-color:#38bdf8">💧 SWIMMING (Slower)</div>`;
+    if(b.name === 'Tundra') container.innerHTML += `<div class="effect-tag" style="border-color:#f1f5f9">❄️ ICY (Faster)</div>`;
+}
+
+function spawnApple() {
+    apple.gx = Math.floor(Math.random()*(cols*2));
+    apple.gy = Math.floor(Math.random()*(rows*2));
+    apple.isGold = Math.random() > 0.88;
+    if(Math.random() < 0.3) magnet = { gx: Math.floor(Math.random()*(cols*2)), gy: Math.floor(Math.random()*(rows*2)) };
+}
+
+function tick() {
+    weatherTimer--;
+    if(weatherTimer <= 0) {
+        weatherTimer = 60;
+        const list = ['sunny', 'rainy', 'snowy', 'sandstorm', 'foggy'];
+        currentWeather = list[Math.floor(Math.random()*list.length)];
+        document.getElementById('w-icon').innerText = {sunny:'☀️', rainy:'🌧️', snowy:'❄️', sandstorm:'🌪️', foggy:'🌫️'}[currentWeather];
+        document.getElementById('weather-label').innerText = currentWeather.toUpperCase();
+    }
+    document.getElementById('timer-fill').style.width = (weatherTimer/60*100)+'%';
+    document.getElementById('biome-txt').innerText = getBiome(snake.parts[0].gx, snake.parts[0].gy).name;
+    updateUI();
+}
+
+function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawEnvironment();
+    // Apple
+    const h = snake.parts[0];
+    if(Math.floor(apple.gx/cols) === Math.floor(h.gx/cols) && Math.floor(apple.gy/rows) === Math.floor(h.gy/rows)) {
+        const ax = (apple.gx%cols)*gridSize+gridSize/2, ay = (apple.gy%rows)*gridSize+gridSize/2;
+        ctx.fillStyle = apple.isGold ? '#fbbf24' : '#ef4444';
+        ctx.beginPath(); ctx.arc(ax, ay, 20, 0, Math.PI*2); ctx.fill();
+    }
+    // Magnet
+    if(magnet && Math.floor(magnet.gx/cols) === Math.floor(h.gx/cols)) {
+        ctx.fillStyle='#f43f5e'; ctx.fillRect((magnet.gx%cols)*gridSize+15, (magnet.gy%rows)*gridSize+15, 35, 35);
+    }
+    drawSnake();
+    // Minimap
+    mCtx.fillStyle='#000'; mCtx.fillRect(0,0,180,180);
+    mCtx.fillStyle='#10b981'; mCtx.fillRect((snake.parts[0].gx/(cols*2))*180, (snake.parts[0].gy/(rows*2))*180, 8, 8);
+    mCtx.fillStyle='#ef4444'; mCtx.fillRect((apple.gx/(cols*2))*180, (apple.gy/(rows*2))*180, 5, 5);
+    
+    update();
+    requestAnimationFrame(loop);
+}
+
+function toggleShop() { 
+    isShopOpen = !isShopOpen; 
+    document.getElementById('shop').style.display = isShopOpen ? 'grid' : 'none';
+    document.getElementById('buy-btn').innerText = hasCompass ? "OWNED" : "PURCHASE COMPASS";
+    document.getElementById('buy-btn').disabled = hasCompass;
+}
+
+document.getElementById('buy-btn').onclick = () => {
+    if(score >= 10 && goldScore >= 1) {
+        score -= 10; goldScore -= 1;
+        hasCompass = true;
+        updateUI(); toggleShop();
+        document.getElementById('s-norm').innerText = score;
+        document.getElementById('s-gold').innerText = goldScore;
+    }
+};
+
+window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if(k === 'e') toggleShop();
+    if(isShopOpen) return;
+    if((k === 'w' || k === 'arrowup') && snake.dir.y === 0) snake.nextDir = {x: 0, y: -1};
+    if((k === 's' || k === 'arrowdown') && snake.dir.y === 0) snake.nextDir = {x: 0, y: 1};
+    if((k === 'a' || k === 'arrowleft') && snake.dir.x === 0) snake.nextDir = {x: -1, y: 0};
+    if((k === 'd' || k === 'arrowright') && snake.dir.x === 0) snake.nextDir = {x: 1, y: 0};
+});
+
+init();
