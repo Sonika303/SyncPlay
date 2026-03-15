@@ -124,7 +124,7 @@
         <p id="status">CONNECTING...</p>
         
         <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
-        <button id="sendBtn" onclick="submitWord()" disabled>SUBMIT WORD</button>
+        <button id="sendBtn" disabled>SUBMIT WORD</button>
         <div id="feedback"></div>
     </div>
 
@@ -158,13 +158,11 @@
                 const playerRef = ref(db, `parties/${code}/players/${myUid}`);
                 const disconnectRef = onDisconnect(playerRef);
                 
-                // Set default disconnect behavior
                 disconnectRef.remove();
 
-                // PROTECTIVE LOGIC: If game is active, don't remove player on disconnect
                 onValue(ref(db, `parties/${code}/gameData/status`), (snap) => {
                     if (snap.val() === "playing") {
-                        disconnectRef.cancel(); // Prevent deletion during game transitions
+                        disconnectRef.cancel(); 
                     }
                 });
 
@@ -172,12 +170,7 @@
                     usedWords = snap.val() || [];
                 });
 
-                onValue(ref(db, `parties/${code}/gameData/redirect`), (snap) => {
-                    if (snap.exists() && snap.val() === true) {
-                        window.location.href = `../../index.html?code=${code}`;
-                    }
-                });
-
+                // Handle heart updates and elimination
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
@@ -192,17 +185,20 @@
                     }
                 });
 
+                // Game Loop sync
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
                     
-                    if (gameData.status === "lobby") {
-                        window.location.href = `../../index.html?code=${code}`;
+                    if (gameData.status === "finished") {
+                        document.getElementById("status").innerText = "GAME OVER";
+                        document.getElementById("wordInput").disabled = true;
+                        document.getElementById("sendBtn").disabled = true;
                         return;
                     }
 
                     currentSyllable = (gameData.syllable || "").toUpperCase();
-                    myTurn = (gameData.turn === myUid && gameData.status === "playing" && !["READY?", "WAITING"].includes(currentSyllable));
+                    myTurn = (gameData.turn === myUid && gameData.status === "playing" && !["READY?", "WAITING", "START"].includes(currentSyllable));
                     
                     const input = document.getElementById("wordInput");
                     const btn = document.getElementById("sendBtn");
@@ -216,18 +212,20 @@
                         status.innerText = "YOUR TURN!";
                         status.classList.add("active-status");
                         card.classList.add("my-turn");
-                        setTimeout(() => input.focus(), 50);
+                        input.focus();
                     } else {
                         status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
                         status.classList.remove("active-status");
                         card.classList.remove("my-turn");
                         document.getElementById("feedback").innerText = "";
+                        input.value = "";
                     }
                 });
             }
         });
 
-        window.submitWord = async () => {
+        // Use a function defined in the module and attach event listeners
+        const submitWord = async () => {
             const input = document.getElementById("wordInput");
             const feedback = document.getElementById("feedback");
             const word = input.value.trim().toUpperCase();
@@ -235,25 +233,31 @@
             if(!word || !myTurn) return;
 
             if(!word.includes(currentSyllable)) {
+                feedback.style.color = "var(--danger)";
                 feedback.innerText = `MUST INCLUDE "${currentSyllable}"`;
                 return;
             }
 
             if(usedWords.includes(word.toLowerCase())) {
-                feedback.innerText = "WORD ALREADY USED!";
+                feedback.style.color = "var(--danger)";
+                feedback.innerText = "ALREADY USED!";
                 return;
             }
 
-            set(ref(db, `parties/${code}/action`), { 
+            // If local checks pass, send to host for dictionary validation
+            await set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
                 time: Date.now() 
             });
             
+            feedback.style.color = "var(--accent)";
+            feedback.innerText = "CHECKING...";
             input.value = "";
-            feedback.innerText = "";
         };
 
+        // Attach listeners since we are in a module
+        document.getElementById("sendBtn").addEventListener("click", submitWord);
         document.getElementById("wordInput").addEventListener("keypress", (e) => {
             if (e.key === "Enter") submitWord();
         });

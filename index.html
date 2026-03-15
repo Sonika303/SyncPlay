@@ -282,7 +282,7 @@
     let currentUser;
     let selectedColor = "#6c5ce7";
     
-    // UI Helpers
+    // UI Setup for Palette
     const palette = [];
     for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
     const grid = document.getElementById("colorGrid");
@@ -364,29 +364,40 @@
 
     window.joinParty = async () => {
         const code = document.getElementById("partyCode").value.trim().toUpperCase();
-        if (!code) return;
+        if (!code || !currentUser) return;
+        
         const snap = await get(ref(db, "parties/" + code));
 
         if (snap.exists()) {
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
+            const name = document.getElementById("usernameInput").value || "Player";
             
-            // NO ONDISCONNECT. WE SAVE PERMANENTLY.
             await set(playerRef, { 
-                name: document.getElementById("usernameInput").value, 
+                name: name, 
                 color: selectedColor, 
                 joinedAt: serverTimestamp(),
-                lastPing: serverTimestamp() // Host can check this to see if player is "stale"
+                lastPing: serverTimestamp() 
             });
 
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("displayRoomCode").innerText = code;
             document.getElementById("partyScreen").classList.remove("hidden");
 
-            onValue(ref(db, `parties/${code}/gameData/status`), (gsnap) => {
-                if(gsnap.val() === "playing") {
-                    window.location.href = `Games/Word Bomb/game.html?code=${code}`;
+            // --- REDIRECT LISTENER ---
+            // When the Host changes redirect to "controller", this triggers.
+            onValue(ref(db, `parties/${code}/gameData/redirect`), (gsnap) => {
+                if(gsnap.val() === "controller") {
+                    window.location.href = `Games/Word Bomb/controller.html?code=${code}`;
                 }
             });
+
+            // Heartbeat so the host knows the player is still here
+            setInterval(() => {
+                update(ref(db, `parties/${code}/players/${currentUser.uid}`), {
+                    lastPing: serverTimestamp()
+                });
+            }, 20000);
+
         } else { alert("Room not found!"); }
     };
 

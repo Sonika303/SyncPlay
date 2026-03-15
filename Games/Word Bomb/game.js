@@ -24,7 +24,7 @@ let gameActive = false;
 let timerInterval = null;
 let usedWords = [];
 
-const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE", "PRE", "VER", "TION", "IC", "AL", "OUS", "ABLE", "MENT"];
+const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE", "PRE", "VER", "TION", "IC", "AL", "OUS", "ABLE", "MENT", "ACK", "IGHT", "AND", "EST"];
 
 onAuthStateChanged(auth, async (user) => {
     if (!user || !partyCode) return;
@@ -38,6 +38,7 @@ onAuthStateChanged(auth, async (user) => {
         const partyData = partySnap.val();
         if (partyData.hostId === myUid) {
             isHost = true;
+            // Clear any lingering actions from a previous session
             await remove(ref(db, `parties/${partyCode}/action`));
             
             const gameData = partyData.gameData || {};
@@ -81,7 +82,7 @@ async function forceInit(playersObj) {
     updates[`parties/${partyCode}/usedWords`] = [];
     updates[`parties/${partyCode}/gameData`] = {
         syllable: "READY?",
-        timer: 10,
+        timer: 5,
         turn: playerIds[0],
         status: "playing",
         lastWord: "",
@@ -91,7 +92,8 @@ async function forceInit(playersObj) {
     await update(ref(db), updates);
     document.getElementById("victory-overlay").style.display = "none";
     
-    setTimeout(() => updateTurn(0), 3000);
+    // Brief countdown before the first real syllable
+    setTimeout(() => updateTurn(0), 5000);
     startHostTimer();
 }
 
@@ -104,6 +106,7 @@ async function updateTurn(idx) {
     const playerIds = Object.keys(pData);
     let nextIdx = idx % playerIds.length;
     
+    // Find next alive player
     let attempts = 0;
     while (pData[playerIds[nextIdx]].lives <= 0 && attempts < playerIds.length) {
         nextIdx = (nextIdx + 1) % playerIds.length;
@@ -112,7 +115,6 @@ async function updateTurn(idx) {
 
     const randomSyl = syllables[Math.floor(Math.random() * syllables.length)];
     
-    // Clear the action first so the next player doesn't trigger the previous word
     await remove(ref(db, `parties/${partyCode}/action`));
 
     await update(ref(db, `parties/${partyCode}/gameData`), {
@@ -183,15 +185,28 @@ async function updateTurnUI(turnUid) {
     }
 }
 
-function showVictoryScreen() {
+async function showVictoryScreen() {
     gameActive = false;
     if (timerInterval) clearInterval(timerInterval);
+    
+    // Find the winner's name
+    const pSnap = await get(ref(db, `parties/${partyCode}/playersData`));
+    if (pSnap.exists()) {
+        const players = pSnap.val();
+        const winnerId = Object.keys(players).find(uid => players[uid].lives > 0);
+        if (winnerId) {
+            document.getElementById("winner-text").innerText = players[winnerId].name.toUpperCase() + " WINS!";
+        }
+    }
+
     document.getElementById("victory-overlay").style.display = "flex";
     if (isHost) document.getElementById("host-controls").style.display = "flex";
+    if (window.confetti) confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } });
 }
 
 async function checkWinner(playersData) {
     const alive = Object.keys(playersData).filter(uid => playersData[uid].lives > 0);
+    // Game is over if only 1 (or 0) players remain alive
     if (Object.keys(playersData).length > 1 && alive.length <= 1 && gameActive) {
         await update(ref(db, `parties/${partyCode}/gameData`), { status: "finished" });
     }
@@ -221,23 +236,24 @@ async function isValidWord(word) {
     try {
         const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
         return response.ok;
-    } catch { return false; }
+    } catch { 
+        // Fallback: If API fails, allow it if it's long enough as a courtesy
+        return cleanWord.length > 2; 
+    }
 }
 
 function listenForControllerInput() {
     onValue(ref(db, `parties/${partyCode}/action`), async (snap) => {
-        if (!snap.exists() || !isHost) return; 
+        if (!snap.exists() || !isHost || !gameActive) return; 
         const action = snap.val();
         const gSnap = await get(ref(db, `parties/${partyCode}/gameData`));
         const gameData = gSnap.val();
         
-        // Ensure this action hasn't been processed yet and belongs to current turn
         if (action.uid === gameData.turn && gameData.status === "playing") {
             const word = (action.word || "").toUpperCase().trim();
             if (word.includes(gameData.syllable)) {
                 const valid = await isValidWord(word);
                 if (valid) {
-                    // Prevent immediate re-triggering
                     await remove(ref(db, `parties/${partyCode}/action`));
                     
                     usedWords.push(word.toLowerCase());
@@ -245,8 +261,6 @@ function listenForControllerInput() {
                         "gameData/lastWord": word,
                         "usedWords": usedWords
                     });
-                    
-                    if (window.confetti) confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
                     
                     const pSnap = await get(ref(db, `parties/${partyCode}/playersData`));
                     const ids = Object.keys(pSnap.val());
@@ -268,7 +282,6 @@ function startHostTimer() {
 
         if (d.status === "playing" && !["READY?", "WAITING"].includes(d.syllable)) {
             if (d.timer > 0) {
-                // Atomic decrease
                 update(ref(db, `parties/${partyCode}/gameData`), { timer: d.timer - 1 });
             } else {
                 // TIMER EXPIRED
@@ -278,7 +291,6 @@ function startHostTimer() {
                     const currentLives = pSnap.val().lives;
                     const newLives = Math.max(0, currentLives - 1);
                     
-                    // Batch these updates to prevent turn-skipping
                     const updates = {};
                     updates[`parties/${partyCode}/playersData/${d.turn}/lives`] = newLives;
                     await update(ref(db), updates);

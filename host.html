@@ -175,7 +175,7 @@
 
     let partyCode;
     let currentUser;
-    let cleanupInterval;
+    let ghostInterval;
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -194,6 +194,7 @@
         const snapshot = await get(ref(db, `parties/${partyCode}`));
         if(snapshot.exists()) {
             setupUI();
+            // Reset status and redirect flag so players don't auto-jump if the host refreshes
             await update(ref(db, `parties/${partyCode}/gameData`), { 
                 status: "lobby", 
                 redirect: false 
@@ -243,26 +244,22 @@
         set(hostRef, true);
     }
 
-    // --- NEW: GHOST CLEANUP LOGIC ---
     function startGhostCleanup() {
-        if(cleanupInterval) clearInterval(cleanupInterval);
-        cleanupInterval = setInterval(async () => {
-            const playersRef = ref(db, `parties/${partyCode}/players`);
-            const snap = await get(playersRef);
-            if (!snap.exists()) return;
+        if(ghostInterval) clearInterval(ghostInterval);
+        ghostInterval = setInterval(async () => {
+            const snap = await get(ref(db, `parties/${partyCode}/players`));
+            if(!snap.exists()) return;
 
             const now = Date.now();
             const players = snap.val();
-            
             Object.keys(players).forEach(uid => {
-                const lastPing = players[uid].lastPing || players[uid].joinedAt;
-                // If no ping for 1 minute (60,000 ms), remove them
-                if (now - lastPing > 60000) {
-                    console.log(`Removing ghost player: ${players[uid].name}`);
+                const lastSeen = players[uid].lastPing || players[uid].joinedAt || now;
+                // Kick if inactive for 45 seconds
+                if (now - lastSeen > 45000) {
                     remove(ref(db, `parties/${partyCode}/players/${uid}`));
                 }
             });
-        }, 5000); // Check every 5 seconds
+        }, 10000);
     }
 
     function listenPlayers() {
@@ -295,6 +292,7 @@
             countLabel.innerText = count;
             lucide.createIcons();
 
+            // Allow start if there's at least 1 player
             if (count >= 1) { 
                 startBtn.classList.remove("hidden");
                 msg.classList.add("hidden");
@@ -308,9 +306,8 @@
     window.copyCode = () => {
         navigator.clipboard.writeText(partyCode);
         const codeEl = document.getElementById("code");
-        const originalCode = codeEl.innerText;
         codeEl.innerText = "COPIED!";
-        setTimeout(() => codeEl.innerText = originalCode, 1000);
+        setTimeout(() => codeEl.innerText = partyCode, 1000);
     };
 
     window.kickPlayer = (uid) => {
@@ -322,30 +319,32 @@
     window.startGame = async function() {
         const startBtn = document.getElementById("startBtn");
         startBtn.disabled = true;
-        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> INITIALIZING...`;
+        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> STARTING...`;
         lucide.createIcons();
 
         const pSnap = await get(ref(db, `parties/${partyCode}/players`));
         if (!pSnap.exists()) {
-            alert("No players found.");
+            alert("Waiting for players...");
             startBtn.disabled = false;
             startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
             return;
         }
 
-        // Clean up temporary data paths only
+        // 1. Prepare clean game session data
         await remove(ref(db, `parties/${partyCode}/playersData`));
         await remove(ref(db, `parties/${partyCode}/usedWords`));
 
-        // Use update to avoid wiping 'players' folder
+        // 2. IMPORTANT: Set the redirect flag to "controller"
+        // This triggers the index.html logic to send players to their game input screen
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
-            redirect: false 
+            redirect: "controller" 
         });
 
+        // 3. Move the Host to the Big Screen game UI
         setTimeout(() => {
             window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
-        }, 800);
+        }, 1200);
     }
 
     lucide.createIcons();
