@@ -30,6 +30,7 @@
             text-shadow: 0 0 10px rgba(108, 92, 231, 0.3);
         }
 
+        /* DPAD STYLES */
         .dpad { 
             display: grid; 
             grid-template-columns: repeat(3, 95px); 
@@ -48,10 +49,9 @@
             cursor: pointer;
             transition: all 0.1s ease;
             -webkit-tap-highlight-color: transparent;
-            touch-action: none; /* Prevents scrolling while playing */
+            touch-action: none;
         }
 
-        /* The 'Active' class is triggered on tap */
         .btn:active, .btn.pressing { 
             background: #6c5ce7; 
             border-color: #a29bfe; 
@@ -63,6 +63,34 @@
         .left { grid-row: 2; grid-column: 1; } 
         .right { grid-row: 2; grid-column: 3; } 
         .down { grid-row: 3; grid-column: 2; }
+
+        /* SHOP OVERLAY STYLES */
+        #shop-overlay {
+            position: absolute;
+            inset: 0;
+            background: #161b22;
+            display: none; /* Controlled by Firebase */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 500;
+        }
+
+        .shop-btn {
+            width: 80%;
+            padding: 25px;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            color: white;
+        }
+
+        .buy-btn { background: #10b981; border: 2px solid #34d399; }
+        .close-btn { background: #ef4444; border: 2px solid #f87171; }
 
         .hint {
             position: absolute;
@@ -76,21 +104,26 @@
 <body>
     <div id="nameDisp">JOINING...</div>
 
-    <div class="dpad">
+    <div class="dpad" id="dpad-container">
         <div class="btn up" onpointerdown="sendDir(0, -1)">▲</div>
         <div class="btn left" onpointerdown="sendDir(-1, 0)">◀</div>
         <div class="btn right" onpointerdown="sendDir(1, 0)">▶</div>
         <div class="btn down" onpointerdown="sendDir(0, 1)">▼</div>
     </div>
 
-    <div class="hint">Tap arrows to move your snake</div>
+    <div id="shop-overlay">
+        <div style="color: #10b981; font-weight: bold; font-size: 24px; margin-bottom: 10px;">SHOP OPEN</div>
+        <button class="shop-btn buy-btn" onpointerdown="buyItem()">PURCHASE FOR TEAM</button>
+        <button class="shop-btn close-btn" onpointerdown="closeShop()">CLOSE SHOP</button>
+    </div>
+
+    <div class="hint" id="hint-text">Tap arrows to move your snake</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
             authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -109,45 +142,50 @@
         const partyCode = urlParams.get('code');
         let myUid;
 
-        // AUTH & UI UPDATE
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 myUid = user.uid;
-                // Grab player name and color from the party
+                
+                // 1. Monitor user data (Name/Color)
                 onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (snapshot) => {
                     if(snapshot.exists()) {
                         const data = snapshot.val();
-                        const disp = document.getElementById('nameDisp');
-                        disp.innerText = data.name;
-                        disp.style.color = data.color || "#6c5ce7";
+                        document.getElementById('nameDisp').innerText = data.name;
+                        document.getElementById('nameDisp').style.color = data.color || "#6c5ce7";
                     }
                 });
-            } else {
-                document.getElementById('nameDisp').innerText = "AUTH ERROR";
+
+                // 2. Monitor Shop State from main screen
+                onValue(ref(db, `parties/${partyCode}/gameState/shopOpen`), (snapshot) => {
+                    const isShopOpen = snapshot.val() === true;
+                    document.getElementById('shop-overlay').style.display = isShopOpen ? 'flex' : 'none';
+                    document.getElementById('dpad-container').style.opacity = isShopOpen ? '0.1' : '1';
+                });
             }
         });
 
-        // INPUT LOGIC
+        // DIRECTION LOGIC
         window.sendDir = (x, y) => {
             if(!myUid || !partyCode) return;
-            
-            // Haptic Feedback for mobile
             if (navigator.vibrate) navigator.vibrate(15);
-
-            // Immediate update to Firebase
-            // We update the direction inside the player's object
-            const playerRef = ref(db, `parties/${partyCode}/players/${myUid}`);
-            update(playerRef, {
-                dir: { x: x, y: y }
-            }).catch(err => console.error("Firebase Update Failed:", err));
+            update(ref(db, `parties/${partyCode}/players/${myUid}`), {
+                dir: { x, y }
+            });
         };
 
-        // Prevent context menu (right click) on long press for mobile
-        window.oncontextmenu = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
+        // SHOP LOGIC
+        window.closeShop = () => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            update(ref(db, `parties/${partyCode}/gameState`), { shopOpen: false });
         };
+
+        window.buyItem = () => {
+            if (navigator.vibrate) navigator.vibrate(20);
+            // This signals the host to run the purchase logic
+            update(ref(db, `parties/${partyCode}/gameState`), { buyRequest: Date.now() });
+        };
+
+        window.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
     </script>
 </body>
 </html>
