@@ -1,276 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Word Bomb Controller</title>
+    <title>Snake Controller</title>
     <style>
-        :root {
-            --bg: #0f0f13;
-            --card: #1c1c24;
-            --accent: #2ecc71;
-            --danger: #ff4757;
-            --text: #ffffff;
-        }
-
-        body { 
-            font-family: 'Segoe UI', Roboto, sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            text-align: center; 
-            padding: 20px; 
-            margin: 0; 
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            overflow: hidden;
-            touch-action: manipulation;
-        }
-
-        .controller-card { 
-            background: var(--card); 
-            padding: 40px 20px; 
-            border-radius: 30px; 
-            border: 4px solid #333; 
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .my-turn { 
-            border-color: var(--accent); 
-            box-shadow: 0 0 40px rgba(46, 204, 113, 0.3); 
-            transform: scale(1.02);
-        }
-
-        #playerName { font-size: 28px; margin: 0; letter-spacing: 1px; }
-        
-        #heart-container { 
-            font-size: 30px; 
-            margin: 15px 0; 
-            letter-spacing: 5px;
-            filter: drop-shadow(0 0 5px var(--danger));
-        }
-
-        #status { 
-            font-size: 18px; 
-            font-weight: 900; 
-            text-transform: uppercase; 
-            letter-spacing: 2px;
-            color: #888;
-            margin-bottom: 5px;
-        }
-
-        #feedback {
-            font-size: 14px;
-            height: 24px;
-            color: var(--danger);
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        .active-status { color: var(--accent) !important; animation: pulse 1.5s infinite; }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        input { 
-            width: 100%; 
-            padding: 18px; 
-            font-size: 24px; 
-            border-radius: 15px; 
-            border: 2px solid #444; 
-            margin: 15px 0; 
-            text-align: center; 
-            background: #25252e;
-            color: white;
-            box-sizing: border-box;
-            outline: none;
-            text-transform: uppercase;
-        }
-
-        input:focus { border-color: var(--accent); }
-
-        button { 
-            width: 100%; 
-            padding: 18px; 
-            background: var(--accent); 
-            color: white; 
-            border: none; 
-            border-radius: 15px; 
-            font-size: 20px; 
-            font-weight: 900; 
-            cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
-        }
-
-        button:active { transform: translateY(2px); }
-        button:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
-
-        @media screen and (max-width: 768px) {
-            input { font-size: 18px; }
-        }
+        body { margin: 0; background: #1a1a1a; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: white; }
+        .dpad { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 15px; }
+        .btn { background: #333; border: 4px solid #444; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 30px; touch-action: manipulation; }
+        .btn:active { background: #6c5ce7; border-color: white; transform: scale(0.9); }
+        .up { grid-column: 2; } .left { grid-row: 2; grid-column: 1; } .right { grid-row: 2; grid-column: 3; } .down { grid-row: 3; grid-column: 2; }
+        #nameDisp { position: absolute; top: 20px; font-weight: bold; color: #6c5ce7; }
     </style>
 </head>
 <body>
-
-    <div class="controller-card" id="card">
-        <h2 id="playerName">---</h2>
-        <div id="heart-container"></div>
-        <p id="status">CONNECTING...</p>
-        
-        <input type="text" id="wordInput" placeholder="TYPE HERE" autocomplete="off" disabled>
-        <button id="sendBtn" disabled>SUBMIT WORD</button>
-        <div id="feedback"></div>
+    <div id="nameDisp">CONTROLLING SNAKE</div>
+    <div class="dpad">
+        <div class="btn up" onclick="sendDir(0, -1)">▲</div>
+        <div class="btn left" onclick="sendDir(-1, 0)">◀</div>
+        <div class="btn right" onclick="sendDir(1, 0)">▶</div>
+        <div class="btn down" onclick="sendDir(0, 1)">▼</div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const firebaseConfig = { 
-            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU", 
-            authDomain: "syncplay-17b6e.firebaseapp.com", 
-            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com", 
-            projectId: "syncplay-17b6e", 
-            storageBucket: "syncplay-17b6e.firebasestorage.app", 
-            messagingSenderId: "86016195929", 
-            appId: "1:86016195929:web:40262a28786f2ead712048" 
+        const firebaseConfig = {
+            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+            authDomain: "syncplay-17b6e.firebaseapp.com",
+            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+            projectId: "syncplay-17b6e",
+            storageBucket: "syncplay-17b6e.firebasestorage.app",
+            messagingSenderId: "86016195929",
+            appId: "1:86016195929:web:40262a28786f2ead712048"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const auth = getAuth(app);
-        const code = new URLSearchParams(window.location.search).get('code');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const partyCode = urlParams.get('code');
+        let myUid;
 
-        let myTurn = false;
-        let currentSyllable = "";
-        let usedWords = [];
-
-        onAuthStateChanged(auth, async (user) => {
-            if (user) { 
-                const myUid = user.uid;
-                const playerRef = ref(db, `parties/${code}/players/${myUid}`);
-                const disconnectRef = onDisconnect(playerRef);
-                
-                disconnectRef.remove();
-
-                // Listen for game status changes
-                onValue(ref(db, `parties/${code}/gameData/status`), (snap) => {
-                    const status = snap.val();
-                    if (status === "playing") {
-                        disconnectRef.cancel(); 
-                    }
-                    
-                    // REDIRECT LOGIC: Go back to index.html with the code
-                    if (status === "lobby" || status === "waiting") {
-                        window.location.href = `../../index.html?code=${code}`;
-                    }
-                });
-
-                // Listen for the specific Redirect flag
-                onValue(ref(db, `parties/${code}/gameData/redirect`), (snap) => {
-                    const redirectValue = snap.val();
-                    // If the host sets redirect to false or lobby, send player back
-                    if (redirectValue === "lobby" || redirectValue === false) {
-                        window.location.href = `../../index.html?code=${code}`;
-                    }
-                });
-
-                onValue(ref(db, `parties/${code}/usedWords`), (snap) => {
-                    usedWords = snap.val() || [];
-                });
-
-                onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
-                    const data = snap.val();
-                    if(!data) return;
-                    document.getElementById("playerName").innerText = data.name.toUpperCase();
-                    document.getElementById("heart-container").innerText = data.lives > 0 ? "❤️".repeat(data.lives) : "💀";
-                    
-                    if(data.lives <= 0) {
-                        document.getElementById("status").innerText = "ELIMINATED";
-                        document.getElementById("card").style.opacity = "0.4";
-                        document.getElementById("wordInput").disabled = true;
-                        document.getElementById("sendBtn").disabled = true;
-                    }
-                });
-
-                onValue(ref(db, `parties/${code}/gameData`), (snap) => {
-                    if(!snap.exists()) return;
-                    const gameData = snap.val();
-                    
-                    if (gameData.status === "finished" || gameData.status === "gameOver") {
-                        document.getElementById("status").innerText = "GAME OVER";
-                        document.getElementById("wordInput").disabled = true;
-                        document.getElementById("sendBtn").disabled = true;
-                        return;
-                    }
-
-                    currentSyllable = (gameData.syllable || "").toUpperCase();
-                    myTurn = (gameData.turn === myUid && gameData.status === "playing" && !["READY?", "WAITING", "START"].includes(currentSyllable));
-                    
-                    const input = document.getElementById("wordInput");
-                    const btn = document.getElementById("sendBtn");
-                    const status = document.getElementById("status");
-                    const card = document.getElementById("card");
-
-                    input.disabled = !myTurn;
-                    btn.disabled = !myTurn;
-
-                    if (myTurn) {
-                        status.innerText = "YOUR TURN!";
-                        status.classList.add("active-status");
-                        card.classList.add("my-turn");
-                        input.focus();
-                    } else {
-                        status.innerText = (gameData.turn === myUid) ? "GET READY..." : "WAITING...";
-                        status.classList.remove("active-status");
-                        card.classList.remove("my-turn");
-                        document.getElementById("feedback").innerText = "";
-                    }
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                myUid = user.uid;
+                // Get player name to display
+                onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (s) => {
+                    if(s.exists()) document.getElementById('nameDisp').innerText = s.val().name.toUpperCase();
                 });
             }
         });
 
-        const submitWord = async () => {
-            const input = document.getElementById("wordInput");
-            const feedback = document.getElementById("feedback");
-            const word = input.value.trim().toUpperCase();
-
-            if(!word || !myTurn) return;
-
-            if(!word.includes(currentSyllable)) {
-                feedback.style.color = "var(--danger)";
-                feedback.innerText = `MUST INCLUDE "${currentSyllable}"`;
-                return;
-            }
-
-            if(usedWords.includes(word.toLowerCase())) {
-                feedback.style.color = "var(--danger)";
-                feedback.innerText = "ALREADY USED!";
-                return;
-            }
-
-            await set(ref(db, `parties/${code}/action`), { 
-                uid: auth.currentUser.uid, 
-                word: word,
-                time: Date.now() 
+        window.sendDir = (x, y) => {
+            if(!myUid || !partyCode) return;
+            update(ref(db, `parties/${partyCode}/players/${myUid}`), {
+                dir: { x: x, y: y }
             });
-            
-            feedback.style.color = "var(--accent)";
-            feedback.innerText = "CHECKING...";
-            input.value = "";
         };
-
-        document.getElementById("sendBtn").addEventListener("click", submitWord);
-        document.getElementById("wordInput").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") submitWord();
-        });
     </script>
 </body>
 </html>

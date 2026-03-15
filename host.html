@@ -33,61 +33,99 @@
             border-radius: 40px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.15);
             width: 90%;
-            max-width: 480px;
+            max-width: 500px;
             text-align: center;
             border: 4px solid white;
             position: relative;
-            max-height: 90vh;
+            max-height: 95vh;
             overflow-y: auto;
         }
 
-        h1 { font-weight: 800; font-size: 2rem; margin: 0; letter-spacing: -1px; }
+        h1 { font-weight: 800; font-size: 1.8rem; margin: 0; letter-spacing: -1px; }
 
-        /* Game Menu Styles */
-        .game-selection {
-            margin: 20px 0;
-            display: grid;
-            gap: 10px;
+        /* --- MODERN GAME SLIDER --- */
+        .game-slider-container {
+            margin: 25px 0;
+            position: relative;
+            padding: 10px 0;
         }
+
+        .game-slider {
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            padding: 10px 5px;
+            scrollbar-width: none; /* Hide scrollbar Firefox */
+        }
+
+        .game-slider::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome/Safari */
 
         .game-card {
+            flex: 0 0 75%;
+            scroll-snap-align: center;
             background: white;
-            padding: 15px;
-            border-radius: 20px;
-            border: 2px solid #f1f2f6;
+            padding: 20px;
+            border-radius: 28px;
+            border: 3px solid #f1f2f6;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            position: relative;
+        }
+
+        .game-card.active {
+            border-color: var(--primary);
+            background: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(108, 92, 231, 0.2);
+        }
+
+        .game-card .icon-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            margin: 0 auto 15px;
             display: flex;
             align-items: center;
-            gap: 15px;
-            text-align: left;
+            justify-content: center;
+            color: white;
         }
 
-        .game-card:hover { transform: translateY(-2px); border-color: var(--primary); }
-        .game-card.active { border-color: var(--primary); background: #f0eeff; box-shadow: 0 5px 15px rgba(108,92,231,0.1); }
+        .game-card h3 { margin: 0; font-size: 18px; font-weight: 800; }
+        .game-card p { margin: 5px 0 0; font-size: 12px; color: #636e72; line-height: 1.4; }
 
-        .game-card h3 { margin: 0; font-size: 16px; color: #2d3436; }
-        .game-card p { margin: 0; font-size: 12px; color: #636e72; }
+        .active-tag {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: none;
+        }
+        .game-card.active .active-tag { display: block; }
 
+        /* --- LOBBY UI --- */
         #codeContainer {
             background: #f1f2f6;
-            padding: 20px;
+            padding: 15px;
             border-radius: 24px;
-            margin: 20px 0;
+            margin-bottom: 20px;
             cursor: pointer;
-            transition: 0.2s;
         }
-        #codeContainer:hover { transform: scale(1.02); background: #e8e9ed; }
         
         #code {
-            font-size: 64px;
+            font-size: 52px;
             font-weight: 800;
             display: block;
             color: var(--primary);
-            letter-spacing: 8px;
+            letter-spacing: 6px;
         }
-
-        .copy-hint { font-size: 11px; color: #b2bec3; font-weight: 800; text-transform: uppercase; }
 
         .player-area {
             background: white;
@@ -95,7 +133,7 @@
             border: 2px solid #f1f2f6;
             margin: 20px 0;
             padding: 20px;
-            max-height: 200px;
+            max-height: 180px;
             overflow-y: auto;
         }
 
@@ -104,16 +142,16 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 10px;
+            padding: 8px 12px;
             background: #f8f9fa;
             border-radius: 16px;
             margin-bottom: 8px;
         }
 
         .mini-avatar {
-            width: 36px; height: 36px; border-radius: 10px;
+            width: 32px; height: 32px; border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: 800;
+            color: white; font-weight: 800; font-size: 12px;
         }
 
         .player-name { flex: 1; text-align: left; font-weight: 700; color: #2d3436; font-size: 14px; }
@@ -125,16 +163,16 @@
             justify-content: center; gap: 10px; transition: 0.2s;
         }
 
-        .create-btn { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(108,92,231,0.2); }
-        .start-btn { background: var(--success); color: white; margin-top: 10px; box-shadow: 0 10px 20px rgba(0,184,148,0.2); }
-        .kick-btn { width: auto; padding: 6px; background: none; color: var(--danger); border: none; cursor: pointer; }
+        .create-btn { background: var(--primary); color: white; }
+        .start-btn { background: var(--success); color: white; margin-top: 10px; }
+        .kick-btn { width: auto; padding: 5px; background: none; color: var(--danger); border: none; }
         
         .hidden { display: none !important; }
         
         .status-pill {
             display: inline-block; padding: 6px 12px; background: #f1f2f6;
             border-radius: 20px; font-size: 11px; font-weight: 800;
-            color: #b2bec3; margin-top: 20px;
+            color: #b2bec3; margin-top: 15px;
         }
 
         .spin { animation: rotate 1s linear infinite; display: inline-block; }
@@ -152,30 +190,34 @@
     
     <div id="lobbyArea" class="hidden">
         <div id="codeContainer" onclick="copyCode()">
-            <span class="copy-hint">Click to Copy Code</span>
+            <span style="font-size: 10px; font-weight: 800; color: #b2bec3; text-transform: uppercase;">Lobby Code</span>
             <div id="code">----</div>
         </div>
 
-        <div class="game-selection">
-            <div class="game-card active" onclick="selectGame('SNAKE!', this)">
-                <div class="mini-avatar" style="background:#00b894"><i data-lucide="box"></i></div>
-                <div>
+        <div class="game-slider-container">
+            <div style="text-align: left; font-size: 11px; font-weight: 800; color: #b2bec3; margin-bottom: 10px;">CHOOSE GAME (SLIDE)</div>
+            <div class="game-slider" id="gameSlider">
+                
+                <div class="game-card active" onclick="selectGame('SNAKE!', this)">
+                    <div class="active-tag">SELECTED</div>
+                    <div class="icon-box" style="background:#00b894"><i data-lucide="box"></i></div>
                     <h3>SNAKE!</h3>
-                    <p>Classic multiplayer snake battle.</p>
+                    <p>Classic multiplayer arena. Last snake standing wins.</p>
                 </div>
-            </div>
-            <div class="game-card" onclick="selectGame('Word Bomb', this)">
-                <div class="mini-avatar" style="background:var(--primary)"><i data-lucide="bomb"></i></div>
-                <div>
+
+                <div class="game-card" onclick="selectGame('Word Bomb', this)">
+                    <div class="active-tag">SELECTED</div>
+                    <div class="icon-box" style="background:var(--primary)"><i data-lucide="bomb"></i></div>
                     <h3>Word Bomb</h3>
-                    <p>Quick thinking word arena.</p>
+                    <p>Type fast or explode! The ultimate vocabulary battle.</p>
                 </div>
+
             </div>
         </div>
 
         <div class="player-area">
             <div style="display:flex; justify-content:space-between; margin-bottom: 10px;">
-                <span style="font-weight:800; color:#b2bec3; font-size:11px;">PLAYERS JOINED</span>
+                <span style="font-weight:800; color:#b2bec3; font-size:11px;">PLAYERS</span>
                 <span id="playerCount" style="background:var(--primary); color:white; padding:1px 8px; border-radius:6px; font-size:11px;">0</span>
             </div>
             <ul id="players"></ul>
@@ -227,6 +269,8 @@
         selectedGame = game;
         document.querySelectorAll('.game-card').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
+        // Auto scroll to center the selected card
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     };
 
     window.createParty = async function() {
@@ -299,23 +343,25 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> STARTING...`;
         lucide.createIcons();
 
-        // Prepare the game state
+        // Prepare the game state in Firebase
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             currentGame: selectedGame,
-            redirect: "controller" // This tells clients to load controller.html
+            redirect: "controller" // This tells clients to jump to THEIR game controller
         });
 
-        // Small delay to ensure DB updates before moving
+        // Redirect Host to the "Big Screen"
         setTimeout(() => {
             window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
-        }, 800);
+        }, 1000);
     }
 
     window.copyCode = () => {
         navigator.clipboard.writeText(partyCode);
-        document.getElementById("code").innerText = "COPIED!";
-        setTimeout(() => document.getElementById("code").innerText = partyCode, 1000);
+        const codeEl = document.getElementById("code");
+        const oldVal = codeEl.innerText;
+        codeEl.innerText = "COPIED";
+        setTimeout(() => codeEl.innerText = oldVal, 1000);
     };
 
     window.kickPlayer = (uid) => {
