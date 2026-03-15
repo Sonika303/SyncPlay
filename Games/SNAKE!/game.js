@@ -19,21 +19,23 @@ const partyCode = urlParams.get('code');
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const mCanvas = document.getElementById('minimap');
+const mCtx = mCanvas?.getContext('2d');
 
-let gridSize = 70;
+let gridSize = 75;
 let cols, rows;
 let players = {}; 
-let apple = {gx: 5, gy: 5, isGold: false, phase: 0};
+let apple = {gx: 5, gy: 5, isGold: false};
 let shopTile = {gx: 10, gy: 10};
 let partyScore = 0;
 let goldApples = 0;
 let trees = [];
 
 const biomes = [
-    { name: "FOREST", bg1: "#1a2e1a", bg2: "#233d23", accent: "#10b981", type: 'land' },
-    { name: "DESERT", bg1: "#3d2b16", bg2: "#4d3a1e", accent: "#fbbf24", type: 'land' },
-    { name: "WATER", bg1: "#1e3a8a", bg2: "#2563eb", accent: "#38bdf8", type: 'water' },
-    { name: "VOID", bg1: "#0f172a", bg2: "#1e293b", accent: "#6366f1", type: 'land' }
+    { name: "FOREST", bg1: "#0a1a0a", bg2: "#102610", accent: "#10b981", type: 'land' },
+    { name: "DESERT", bg1: "#2d1b00", bg2: "#3d2b00", accent: "#fbbf24", type: 'land' },
+    { name: "WATER", bg1: "#0c1e4a", bg2: "#162e6a", accent: "#38bdf8", type: 'water' },
+    { name: "VOID", bg1: "#020617", bg2: "#0f172a", accent: "#818cf8", type: 'land' }
 ];
 let currentBiomeIndex = 0;
 
@@ -47,8 +49,8 @@ function init() {
         if (!data) return;
         Object.keys(data).forEach(uid => {
             if (!players[uid]) {
-                const sx = Math.floor(Math.random() * (cols - 5)) + 2;
-                const sy = Math.floor(Math.random() * (rows - 5)) + 2;
+                const sx = Math.floor(Math.random() * (cols - 10)) + 5;
+                const sy = Math.floor(Math.random() * (rows - 10)) + 5;
                 players[uid] = {
                     name: data[uid].name || "Player",
                     color: data[uid].color || "#6c5ce7",
@@ -57,7 +59,7 @@ function init() {
                     nextDir: {x: 1, y: 0},
                     moveProgress: 0,
                     tongueLen: 0,
-                    swimPhase: 0
+                    swimPhase: Math.random() * Math.PI
                 };
             } else if (data[uid].dir) {
                 const newD = data[uid].dir;
@@ -70,7 +72,8 @@ function init() {
     });
 
     onValue(ref(db, `parties/${partyCode}/gameState/shopOpen`), (snapshot) => {
-        document.getElementById('shop').style.display = snapshot.val() ? 'grid' : 'none';
+        const shop = document.getElementById('shop');
+        if(shop) shop.style.display = snapshot.val() ? 'grid' : 'none';
     });
 
     spawnTrees();
@@ -86,206 +89,193 @@ function resize() {
 }
 
 function spawnTrees() {
-    trees = [];
-    for(let i=0; i<8; i++) {
-        trees.push({
-            gx: Math.floor(Math.random() * cols),
-            gy: Math.floor(Math.random() * rows),
-            scale: 0.8 + Math.random() * 0.5
-        });
-    }
+    trees = Array.from({length: 12}, () => ({
+        gx: Math.floor(Math.random() * cols),
+        gy: Math.floor(Math.random() * rows),
+        scale: 0.6 + Math.random() * 0.8,
+        flip: Math.random() > 0.5
+    }));
 }
 
 function spawnApple() {
-    apple.gx = Math.floor(Math.random() * (cols - 2)) + 1;
-    apple.gy = Math.floor(Math.random() * (rows - 2)) + 1;
-    apple.isGold = Math.random() > 0.9;
+    apple.gx = Math.floor(Math.random() * (cols - 4)) + 2;
+    apple.gy = Math.floor(Math.random() * (rows - 4)) + 2;
+    apple.isGold = Math.random() > 0.92;
 }
 
 function shiftWorld(dx, dy) {
     currentBiomeIndex = (currentBiomeIndex + 1) % biomes.length;
     const b = biomes[currentBiomeIndex];
-    
-    // UI Feedback
     const bTxt = document.getElementById('biome-txt');
     if(bTxt) { bTxt.innerText = b.name; bTxt.style.color = b.accent; }
 
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        const shiftX = dx !== 0 ? (dx > 0 ? - (cols - 1) : (cols - 1)) : 0;
-        const shiftY = dy !== 0 ? (dy > 0 ? - (rows - 1) : (rows - 1)) : 0;
-        
-        p.parts.forEach(part => {
-            part.gx += shiftX;
-            part.gy += shiftY;
-        });
+        const sX = dx !== 0 ? (dx > 0 ? -(cols-1) : (cols-1)) : 0;
+        const sY = dy !== 0 ? (dy > 0 ? -(rows-1) : (rows-1)) : 0;
+        p.parts.forEach(pt => { pt.gx += sX; pt.gy += sY; });
     });
 
     spawnTrees();
     spawnApple();
-    shopTile.gx = Math.floor(Math.random() * (cols - 2)) + 1;
-    shopTile.gy = Math.floor(Math.random() * (rows - 2)) + 1;
+    shopTile.gx = Math.floor(Math.random() * (cols - 4)) + 2;
+    shopTile.gy = Math.floor(Math.random() * (rows - 4)) + 2;
 }
 
-function drawApple(x, y, isGold) {
-    const time = Date.now() / 200;
-    const bounce = Math.sin(time) * 5;
-    
-    ctx.save();
-    ctx.translate(x * gridSize + gridSize/2, y * gridSize + gridSize/2 + bounce);
-    
-    // Leaf
-    ctx.fillStyle = "#4ade80";
-    ctx.beginPath();
-    ctx.ellipse(5, -18, 10, 5, Math.PI/4, 0, Math.PI*2);
-    ctx.fill();
+function drawMinimap() {
+    if(!mCtx) return;
+    mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+    mCtx.fillStyle = "rgba(0,0,0,0.5)";
+    mCtx.fillRect(0,0, mCanvas.width, mCanvas.height);
 
-    // Body
-    ctx.fillStyle = isGold ? "#fbbf24" : "#ef4444";
-    ctx.beginPath();
-    ctx.arc(0, 0, 20, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Shine
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.beginPath();
-    ctx.arc(-7, -7, 6, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-}
+    const sX = mCanvas.width / cols;
+    const sY = mCanvas.height / rows;
 
-function drawTree(tree) {
-    const b = biomes[currentBiomeIndex];
-    if (b.type === 'water') return; // No trees in water
+    // Trees
+    mCtx.fillStyle = "#166534";
+    trees.forEach(t => mCtx.fillRect(t.gx * sX, t.gy * sY, sX, sY));
 
-    ctx.save();
-    ctx.translate(tree.gx * gridSize + gridSize/2, tree.gy * gridSize + gridSize/2);
-    ctx.scale(tree.scale, tree.scale);
+    // Apple
+    mCtx.fillStyle = apple.isGold ? "#fbbf24" : "#ef4444";
+    mCtx.beginPath();
+    mCtx.arc(apple.gx * sX + sX/2, apple.gy * sY + sY/2, sX, 0, Math.PI*2);
+    mCtx.fill();
 
-    // Trunk
-    ctx.fillStyle = "#452714";
-    ctx.fillRect(-10, 0, 20, 30);
-
-    // Foliage (Cartoonish)
-    ctx.fillStyle = b.accent;
-    for(let i=0; i<3; i++) {
-        ctx.beginPath();
-        ctx.arc(0, -15 - (i*15), 25 - (i*5), 0, Math.PI*2);
-        ctx.fill();
-    }
-    ctx.restore();
+    // Players
+    Object.keys(players).forEach(uid => {
+        const p = players[uid];
+        mCtx.fillStyle = p.color;
+        p.parts.forEach(pt => mCtx.fillRect(pt.gx * sX, pt.gy * sY, sX*1.5, sY*1.5));
+    });
 }
 
 function drawSnake(p) {
     const isWater = biomes[currentBiomeIndex].type === 'water';
-    p.swimPhase += 0.2;
+    p.swimPhase += 0.15;
 
-    p.parts.forEach((part, i) => {
-        const x = part.gx * gridSize + gridSize/2;
-        const y = part.gy * gridSize + gridSize/2;
-        
-        // Swimming Sine Wave
-        const swimOff = isWater ? Math.sin(p.swimPhase + i * 0.5) * 15 : 0;
-        
-        ctx.fillStyle = i === 0 ? "white" : p.color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = p.color;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-        ctx.beginPath();
-        const size = i === 0 ? 28 : 22 - (i * 0.5); // Tapered body
-        ctx.arc(x + (p.dir.y * swimOff), y + (p.dir.x * swimOff), Math.max(size, 10), 0, Math.PI*2);
-        ctx.fill();
+    // 1. Draw Body Path (The "Single Model" look)
+    ctx.beginPath();
+    p.parts.forEach((pt, i) => {
+        const x = pt.gx * gridSize + gridSize/2;
+        const y = pt.gy * gridSize + gridSize/2;
+        const swim = isWater ? Math.sin(p.swimPhase + i*0.8) * 20 : 0;
+        const finalX = x + (p.dir.y * swim);
+        const finalY = y + (p.dir.x * swim);
 
-        // Face details on head
-        if(i === 0) {
-            // Tongue logic
-            if(Math.random() > 0.98) p.tongueLen = 20;
-            if(p.tongueLen > 0) {
-                ctx.strokeStyle = "#ff4d4d";
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x + p.dir.x * (30 + p.tongueLen), y + p.dir.y * (30 + p.tongueLen));
-                ctx.stroke();
-                p.tongueLen -= 2;
-            }
-            
-            // Eyes
-            ctx.fillStyle = "black";
-            ctx.beginPath();
-            ctx.arc(x + p.dir.x*10 - p.dir.y*10, y + p.dir.y*10 + p.dir.x*10, 4, 0, Math.PI*2);
-            ctx.arc(x + p.dir.x*10 + p.dir.y*10, y + p.dir.y*10 - p.dir.x*10, 4, 0, Math.PI*2);
-            ctx.fill();
-        }
+        if(i === 0) ctx.moveTo(finalX, finalY);
+        else ctx.lineTo(finalX, finalY);
     });
+
+    // Shadow/Glow
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = p.color;
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 35;
+    ctx.stroke();
+
+    // Highlight center
     ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 10;
+    ctx.stroke();
+
+    // 2. Draw Head Details
+    const h = p.parts[0];
+    const hX = h.gx * gridSize + gridSize/2;
+    const hY = h.gy * gridSize + gridSize/2;
+
+    // Tongue
+    if(Math.random() > 0.98) p.tongueLen = 25;
+    if(p.tongueLen > 0) {
+        ctx.strokeStyle = "#ff4d4d";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(hX, hY);
+        ctx.lineTo(hX + p.dir.x * (40+p.tongueLen), hY + p.dir.y * (40+p.tongueLen));
+        ctx.stroke();
+        p.tongueLen -= 1.5;
+    }
+
+    // Eyes
+    ctx.fillStyle = "white";
+    const eyeOff = 12;
+    ctx.beginPath();
+    ctx.arc(hX + p.dir.x*15 - p.dir.y*eyeOff, hY + p.dir.y*15 + p.dir.x*eyeOff, 7, 0, Math.PI*2);
+    ctx.arc(hX + p.dir.x*15 + p.dir.y*eyeOff, hY + p.dir.y*15 - p.dir.x*eyeOff, 7, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(hX + p.dir.x*20 - p.dir.y*eyeOff, hY + p.dir.y*20 + p.dir.x*eyeOff, 3, 0, Math.PI*2);
+    ctx.arc(hX + p.dir.x*20 + p.dir.y*eyeOff, hY + p.dir.y*20 - p.dir.x*eyeOff, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
 }
 
 function updatePlayers() {
-    if (document.getElementById('shop').style.display === 'grid') return;
-
-    let shiftX = 0, shiftY = 0;
+    if (document.getElementById('shop')?.style.display === 'grid') return;
+    let sX = 0, sY = 0;
 
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        p.moveProgress += 0.18;
+        p.moveProgress += 0.22; // Speed boost
 
         if (p.moveProgress >= 1) {
             p.moveProgress = 0;
             p.dir = p.nextDir;
+            let nX = p.parts[0].gx + p.dir.x;
+            let nY = p.parts[0].gy + p.dir.y;
 
-            let ngx = p.parts[0].gx + p.dir.x;
-            let ngy = p.parts[0].gy + p.dir.y;
+            if (nX < 0) sX = -1; else if (nX >= cols) sX = 1;
+            else if (nY < 0) sY = -1; else if (nY >= rows) sY = 1;
 
-            // Trigger World Shift
-            if (ngx < 0) shiftX = -1;
-            else if (ngx >= cols) shiftX = 1;
-            else if (ngy < 0) shiftY = -1;
-            else if (ngy >= rows) shiftY = 1;
-
-            if (ngx === apple.gx && ngy === apple.gy) {
+            if (nX === apple.gx && nY === apple.gy) {
                 if (apple.isGold) goldApples++; else partyScore++;
                 document.getElementById('s-norm').innerText = partyScore;
                 document.getElementById('s-gold').innerText = goldApples;
                 spawnApple();
-            } else {
-                p.parts.pop();
-            }
-            p.parts.unshift({ gx: ngx, gy: ngy });
+            } else { p.parts.pop(); }
+            p.parts.unshift({ gx: nX, gy: nY });
         }
     });
-
-    if (shiftX !== 0 || shiftY !== 0) shiftWorld(shiftX, shiftY);
+    if (sX !== 0 || sY !== 0) shiftWorld(sX, sY);
 }
 
 function gameLoop() {
     const biome = biomes[currentBiomeIndex];
-    
-    // Background
     ctx.fillStyle = biome.bg1;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Better Grid
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 1;
+    // Dynamic Grid Graphics
+    ctx.strokeStyle = biome.bg2;
+    ctx.lineWidth = 2;
     for(let i=0; i<=cols; i++) { ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke(); }
     for(let i=0; i<=rows; i++) { ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke(); }
 
-    trees.forEach(drawTree);
-    
-    // Shop Tile Visual
-    ctx.fillStyle = biome.accent;
-    ctx.globalAlpha = 0.2;
-    ctx.beginPath();
-    ctx.roundRect(shopTile.gx * gridSize + 5, shopTile.gy * gridSize + 5, gridSize - 10, gridSize - 10, 20);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
+    // Render Assets
+    trees.forEach(t => {
+        ctx.save();
+        ctx.translate(t.gx*gridSize+gridSize/2, t.gy*gridSize+gridSize/2);
+        ctx.scale(t.scale * (t.flip ? -1 : 1), t.scale);
+        ctx.fillStyle = "#3f2b1a"; ctx.fillRect(-8, 0, 16, 25);
+        ctx.fillStyle = biome.accent;
+        ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(30, 5); ctx.lineTo(-30, 5); ctx.closeFill();
+        ctx.restore();
+    });
 
     drawApple(apple.gx, apple.gy, apple.isGold);
     updatePlayers();
     Object.keys(players).forEach(uid => drawSnake(players[uid]));
+    drawMinimap();
 
     requestAnimationFrame(gameLoop);
 }
+
+// Helper for Triangle Trees
+CanvasRenderingContext2D.prototype.closeFill = function() { this.closePath(); this.fill(); };
 
 init();
