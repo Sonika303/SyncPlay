@@ -35,6 +35,7 @@
             grid-template-columns: repeat(3, 95px); 
             grid-template-rows: repeat(3, 95px); 
             gap: 20px; 
+            transition: opacity 0.3s ease;
         }
 
         .btn { 
@@ -48,11 +49,10 @@
             cursor: pointer;
             transition: all 0.1s ease;
             -webkit-tap-highlight-color: transparent;
-            touch-action: none; /* Prevents scrolling while playing */
+            touch-action: none;
         }
 
-        /* The 'Active' class is triggered on tap */
-        .btn:active, .btn.pressing { 
+        .btn:active { 
             background: #6c5ce7; 
             border-color: #a29bfe; 
             transform: scale(0.92); 
@@ -63,6 +63,33 @@
         .left { grid-row: 2; grid-column: 1; } 
         .right { grid-row: 2; grid-column: 3; } 
         .down { grid-row: 3; grid-column: 2; }
+
+        /* SHOP OVERLAY */
+        #shop-ui {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .shop-btn {
+            width: 80%;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 15px;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .buy { background: #10b981; }
+        .close { background: #ef4444; }
 
         .hint {
             position: absolute;
@@ -76,21 +103,26 @@
 <body>
     <div id="nameDisp">JOINING...</div>
 
-    <div class="dpad">
+    <div class="dpad" id="controller-pad">
         <div class="btn up" onpointerdown="sendDir(0, -1)">▲</div>
         <div class="btn left" onpointerdown="sendDir(-1, 0)">◀</div>
         <div class="btn right" onpointerdown="sendDir(1, 0)">▶</div>
         <div class="btn down" onpointerdown="sendDir(0, 1)">▼</div>
     </div>
 
-    <div class="hint">Tap arrows to move your snake</div>
+    <div id="shop-ui">
+        <h2 style="color: #10b981">SHOP OPEN</h2>
+        <button class="shop-btn buy" onpointerdown="triggerBuy()">BUY ITEM (10🍎)</button>
+        <button class="shop-btn close" onpointerdown="closeShop()">CLOSE</button>
+    </div>
+
+    <div class="hint">Tap arrows to move</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
             authDomain: "syncplay-17b6e.firebaseapp.com",
@@ -109,45 +141,44 @@
         const partyCode = urlParams.get('code');
         let myUid;
 
-        // AUTH & UI UPDATE
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 myUid = user.uid;
-                // Grab player name and color from the party
+                
+                // Track my identity
                 onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (snapshot) => {
-                    if(snapshot.exists()) {
+                    if(snapshot.exists()){
                         const data = snapshot.val();
-                        const disp = document.getElementById('nameDisp');
-                        disp.innerText = data.name;
-                        disp.style.color = data.color || "#6c5ce7";
+                        document.getElementById('nameDisp').innerText = data.name;
+                        document.getElementById('nameDisp').style.color = data.color;
                     }
                 });
-            } else {
-                document.getElementById('nameDisp').innerText = "AUTH ERROR";
+
+                // Listen for Shop State from Host
+                onValue(ref(db, `parties/${partyCode}/gameState/shopOpen`), (snapshot) => {
+                    const isOpen = snapshot.val();
+                    document.getElementById('shop-ui').style.display = isOpen ? 'flex' : 'none';
+                    document.getElementById('controller-pad').style.opacity = isOpen ? '0.2' : '1';
+                });
             }
         });
 
-        // INPUT LOGIC
         window.sendDir = (x, y) => {
             if(!myUid || !partyCode) return;
-            
-            // Haptic Feedback for mobile
             if (navigator.vibrate) navigator.vibrate(15);
-
-            // Immediate update to Firebase
-            // We update the direction inside the player's object
-            const playerRef = ref(db, `parties/${partyCode}/players/${myUid}`);
-            update(playerRef, {
-                dir: { x: x, y: y }
-            }).catch(err => console.error("Firebase Update Failed:", err));
+            update(ref(db, `parties/${partyCode}/players/${myUid}`), { dir: { x, y } });
         };
 
-        // Prevent context menu (right click) on long press for mobile
-        window.oncontextmenu = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
+        window.triggerBuy = () => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            update(ref(db, `parties/${partyCode}/gameState`), { buyRequest: Date.now() });
         };
+
+        window.closeShop = () => {
+            update(ref(db, `parties/${partyCode}/gameState`), { shopOpen: false });
+        };
+
+        window.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
     </script>
 </body>
 </html>
