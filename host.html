@@ -43,7 +43,6 @@
 
         h1 { font-weight: 800; font-size: 1.8rem; margin: 0; letter-spacing: -1px; }
 
-        /* --- MODERN GAME SLIDER --- */
         .game-slider-container {
             margin: 25px 0;
             position: relative;
@@ -56,10 +55,10 @@
             overflow-x: auto;
             scroll-snap-type: x mandatory;
             padding: 10px 5px;
-            scrollbar-width: none; /* Hide scrollbar Firefox */
+            scrollbar-width: none;
         }
 
-        .game-slider::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome/Safari */
+        .game-slider::-webkit-scrollbar { display: none; }
 
         .game-card {
             flex: 0 0 75%;
@@ -110,7 +109,6 @@
         }
         .game-card.active .active-tag { display: block; }
 
-        /* --- LOBBY UI --- */
         #codeContainer {
             background: #f1f2f6;
             padding: 15px;
@@ -195,21 +193,21 @@
         </div>
 
         <div class="game-slider-container">
-            <div style="text-align: left; font-size: 11px; font-weight: 800; color: #b2bec3; margin-bottom: 10px;">CHOOSE GAME (SLIDE)</div>
+            <div style="text-align: left; font-size: 11px; font-weight: 800; color: #b2bec3; margin-bottom: 10px;">CHOOSE GAME</div>
             <div class="game-slider" id="gameSlider">
                 
                 <div class="game-card active" onclick="selectGame('SNAKE!', this)">
                     <div class="active-tag">SELECTED</div>
                     <div class="icon-box" style="background:#00b894"><i data-lucide="box"></i></div>
                     <h3>SNAKE!</h3>
-                    <p>Classic multiplayer arena. Last snake standing wins.</p>
+                    <p>Classic multiplayer arena.</p>
                 </div>
 
                 <div class="game-card" onclick="selectGame('Word Bomb', this)">
                     <div class="active-tag">SELECTED</div>
                     <div class="icon-box" style="background:var(--primary)"><i data-lucide="bomb"></i></div>
                     <h3>Word Bomb</h3>
-                    <p>Type fast or explode! The ultimate vocabulary battle.</p>
+                    <p>Type fast or explode!</p>
                 </div>
 
             </div>
@@ -234,7 +232,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, remove, serverTimestamp, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -269,7 +267,6 @@
         selectedGame = game;
         document.querySelectorAll('.game-card').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
-        // Auto scroll to center the selected card
         el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     };
 
@@ -343,14 +340,15 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> STARTING...`;
         lucide.createIcons();
 
-        // Prepare the game state in Firebase
+        // THE FIX: We pass the specific game folder in the redirect string
+        const controllerPath = `Games/${selectedGame}/controller.html`;
+
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             currentGame: selectedGame,
-            redirect: "controller" // This tells clients to jump to THEIR game controller
+            redirect: controllerPath // Now it tells players EXACTLY where to go
         });
 
-        // Redirect Host to the "Big Screen"
         setTimeout(() => {
             window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
         }, 1000);

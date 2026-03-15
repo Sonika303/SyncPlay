@@ -1,419 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SyncPlay | Word Bomb</title>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <title>Snake Controller</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-
-        :root {
-            --primary: #6c5ce7;
-            --accent: #00b894;
-            --danger: #ff7675;
-            --bg-joy: #fab1a0;
-            --user-color: #6c5ce7;
+        body { 
+            margin: 0; 
+            background: #0f172a; 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            color: white; 
+            user-select: none;
         }
 
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        #nameDisp { 
+            position: absolute; 
+            top: 40px; 
+            font-weight: 900; 
+            color: #6c5ce7; 
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
-        body {
-            margin: 0;
-            height: 100dvh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            background: linear-gradient(45deg, #a29bfe, #fab1a0, #81ecec, #ffeaa7);
-            background-size: 400% 400%;
-            animation: joyFlow 15s ease infinite;
+        .dpad { 
+            display: grid; 
+            grid-template-columns: repeat(3, 95px); 
+            grid-template-rows: repeat(3, 95px); 
+            gap: 20px; 
         }
 
-        @keyframes joyFlow {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .container {
-            position: relative;
-            background: rgba(255, 255, 255, 0.92);
-            padding: 40px 30px;
-            border-radius: 40px;
-            backdrop-filter: blur(20px);
-            border: 4px solid white;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.12);
-            width: 90%;
-            max-width: 420px;
-            text-align: center;
-            z-index: 10;
-        }
-
-        .avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 32px;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 42px;
-            font-weight: 800;
-            color: white;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
-            background: var(--user-color);
-            border: 4px solid white;
-        }
-
-        h1 { margin: 0; font-size: 2.5rem; font-weight: 800; color: #2d3436; letter-spacing: -1.5px; }
-        p { color: #636e72; margin-bottom: 30px; font-weight: 600; }
-
-        .input-group { position: relative; margin-bottom: 15px; text-align: left; }
-        .input-group i { position: absolute; left: 18px; top: 18px; color: #b2bec3; z-index: 2; }
-
-        input[type="text"] {
-            padding: 18px 16px 18px 55px;
-            border-radius: 20px;
-            border: 3px solid transparent;
-            width: 100%;
-            background: #f1f2f6;
-            font-size: 16px;
-            font-weight: 700;
-            color: #2d3436;
-            outline: none;
-        }
-
-        input[type="text"]:focus { border-color: var(--user-color); background: white; }
-
-        button {
-            padding: 18px;
-            border: none;
-            border-radius: 20px;
-            margin: 8px 0;
+        .btn { 
+            background: #1e293b; 
+            border: 4px solid #334155; 
+            border-radius: 25px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 32px; 
             cursor: pointer;
-            font-weight: 800;
-            width: 100%;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
+            transition: all 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        button:active { transform: scale(0.96); }
+        /* Using touch-action none to prevent browser zoom/delay */
+        .btn { touch-action: none; }
 
-        .btn-google { background: #2d3436; color: white; }
-        .btn-join { background: var(--user-color); color: white; box-shadow: 0 12px 24px -8px var(--user-color); }
-        .btn-host { background: white; color: #2d3436; border: 3px solid #f1f2f6; }
-        
-        .btn-settings { 
-            position: absolute; top: 20px; right: 20px; width: 48px; height: 48px; 
-            background: white; border-radius: 16px; color: #2d3436; padding: 0;
-            box-shadow: 0 8px 15px rgba(0,0,0,0.05);
-            z-index: 100;
+        .btn:active { 
+            background: #6c5ce7; 
+            border-color: #a29bfe; 
+            transform: scale(0.92); 
+            box-shadow: 0 0 20px rgba(108, 92, 231, 0.4);
         }
 
-        #settingsPage, #colorSubPage {
-            position: fixed; inset: 0; background: #f9f9fb;
-            display: none; flex-direction: column; z-index: 2000;
-            padding: 40px 20px; overflow-y: auto;
+        .up { grid-column: 2; } 
+        .left { grid-row: 2; grid-column: 1; } 
+        .right { grid-row: 2; grid-column: 3; } 
+        .down { grid-row: 3; grid-column: 2; }
+
+        .hint {
+            position: absolute;
+            bottom: 40px;
+            font-size: 12px;
+            opacity: 0.4;
+            text-transform: uppercase;
         }
-
-        .settings-header { display: flex; align-items: center; justify-content: space-between; max-width: 500px; margin: 0 auto 30px; width: 100%; }
-
-        .subcat-btn {
-            background: white; border-radius: 24px; padding: 20px;
-            display: flex; align-items: center; justify-content: space-between;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.04); cursor: pointer;
-            margin-bottom: 25px; border: 2px solid transparent;
-        }
-
-        .preview-card {
-            background: white; border-radius: 30px; padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 30px;
-            text-align: center; border: 1px solid #eee;
-        }
-
-        .color-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); 
-            gap: 10px; margin-top: 20px; padding-bottom: 40px;
-        }
-
-        .color-cell {
-            aspect-ratio: 1; border-radius: 10px; cursor: pointer;
-            border: 3px solid transparent;
-        }
-        .color-cell.active { border-color: #2d3436; transform: scale(1.15); }
-
-        .custom-picker-box {
-            display: flex; align-items: center; gap: 20px; margin-bottom: 25px;
-            padding: 20px; background: white; border-radius: 24px; border: 2px solid #f1f2f6;
-        }
-
-        .hex-tag {
-            background: #2d3436; color: white; padding: 4px 12px;
-            border-radius: 8px; font-family: monospace; font-size: 14px;
-            margin-top: 8px; display: inline-block;
-        }
-
-        .hidden { display: none; }
     </style>
 </head>
 <body>
+    <div id="nameDisp">JOINING...</div>
 
-<div class="container" id="mainContainer">
-    <button id="setBtn" class="btn-settings" onclick="toggleSettings()" style="display:none">
-        <i data-lucide="settings"></i>
-    </button>
-    
-    <h1>SyncPlay</h1>
-    <p>Word Bomb Arena</p>
-
-    <div id="login">
-        <button class="btn-google" onclick="googleLogin()">
-            <i data-lucide="log-in"></i> Play with Google
-        </button>
+    <div class="dpad">
+        <div class="btn up" onpointerdown="sendDir(0, -1)">▲</div>
+        <div class="btn left" onpointerdown="sendDir(-1, 0)">◀</div>
+        <div class="btn right" onpointerdown="sendDir(1, 0)">▶</div>
+        <div class="btn down" onpointerdown="sendDir(0, 1)">▼</div>
     </div>
 
-    <div id="mainUI" style="display:none">
-        <div id="avatarCircle" class="avatar">?</div>
-        <h2 id="welcome" style="margin:0 0 25px 0; color: #2d3436;">Welcome!</h2>
-        
-        <div class="input-group">
-            <i data-lucide="ticket"></i>
-            <input id="partyCode" type="text" maxlength="4" placeholder="Room Code" autocomplete="off">
-        </div>
-        <button class="btn-join" onclick="joinParty()">Join Room</button>
-        <button class="btn-host" onclick="goToHost()">Create Room</button>
-    </div>
+    <div class="hint">Tap arrows to move your snake</div>
 
-    <div id="partyScreen" class="hidden">
-        <div class="avatar" id="lobbyAvatar">?</div>
-        <h2 id="lobbyStatus" style="color: var(--user-color);">Waiting for Host...</h2>
-        <p>Code: <span id="displayRoomCode" style="color:#2d3436; font-weight:800;">----</span></p>
-    </div>
-</div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-<div id="settingsPage">
-    <div class="settings-header">
-        <h2 style="font-weight: 800; margin:0;">Edit Profile</h2>
-        <button onclick="toggleSettings()" style="width: auto; height:auto; padding: 12px 20px; background: #f1f2f6; color: #2d3436; border-radius:15px;">Done</button>
-    </div>
-
-    <div style="max-width: 450px; margin: 0 auto; width: 100%;">
-        <div class="preview-card">
-            <div style="font-size: 12px; font-weight: 800; color: #b2bec3; margin-bottom: 15px; letter-spacing: 1px;">LIVE PREVIEW</div>
-            <div class="avatar" id="previewAvatar" style="width: 110px; height: 110px; font-size: 48px;">?</div>
-            <div id="previewName" style="font-weight: 800; font-size: 20px; color: #2d3436;">Your Name</div>
-            <div id="hexDisplay" class="hex-tag">#6C5CE7</div>
-        </div>
-        
-        <div class="input-group">
-            <i data-lucide="user"></i>
-            <input id="usernameInput" type="text" placeholder="Display Name" oninput="updatePreview()">
-        </div>
-
-        <div style="text-align: left; margin: 30px 0 10px 10px; font-weight: 800; color: #b2bec3; font-size: 12px; letter-spacing: 1px;">CUSTOMIZE</div>
-        
-        <div class="subcat-btn" onclick="toggleColorPage()">
-            <div style="display:flex; align-items:center; gap:15px;">
-                <div style="background:var(--user-color); color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center; box-shadow: 0 8px 15px -5px var(--user-color);">
-                    <i data-lucide="palette"></i>
-                </div>
-                <div style="text-align:left;">
-                    <div style="font-weight: 800; color:#2d3436;">Theme Colors</div>
-                    <div style="font-size: 12px; color:#b2bec3;">Presets & Custom</div>
-                </div>
-            </div>
-            <i data-lucide="chevron-right" style="color:#b2bec3"></i>
-        </div>
-
-        <button class="btn-join" onclick="saveSettings()" style="margin-top:10px;">Save Profile</button>
-        <button style="background:none; color:var(--danger); margin-top:10px;" onclick="logout()">Sign Out</button>
-    </div>
-</div>
-
-<div id="colorSubPage">
-    <div class="settings-header">
-        <button onclick="toggleColorPage()" style="width:auto; height:auto; padding:10px; background:none; color:#2d3436;">
-            <i data-lucide="arrow-left"></i>
-        </button>
-        <h2 style="font-weight: 800; margin:0;">Color Vault</h2>
-        <div style="width:40px;"></div>
-    </div>
-    <div style="max-width: 450px; margin: 0 auto; width: 100%;">
-        <div class="custom-picker-box">
-            <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:60px; height:60px; border-radius:15px; border:none; background:none; cursor:pointer; padding:0;">
-            <div style="text-align:left;">
-                <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">CUSTOM SLIDER</div>
-                <div style="font-size: 15px; font-weight: 700;">Pick a unique hex</div>
-            </div>
-        </div>
-        <div class="color-grid" id="colorGrid"></div>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, get, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
-        authDomain: "syncplay-17b6e.firebaseapp.com",
-        databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
-        projectId: "syncplay-17b6e",
-        storageBucket: "syncplay-17b6e.firebasestorage.app",
-        messagingSenderId: "86016195929",
-        appId: "1:86016195929:web:40262a28786f2ead712048"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    let currentUser;
-    let selectedColor = "#6c5ce7";
-    
-    // Check for room code in URL (if player was sent back from controller)
-    const urlParams = new URLSearchParams(window.location.search);
-    const autoRoomCode = urlParams.get('code');
-
-    // UI Setup for Palette
-    const palette = [];
-    for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
-    const grid = document.getElementById("colorGrid");
-    palette.forEach(color => {
-        const cell = document.createElement("div");
-        cell.className = "color-cell";
-        cell.style.background = color;
-        cell.onclick = () => {
-            selectedColor = color;
-            document.querySelectorAll(".color-cell").forEach(c => c.classList.remove("active"));
-            cell.classList.add("active");
-            updatePreview();
+        const firebaseConfig = {
+            apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+            authDomain: "syncplay-17b6e.firebaseapp.com",
+            databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+            projectId: "syncplay-17b6e",
+            storageBucket: "syncplay-17b6e.firebasestorage.app",
+            messagingSenderId: "86016195929",
+            appId: "1:86016195929:web:40262a28786f2ead712048"
         };
-        grid.appendChild(cell);
-    });
 
-    window.toggleSettings = () => {
-        const page = document.getElementById("settingsPage");
-        page.style.display = (page.style.display === "flex") ? "none" : "flex";
-    };
-
-    window.toggleColorPage = () => {
-        const page = document.getElementById("colorSubPage");
-        page.style.display = (page.style.display === "flex") ? "none" : "flex";
-    };
-
-    window.pickCustomColor = (hex) => {
-        selectedColor = hex;
-        updatePreview();
-    };
-
-    window.updatePreview = () => {
-        const name = document.getElementById("usernameInput").value || "Player";
-        document.getElementById("previewAvatar").innerText = name.charAt(0).toUpperCase();
-        document.getElementById("previewAvatar").style.background = selectedColor;
-        document.getElementById("previewName").innerText = name;
-        document.getElementById("hexDisplay").innerText = selectedColor.startsWith('hsl') ? "HSL COLOR" : selectedColor.toUpperCase();
-        document.documentElement.style.setProperty('--user-color', selectedColor);
-    };
-
-    window.googleLogin = () => signInWithPopup(auth, provider);
-
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            currentUser = user;
-            document.getElementById("login").style.display = "none";
-            document.getElementById("mainUI").style.display = "block";
-            document.getElementById("setBtn").style.display = "block";
-            const snap = await get(ref(db, "users/" + user.uid));
-            let username = user.displayName ? user.displayName.split(' ')[0] : "Player";
-            if (snap.exists()) {
-                username = snap.val().username || username;
-                selectedColor = snap.val().profileColor || selectedColor;
-            }
-            updateUI(username, selectedColor);
-
-            // If we came back from a game, re-join the lobby automatically
-            if(autoRoomCode) {
-                document.getElementById("partyCode").value = autoRoomCode;
-                joinParty();
-            }
-        }
-    });
-
-    function updateUI(name, color) {
-        const char = name.charAt(0).toUpperCase();
-        ["avatarCircle", "lobbyAvatar", "previewAvatar"].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) { el.innerText = char; el.style.background = color; }
-        });
-        document.getElementById("welcome").innerText = "Hey, " + name + "!";
-        document.getElementById("usernameInput").value = name;
-        document.documentElement.style.setProperty('--user-color', color);
-    }
-
-    window.saveSettings = async () => {
-        await update(ref(db, "users/" + currentUser.uid), { 
-            username: document.getElementById("usernameInput").value, 
-            profileColor: selectedColor 
-        });
-        toggleSettings();
-    };
-
-    window.goToHost = () => window.location.href = "host.html";
-
-    window.joinParty = async () => {
-        const code = document.getElementById("partyCode").value.trim().toUpperCase();
-        if (!code || !currentUser) return;
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
         
-        const snap = await get(ref(db, "parties/" + code));
+        const urlParams = new URLSearchParams(window.location.search);
+        const partyCode = urlParams.get('code');
+        let myUid;
 
-        if (snap.exists()) {
-            const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
-            const name = document.getElementById("usernameInput").value || "Player";
-            
-            await set(playerRef, { 
-                name: name, 
-                color: selectedColor, 
-                joinedAt: serverTimestamp(),
-                lastPing: serverTimestamp() 
-            });
-
-            document.getElementById("mainUI").style.display = "none";
-            document.getElementById("displayRoomCode").innerText = code;
-            document.getElementById("partyScreen").classList.remove("hidden");
-
-            // --- REDIRECT LISTENER ---
-            // Fix path to match your folder structure exactly
-            onValue(ref(db, `parties/${code}/gameData/redirect`), (gsnap) => {
-                const val = gsnap.val();
-                if(val === "controller") {
-                    window.location.href = `Games/Word Bomb/controller.html?code=${code}`;
-                }
-            });
-
-            // Heartbeat
-            setInterval(() => {
-                update(ref(db, `parties/${code}/players/${currentUser.uid}`), {
-                    lastPing: serverTimestamp()
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                myUid = user.uid;
+                onValue(ref(db, `parties/${partyCode}/players/${myUid}`), (s) => {
+                    if(s.exists()) {
+                        document.getElementById('nameDisp').innerText = s.val().name;
+                        document.getElementById('nameDisp').style.color = s.val().color || "#6c5ce7";
+                    }
                 });
-            }, 20000);
+            }
+        });
 
-        } else { alert("Room not found!"); }
-    };
+        window.sendDir = (x, y) => {
+            if(!myUid || !partyCode) return;
+            
+            // Haptic Feedback for better feel
+            if (navigator.vibrate) navigator.vibrate(10);
 
-    window.logout = () => signOut(auth).then(() => location.reload());
-    lucide.createIcons();
-</script>
+            update(ref(db, `parties/${partyCode}/players/${myUid}`), {
+                dir: { x: x, y: y }
+            });
+        };
+    </script>
 </body>
 </html>
