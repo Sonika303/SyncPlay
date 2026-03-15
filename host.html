@@ -227,7 +227,7 @@
         </button>
     </div>
 
-    <div class="status-pill" id="statusMsg">Connecting to Server...</div>
+    <div class="status-pill" id="statusMsg">Connecting...</div>
 </div>
 
 <script type="module">
@@ -256,7 +256,7 @@
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
-            document.getElementById("statusMsg").innerText = "Logged in as Host";
+            document.getElementById("statusMsg").innerText = "Host Ready";
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             if(code) rejoinLobby(code);
@@ -281,7 +281,7 @@
             created: serverTimestamp(),
             hostId: currentUser.uid,
             hostActive: true,
-            gameData: { status: "lobby", redirect: false }
+            gameData: { status: "lobby", redirect: "" }
         });
         listenPlayers();
     };
@@ -337,21 +337,25 @@
     window.startGame = async function() {
         const startBtn = document.getElementById("startBtn");
         startBtn.disabled = true;
-        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> STARTING...`;
+        startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> LAUNCHING...`;
         lucide.createIcons();
 
-        // THE FIX: We pass the specific game folder in the redirect string
+        // Make sure the controllerPath EXACTLY matches your folder name
+        // If your folder is "SNAKE!", keep it like this.
         const controllerPath = `Games/${selectedGame}/controller.html`;
+        
+        console.log("Redirecting players to:", controllerPath);
 
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             currentGame: selectedGame,
-            redirect: controllerPath // Now it tells players EXACTLY where to go
+            redirect: controllerPath 
         });
 
+        // Delay host transition to allow Firebase to update first
         setTimeout(() => {
             window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
-        }, 1000);
+        }, 1200);
     }
 
     window.copyCode = () => {
