@@ -119,7 +119,7 @@
             z-index: 100;
         }
 
-        #settingsPage, #colorSubPage {
+        #settingsPage, #colorSubPage, #achievementsPage {
             position: fixed; inset: 0; background: #f9f9fb;
             display: none; flex-direction: column; z-index: 2000;
             padding: 40px 20px; overflow-y: auto;
@@ -131,7 +131,7 @@
             background: white; border-radius: 24px; padding: 20px;
             display: flex; align-items: center; justify-content: space-between;
             box-shadow: 0 4px 20px rgba(0,0,0,0.04); cursor: pointer;
-            margin-bottom: 25px; border: 2px solid transparent;
+            margin-bottom: 15px; border: 2px solid transparent;
         }
 
         .preview-card {
@@ -145,22 +145,26 @@
             gap: 10px; margin-top: 20px; padding-bottom: 40px;
         }
 
-        .color-cell {
-            aspect-ratio: 1; border-radius: 10px; cursor: pointer;
-            border: 3px solid transparent;
-        }
+        .color-cell { aspect-ratio: 1; border-radius: 10px; cursor: pointer; border: 3px solid transparent; }
         .color-cell.active { border-color: #2d3436; transform: scale(1.15); }
 
-        .custom-picker-box {
-            display: flex; align-items: center; gap: 20px; margin-bottom: 25px;
-            padding: 20px; background: white; border-radius: 24px; border: 2px solid #f1f2f6;
+        /* Achievement Styles - Minecraft Advancement Vibe */
+        .achievement-item {
+            display: flex; align-items: center; gap: 15px; padding: 18px;
+            background: #212121; border: 3px solid #000; border-radius: 4px; 
+            margin-bottom: 12px; text-align: left; opacity: 0.4; filter: grayscale(1);
+        }
+        .achievement-item.unlocked { opacity: 1; filter: grayscale(0); border-color: #55ff55; }
+        
+        .ach-icon-box { 
+            width: 48px; height: 48px; background: #404040; 
+            display: flex; align-items: center; justify-content: center; font-size: 28px;
+            border: 2px solid #000;
         }
 
-        .hex-tag {
-            background: #2d3436; color: white; padding: 4px 12px;
-            border-radius: 8px; font-family: monospace; font-size: 14px;
-            margin-top: 8px; display: inline-block;
-        }
+        .ach-label { color: #ffff55; font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .ach-name-text { color: #fff; font-weight: bold; font-size: 16px; }
+        .ach-desc-text { color: #aaa; font-size: 12px; margin-top: 2px; }
 
         .hidden { display: none; }
     </style>
@@ -184,7 +188,6 @@
     <div id="mainUI" style="display:none">
         <div id="avatarCircle" class="avatar">?</div>
         <h2 id="welcome" style="margin:0 0 25px 0; color: #2d3436;">Welcome!</h2>
-        
         <div class="input-group">
             <i data-lucide="ticket"></i>
             <input id="partyCode" type="text" maxlength="4" placeholder="Room Code" autocomplete="off">
@@ -196,9 +199,7 @@
     <div id="partyScreen" class="hidden">
         <div class="avatar" id="lobbyAvatar">?</div>
         <h2 id="lobbyStatus" style="color: var(--user-color);">Waiting for Host...</h2>
-        <div style="margin: 20px 0;">
-             <i data-lucide="loader" class="spin" style="animation: rotate 2s linear infinite; display: inline-block;"></i>
-        </div>
+        <div style="margin: 20px 0;"><i data-lucide="loader" class="spin" style="animation: rotate 2s linear infinite; display: inline-block;"></i></div>
         <p>Code: <span id="displayRoomCode" style="color:#2d3436; font-weight:800;">----</span></p>
     </div>
 </div>
@@ -215,15 +216,15 @@
             <div id="previewName" style="font-weight: 800; font-size: 20px; color: #2d3436;">Your Name</div>
             <div id="hexDisplay" class="hex-tag">#6C5CE7</div>
         </div>
+        
         <div class="input-group">
             <i data-lucide="user"></i>
             <input id="usernameInput" type="text" placeholder="Display Name" oninput="updatePreview()">
         </div>
+
         <div class="subcat-btn" onclick="toggleColorPage()">
             <div style="display:flex; align-items:center; gap:15px;">
-                <div style="background:var(--user-color); color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center;">
-                    <i data-lucide="palette"></i>
-                </div>
+                <div style="background:var(--user-color); color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center;"><i data-lucide="palette"></i></div>
                 <div style="text-align:left;">
                     <div style="font-weight: 800; color:#2d3436;">Theme Colors</div>
                     <div style="font-size: 12px; color:#b2bec3;">Presets & Custom</div>
@@ -231,6 +232,18 @@
             </div>
             <i data-lucide="chevron-right" style="color:#b2bec3"></i>
         </div>
+
+        <div class="subcat-btn" onclick="toggleAchievements()">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="background:#f1c40f; color:white; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center;"><i data-lucide="trophy"></i></div>
+                <div style="text-align:left;">
+                    <div style="font-weight: 800; color:#2d3436;">Achievements</div>
+                    <div style="font-size: 12px; color:#b2bec3;" id="ach-count">0/4 Advancements</div>
+                </div>
+            </div>
+            <i data-lucide="chevron-right" style="color:#b2bec3"></i>
+        </div>
+
         <button class="btn-join" onclick="saveSettings()">Save Profile</button>
         <button style="background:none; color:var(--danger); margin-top:10px;" onclick="logout()">Sign Out</button>
     </div>
@@ -252,6 +265,15 @@
         </div>
         <div class="color-grid" id="colorGrid"></div>
     </div>
+</div>
+
+<div id="achievementsPage">
+    <div class="settings-header">
+        <button onclick="toggleAchievements()" style="width:auto; height:auto; padding:10px; background:none; color:#2d3436;"><i data-lucide="arrow-left"></i></button>
+        <h2 style="font-weight: 800; margin:0;">Advancements</h2>
+        <div style="width:40px;"></div>
+    </div>
+    <div style="max-width: 450px; margin: 0 auto; width: 100%;" id="achievementList"></div>
 </div>
 
 <script type="module">
@@ -276,10 +298,15 @@
 
     let currentUser;
     let selectedColor = "#6c5ce7";
-    const urlParams = new URLSearchParams(window.location.search);
-    const autoRoomCode = urlParams.get('code');
+    
+    // EXACT DATA FROM YOUR ACHIEVEMENT.JS
+    const ACHIEVEMENT_LIB = {
+        WELCOME_JOIN:   { name: "First Steps", icon: "🎟️", desc: "Joined the Arena" },
+        APPLE_10:       { name: "Hungry Snake", icon: "🍎", desc: "Collected 10 Apples" },
+        GOLD_APPLE:     { name: "Midas Touch", icon: "✨", desc: "Found a Golden Apple" },
+        WORD_BOMB_10:   { name: "Word Master", icon: "💣", desc: "Survived 10 Rounds" }
+    };
 
-    // Setup color grid
     const palette = [];
     for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
     const grid = document.getElementById("colorGrid");
@@ -300,13 +327,15 @@
         const page = document.getElementById("settingsPage");
         page.style.display = (page.style.display === "flex") ? "none" : "flex";
     };
-
     window.toggleColorPage = () => {
         const page = document.getElementById("colorSubPage");
         page.style.display = (page.style.display === "flex") ? "none" : "flex";
     };
-
-    window.pickCustomColor = (hex) => { selectedColor = hex; updatePreview(); };
+    window.toggleAchievements = () => {
+        const page = document.getElementById("achievementsPage");
+        page.style.display = (page.style.display === "flex") ? "none" : "flex";
+        if(page.style.display === "flex") loadAchievements();
+    };
 
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "Player";
@@ -317,7 +346,36 @@
         document.documentElement.style.setProperty('--user-color', selectedColor);
     };
 
-    window.googleLogin = () => signInWithPopup(auth, provider);
+    async function loadAchievements() {
+        if(!currentUser) return;
+        // MATCHES YOUR FIREBASE PATH: users/UID/Achievements
+        const snap = await get(ref(db, `users/${currentUser.uid}/Achievements`));
+        const unlocked = snap.val() || {};
+        
+        const list = document.getElementById("achievementList");
+        list.innerHTML = "";
+        let count = 0;
+
+        Object.keys(ACHIEVEMENT_LIB).forEach(id => {
+            const ach = ACHIEVEMENT_LIB[id];
+            const isUnlocked = unlocked[id];
+            if(isUnlocked) count++;
+
+            const item = document.createElement("div");
+            item.className = `achievement-item ${isUnlocked ? 'unlocked' : ''}`;
+            item.innerHTML = `
+                <div class="ach-icon-box">${isUnlocked ? ach.icon : '🔒'}</div>
+                <div>
+                    <div class="ach-label">${isUnlocked ? 'Advancement Made!' : 'Locked'}</div>
+                    <div class="ach-name-text">${ach.name}</div>
+                    <div class="ach-desc-text">${ach.desc}</div>
+                </div>
+            `;
+            list.appendChild(item);
+        });
+
+        document.getElementById("ach-count").innerText = `${count}/${Object.keys(ACHIEVEMENT_LIB).length} Advancements`;
+    }
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -325,6 +383,7 @@
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
             document.getElementById("setBtn").style.display = "block";
+            
             const snap = await get(ref(db, "users/" + user.uid));
             let username = user.displayName ? user.displayName.split(' ')[0] : "Player";
             if (snap.exists()) {
@@ -332,10 +391,7 @@
                 selectedColor = snap.val().profileColor || selectedColor;
             }
             updateUI(username, selectedColor);
-            if(autoRoomCode) {
-                document.getElementById("partyCode").value = autoRoomCode;
-                joinParty();
-            }
+            loadAchievements(); 
         }
     });
 
@@ -358,43 +414,24 @@
         toggleSettings();
     };
 
+    window.googleLogin = () => signInWithPopup(auth, provider);
     window.goToHost = () => window.location.href = "host.html";
-
     window.joinParty = async () => {
         const code = document.getElementById("partyCode").value.trim().toUpperCase();
         if (!code || !currentUser) return;
-        
         const snap = await get(ref(db, "parties/" + code));
         if (snap.exists()) {
-            const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
-            const name = document.getElementById("usernameInput").value || "Player";
-            
-            await set(playerRef, { 
-                name: name, 
-                color: selectedColor, 
-                joinedAt: serverTimestamp(),
-                lastPing: serverTimestamp() 
+            await set(ref(db, `parties/${code}/players/${currentUser.uid}`), { 
+                name: document.getElementById("usernameInput").value || "Player", 
+                color: selectedColor, joinedAt: serverTimestamp(), lastPing: serverTimestamp() 
             });
-
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("displayRoomCode").innerText = code;
             document.getElementById("partyScreen").classList.remove("hidden");
-
-            // --- THE FIX: DYNAMIC REDIRECT LISTENER ---
             onValue(ref(db, `parties/${code}/gameData/redirect`), (gsnap) => {
-                const redirectPath = gsnap.val();
-                // If redirectPath is a string like "Games/SNAKE!/controller.html"
-                if(redirectPath && redirectPath !== "" && redirectPath !== false) {
-                    console.log("Redirecting player to: ", redirectPath);
-                    window.location.href = redirectPath + `?code=${code}`;
-                }
+                const path = gsnap.val();
+                if(path && path !== false) window.location.href = path + `?code=${code}`;
             });
-
-            setInterval(() => {
-                update(ref(db, `parties/${code}/players/${currentUser.uid}`), {
-                    lastPing: serverTimestamp()
-                });
-            }, 20000);
         } else { alert("Room not found!"); }
     };
 

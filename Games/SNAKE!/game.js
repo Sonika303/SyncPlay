@@ -1,5 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, onValue, update, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+// Import the achievement logic
+import { unlockAchievement } from "./achievements.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -49,6 +51,15 @@ const biomes = [
 ];
 let currentBiomeIndex = 0;
 
+// HELPER: Updates the Stats folder for a specific player
+function updatePlayerStats(uid, statName, value) {
+    if(!uid) return;
+    const statsRef = ref(db, `users/${uid}/stats`);
+    update(statsRef, {
+        [statName]: increment(value)
+    });
+}
+
 function init() {
     if (!partyCode) return;
     resize();
@@ -77,6 +88,7 @@ function init() {
                 const sx = Math.floor(Math.random() * (cols - 5)) + 2;
                 const sy = Math.floor(Math.random() * (rows - 5)) + 2;
                 players[uid] = {
+                    uid: uid, // Keeping UID for stats reference
                     name: data[uid].name || "Player",
                     color: data[uid].color || "#6c5ce7",
                     parts: [{gx: sx, gy: sy}, {gx: sx-1, gy: sy}, {gx: sx-2, gy: sy}],
@@ -84,7 +96,8 @@ function init() {
                     nextDir: {x: 1, y: 0},
                     moveProgress: 0,
                     tongueLen: 0,
-                    swimPhase: 0
+                    swimPhase: 0,
+                    sessionApples: 0 // Local counter for APPLE_10
                 };
             } else if (data[uid].dir) {
                 const newD = data[uid].dir;
@@ -305,7 +318,21 @@ function updatePlayers() {
             else if (ngy >= rows) shiftY = 1;
 
             if (ngx === apple.gx && ngy === apple.gy) {
-                if (apple.isGold) goldApples++; else partyScore++;
+                // HANDLE APPLE SCORE & ACHIEVEMENTS
+                if (apple.isGold) {
+                    goldApples++;
+                    updatePlayerStats(uid, 'gold_apples', 1);
+                    unlockAchievement(uid, "GOLD_APPLE");
+                } else {
+                    partyScore++;
+                    p.sessionApples++;
+                    updatePlayerStats(uid, 'apples_eaten', 1);
+                    // Check for Apple 10
+                    if (p.sessionApples >= 10) {
+                        unlockAchievement(uid, "APPLE_10");
+                    }
+                }
+
                 const sn = document.getElementById('s-norm');
                 const sg = document.getElementById('s-gold');
                 if(sn) sn.innerText = partyScore;

@@ -1,6 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, get, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+// ACHIEVEMENT SYSTEM IMPORT
+import { unlockAchievement } from "./achievements.js";
 
 const firebaseConfig = { 
     apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -138,7 +140,6 @@ function listenToGame() {
         if (data.status === "finished" || data.status === "gameOver") {
             showVictoryScreen();
         } else if (data.status === "lobby") {
-            // This is the Host's auto-redirect back to lobby
             window.location.href = `../../host.html?code=${partyCode}`;
         } else {
             document.getElementById("victory-overlay").style.display = "none";
@@ -206,7 +207,6 @@ async function handleExplosion(uid) {
         const newLives = Math.max(0, pSnap.val().lives - 1);
         await update(pRef, { lives: newLives });
         
-        // After explosion, immediately check if game is over before moving turn
         const idsSnap = await get(ref(db, `parties/${partyCode}/playersData`));
         const playersData = idsSnap.val();
         const alive = Object.keys(playersData).filter(id => playersData[id].lives > 0);
@@ -215,7 +215,6 @@ async function handleExplosion(uid) {
             const keys = Object.keys(playersData);
             updateTurn(keys.indexOf(uid) + 1);
         } else {
-            // Only one or zero players left, let checkWinner handle it
             checkWinner(playersData);
         }
     }
@@ -264,12 +263,15 @@ async function checkWinner(playersData) {
     const alive = players.filter(uid => playersData[uid].lives > 0);
     
     if (players.length > 1 && alive.length === 1) {
-        gameActive = false; // Stop timer immediately
+        gameActive = false; 
         await update(ref(db, `parties/${partyCode}/gameData`), { status: "gameOver" });
     }
 }
 
 async function showVictoryScreen() {
+    // Prevent multiple triggers
+    if (document.getElementById("victory-overlay").style.display === "flex") return;
+    
     gameActive = false;
     if (timerInterval) clearInterval(timerInterval);
     
@@ -280,6 +282,12 @@ async function showVictoryScreen() {
         
         if (winnerEntry) {
             const [uid, winner] = winnerEntry;
+
+            // --- UNLOCK FINAL ACHIEVEMENT: BOMB SQUAD ---
+            if (isHost) {
+                unlockAchievement(uid, "BOMB_SQUAD");
+            }
+
             const overlay = document.getElementById("victory-overlay");
             const winnerContainer = document.getElementById("winner-container");
             
@@ -294,7 +302,12 @@ async function showVictoryScreen() {
             
             overlay.style.display = "flex";
             if (window.confetti) {
-                confetti({ particleCount: 250, spread: 100, origin: { y: 0.6 }, colors: [winner.color, '#ffffff', '#f1c40f'] });
+                confetti({ 
+                    particleCount: 250, 
+                    spread: 100, 
+                    origin: { y: 0.6 }, 
+                    colors: [winner.color, '#ffffff', '#f1c40f'] 
+                });
             }
         }
     }
@@ -306,13 +319,10 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 document.getElementById('btn-lobby').addEventListener('click', async () => {
-    // 1. Update DB to trigger redirects for everyone
     await update(ref(db, `parties/${partyCode}/gameData`), { 
         status: "lobby",
         redirect: false 
     });
-    // 2. Clear host side local data
     if (timerInterval) clearInterval(timerInterval);
-    // 3. Navigate host back
     window.location.href = `../../host.html?code=${partyCode}`;
 });

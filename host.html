@@ -26,7 +26,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Animated Mesh Gradient Background */
             background: radial-gradient(at 0% 0%, #6c5ce7 0px, transparent 50%),
                         radial-gradient(at 100% 0%, #fab1a0 0px, transparent 50%),
                         radial-gradient(at 100% 100%, #00b894 0px, transparent 50%),
@@ -36,7 +35,6 @@
             overflow: hidden;
         }
 
-        /* The Main Command Center */
         .host-screen {
             width: 95vw;
             height: 90vh;
@@ -53,7 +51,6 @@
             position: relative;
         }
 
-        /* Sidebar: Party & Players */
         .sidebar {
             background: rgba(255, 255, 255, 0.4);
             border-right: 1px solid var(--border);
@@ -63,7 +60,6 @@
             gap: 30px;
         }
 
-        /* Main Content: Game Selection */
         .main-content {
             padding: 60px;
             overflow-y: auto;
@@ -74,7 +70,6 @@
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
         h1 { font-weight: 800; font-size: 2.2rem; margin: 0; letter-spacing: -1.5px; }
 
-        /* Code Display */
         .code-box {
             background: white;
             padding: 24px;
@@ -89,7 +84,6 @@
         .code-label { font-size: 12px; font-weight: 800; color: #a29bfe; text-transform: uppercase; letter-spacing: 2px; }
         .code-value { font-size: 48px; font-weight: 800; color: var(--primary); letter-spacing: 8px; margin-top: 5px; }
 
-        /* Game Grid */
         .game-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -130,7 +124,6 @@
         }
         .game-card.active .selected-badge { opacity: 1; }
 
-        /* Players List */
         .player-list {
             flex: 1; overflow-y: auto; margin-top: 10px;
         }
@@ -149,7 +142,6 @@
 
         .name { flex: 1; font-weight: 700; color: #2d3436; }
 
-        /* Buttons */
         button {
             padding: 20px; border: none; border-radius: 24px;
             font-weight: 800; font-size: 18px; cursor: pointer;
@@ -170,10 +162,9 @@
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Responsive */
         @media (max-width: 900px) {
             .host-screen { grid-template-columns: 1fr; height: 95vh; }
-            .sidebar { display: none; } /* On mobile, we'd need a different layout */
+            .sidebar { display: none; }
         }
     </style>
 </head>
@@ -198,8 +189,7 @@
                 <span style="font-weight:800; color:#636e72;">SQUAD</span>
                 <span id="playerCount" style="background:var(--primary); color:white; padding:4px 12px; border-radius:10px; font-size:12px; font-weight:800;">0</span>
             </div>
-            <div class="player-list" id="players">
-                </div>
+            <div class="player-list" id="players"></div>
         </div>
 
         <button id="startBtn" class="launch-btn" onclick="startGame()" disabled>
@@ -245,6 +235,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue, remove, serverTimestamp, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    // Achievement Logic
+    import { unlockAchievement } from "./achievements.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -263,6 +255,7 @@
     let partyCode;
     let currentUser;
     let selectedGame = "SNAKE!";
+    let knownPlayers = new Set(); // Track unique joins in this session
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -284,7 +277,6 @@
         if (!currentUser) return;
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
         
-        // UI Transition
         document.getElementById("setupView").classList.add("hidden");
         document.getElementById("hostDashboard").classList.remove("hidden");
         document.getElementById("codeValue").innerText = partyCode;
@@ -325,6 +317,13 @@
                 Object.keys(players).forEach(uid => {
                     count++;
                     const p = players[uid];
+
+                    // TRIGGER: WELCOME_JOIN achievement
+                    if (!knownPlayers.has(uid)) {
+                        unlockAchievement(uid, "WELCOME_JOIN");
+                        knownPlayers.add(uid);
+                    }
+
                     const item = document.createElement("div");
                     item.className = "player-item";
                     item.innerHTML = `
