@@ -41,7 +41,6 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* --- UI COMPONENTS --- */
         .container {
             position: relative;
             background: rgba(255, 255, 255, 0.92);
@@ -120,7 +119,6 @@
             z-index: 100;
         }
 
-        /* --- SETTINGS & SUB-PAGES --- */
         #settingsPage, #colorSubPage {
             position: fixed; inset: 0; background: #f9f9fb;
             display: none; flex-direction: column; z-index: 2000;
@@ -135,7 +133,6 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.04); cursor: pointer;
             margin-bottom: 25px; border: 2px solid transparent;
         }
-        .subcat-btn:hover { border-color: var(--user-color); transform: translateY(-2px); }
 
         .preview-card {
             background: white; border-radius: 30px; padding: 30px;
@@ -231,7 +228,7 @@
                 </div>
                 <div style="text-align:left;">
                     <div style="font-weight: 800; color:#2d3436;">Theme Colors</div>
-                    <div style="font-size: 12px; color:#b2bec3;">100+ Presets & Custom Slider</div>
+                    <div style="font-size: 12px; color:#b2bec3;">Presets & Custom</div>
                 </div>
             </div>
             <i data-lucide="chevron-right" style="color:#b2bec3"></i>
@@ -250,24 +247,21 @@
         <h2 style="font-weight: 800; margin:0;">Color Vault</h2>
         <div style="width:40px;"></div>
     </div>
-
     <div style="max-width: 450px; margin: 0 auto; width: 100%;">
         <div class="custom-picker-box">
             <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:60px; height:60px; border-radius:15px; border:none; background:none; cursor:pointer; padding:0;">
             <div style="text-align:left;">
-                <div style="font-size: 12px; font-weight: 800; color: #b2bec3; letter-spacing: 1px;">CUSTOM SLIDER</div>
-                <div style="font-size: 15px; font-weight: 700; color:#2d3436;">Slide to pick unique hue</div>
+                <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">CUSTOM SLIDER</div>
+                <div style="font-size: 15px; font-weight: 700;">Pick a unique hex</div>
             </div>
         </div>
-
-        <div style="font-weight: 800; font-size: 13px; color: #636e72; margin: 20px 0 10px 5px; text-align:left;">POPULAR PRESETS</div>
         <div class="color-grid" id="colorGrid"></div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, get, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -288,13 +282,9 @@
     let currentUser;
     let selectedColor = "#6c5ce7";
     
-    // Generate 100 Vibrant Colors
+    // UI Helpers
     const palette = [];
-    for(let i=0; i<100; i++) {
-        palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`);
-    }
-
-    // Populate the Grid
+    for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
     const grid = document.getElementById("colorGrid");
     palette.forEach(color => {
         const cell = document.createElement("div");
@@ -309,7 +299,6 @@
         grid.appendChild(cell);
     });
 
-    // Navigation
     window.toggleSettings = () => {
         const page = document.getElementById("settingsPage");
         page.style.display = (page.style.display === "flex") ? "none" : "flex";
@@ -320,45 +309,20 @@
         page.style.display = (page.style.display === "flex") ? "none" : "flex";
     };
 
-    // Color Pickers
     window.pickCustomColor = (hex) => {
         selectedColor = hex;
-        document.querySelectorAll(".color-cell").forEach(c => c.classList.remove("active"));
         updatePreview();
     };
 
     window.updatePreview = () => {
         const name = document.getElementById("usernameInput").value || "Player";
-        const char = name.charAt(0).toUpperCase();
-        
-        // Update all UI previews
-        document.getElementById("previewAvatar").innerText = char;
+        document.getElementById("previewAvatar").innerText = name.charAt(0).toUpperCase();
         document.getElementById("previewAvatar").style.background = selectedColor;
         document.getElementById("previewName").innerText = name;
-        
-        // Convert to HEX if HSL
-        let displayHex = selectedColor.startsWith('hsl') ? hslToHex(selectedColor) : selectedColor;
-        document.getElementById("hexDisplay").innerText = displayHex.toUpperCase();
-        
+        document.getElementById("hexDisplay").innerText = selectedColor.startsWith('hsl') ? "HSL COLOR" : selectedColor.toUpperCase();
         document.documentElement.style.setProperty('--user-color', selectedColor);
     };
 
-    // Helper: HSL to HEX for display
-    function hslToHex(hsl) {
-        let match = hsl.match(/\d+/g);
-        if(!match) return "#6c5ce7";
-        let [h, s, l] = match.map(Number);
-        l /= 100;
-        const a = s * Math.min(l, 1 - l) / 100;
-        const f = n => {
-            const k = (n + h / 30) % 12;
-            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-            return Math.round(255 * color).toString(16).padStart(2, '0');
-        };
-        return `#${f(0)}${f(8)}${f(4)}`;
-    }
-
-    // Auth & Firebase
     window.googleLogin = () => signInWithPopup(auth, provider);
 
     onAuthStateChanged(auth, async (user) => {
@@ -367,10 +331,8 @@
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
             document.getElementById("setBtn").style.display = "block";
-
             const snap = await get(ref(db, "users/" + user.uid));
             let username = user.displayName ? user.displayName.split(' ')[0] : "Player";
-            
             if (snap.exists()) {
                 username = snap.val().username || username;
                 selectedColor = snap.val().profileColor || selectedColor;
@@ -387,19 +349,14 @@
         });
         document.getElementById("welcome").innerText = "Hey, " + name + "!";
         document.getElementById("usernameInput").value = name;
-        document.getElementById("previewName").innerText = name;
         document.documentElement.style.setProperty('--user-color', color);
-        updatePreview();
     }
 
     window.saveSettings = async () => {
-        const name = document.getElementById("usernameInput").value;
-        if (!name) return;
         await update(ref(db, "users/" + currentUser.uid), { 
-            username: name, 
+            username: document.getElementById("usernameInput").value, 
             profileColor: selectedColor 
         });
-        updateUI(name, selectedColor);
         toggleSettings();
     };
 
@@ -413,24 +370,20 @@
         if (snap.exists()) {
             const playerRef = ref(db, `parties/${code}/players/${currentUser.uid}`);
             
-            // --- FIXED: DISCONNECT PROTECTION ---
-            const presence = onDisconnect(playerRef);
-            presence.remove(); // Default: remove if they quit lobby
-
+            // NO ONDISCONNECT. WE SAVE PERMANENTLY.
             await set(playerRef, { 
                 name: document.getElementById("usernameInput").value, 
                 color: selectedColor, 
-                joinedAt: serverTimestamp() 
+                joinedAt: serverTimestamp(),
+                lastPing: serverTimestamp() // Host can check this to see if player is "stale"
             });
-            
+
             document.getElementById("mainUI").style.display = "none";
             document.getElementById("displayRoomCode").innerText = code;
             document.getElementById("partyScreen").classList.remove("hidden");
 
-            // Listen for status: if game starts, CANCEL the disconnect removal
             onValue(ref(db, `parties/${code}/gameData/status`), (gsnap) => {
-                if(gsnap.exists() && gsnap.val() === "playing") {
-                    presence.cancel(); // Don't delete player, they are moving to game.html
+                if(gsnap.val() === "playing") {
                     window.location.href = `Games/Word Bomb/game.html?code=${code}`;
                 }
             });
@@ -438,7 +391,6 @@
     };
 
     window.logout = () => signOut(auth).then(() => location.reload());
-    
     lucide.createIcons();
 </script>
 </body>

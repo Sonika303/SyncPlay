@@ -39,7 +39,7 @@
             position: relative;
         }
 
-        h1 { font-weight: 800; font-size: 2rem; margin-top: 0; letter-spacing: -1px; }
+        h1 { font-weight: 800; font-size: 2rem; margin: 0; letter-spacing: -1px; }
 
         #codeContainer {
             background: #f1f2f6;
@@ -175,6 +175,7 @@
 
     let partyCode;
     let currentUser;
+    let cleanupInterval;
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -199,6 +200,7 @@
             });
             setupHostPresence();
             listenPlayers();
+            startGhostCleanup();
         } else {
             document.getElementById("statusMsg").innerText = "Session Not Found";
             window.history.pushState({}, '', window.location.pathname);
@@ -208,12 +210,10 @@
     window.createParty = async function() {
         if (!currentUser) return;
         partyCode = Math.floor(1000 + Math.random() * 9000).toString();
-        
         const newurl = window.location.origin + window.location.pathname + '?code=' + partyCode;
         window.history.pushState({path:newurl},'',newurl);
 
         setupUI();
-        
         const initialData = {
             created: serverTimestamp(),
             hostId: currentUser.uid,
@@ -226,9 +226,9 @@
         };
 
         await set(ref(db, "parties/" + partyCode), initialData);
-
         setupHostPresence();
         listenPlayers();
+        startGhostCleanup();
     }
 
     function setupUI() {
@@ -241,6 +241,28 @@
         const hostRef = ref(db, `parties/${partyCode}/hostActive`);
         onDisconnect(hostRef).set(false);
         set(hostRef, true);
+    }
+
+    // --- NEW: GHOST CLEANUP LOGIC ---
+    function startGhostCleanup() {
+        if(cleanupInterval) clearInterval(cleanupInterval);
+        cleanupInterval = setInterval(async () => {
+            const playersRef = ref(db, `parties/${partyCode}/players`);
+            const snap = await get(playersRef);
+            if (!snap.exists()) return;
+
+            const now = Date.now();
+            const players = snap.val();
+            
+            Object.keys(players).forEach(uid => {
+                const lastPing = players[uid].lastPing || players[uid].joinedAt;
+                // If no ping for 1 minute (60,000 ms), remove them
+                if (now - lastPing > 60000) {
+                    console.log(`Removing ghost player: ${players[uid].name}`);
+                    remove(ref(db, `parties/${partyCode}/players/${uid}`));
+                }
+            });
+        }, 5000); // Check every 5 seconds
     }
 
     function listenPlayers() {
@@ -303,27 +325,24 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> INITIALIZING...`;
         lucide.createIcons();
 
-        // 1. FINAL PROTECTION: Check if players actually exist before starting
         const pSnap = await get(ref(db, `parties/${partyCode}/players`));
         if (!pSnap.exists()) {
-            alert("Error: No players found in database. Wait for them to join.");
+            alert("No players found.");
             startBtn.disabled = false;
             startBtn.innerHTML = `<i data-lucide="rocket"></i> START GAME`;
             return;
         }
 
-        // 2. Clear old data using remove() on specific paths only
+        // Clean up temporary data paths only
         await remove(ref(db, `parties/${partyCode}/playersData`));
-        await remove(ref(db, `parties/${partyCode}/action`));
         await remove(ref(db, `parties/${partyCode}/usedWords`));
 
-        // 3. Set status to playing using update() so we don't overwrite the 'players' folder
+        // Use update to avoid wiping 'players' folder
         await update(ref(db, `parties/${partyCode}/gameData`), { 
             status: "playing",
             redirect: false 
         });
 
-        // 4. Smooth transition to the Game screen
         setTimeout(() => {
             window.location.href = `Games/Word Bomb/game.html?code=${partyCode}`;
         }, 800);
