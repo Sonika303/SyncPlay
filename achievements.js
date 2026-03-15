@@ -12,43 +12,63 @@ export const ACHIEVEMENT_LIB = {
 const style = document.createElement('style');
 style.textContent = `
     #ach-popup {
-        position: fixed; top: -120px; right: 20px;
-        background: #212121; border: 4px solid #000;
-        padding: 12px 24px; display: flex; align-items: center; gap: 16px;
-        font-family: 'Courier New', Courier, monospace; z-index: 10000;
+        position: fixed; 
+        top: -150px; 
+        right: 20px;
+        background: #212121; 
+        border: 4px solid #000;
+        padding: 12px 24px; 
+        display: flex !important; 
+        align-items: center; 
+        gap: 16px;
+        font-family: 'Courier New', Courier, monospace; 
+        z-index: 999999 !important; 
         transition: 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.5); pointer-events: none;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
+        pointer-events: none;
     }
-    #ach-popup.show { top: 20px; }
+    #ach-popup.show { 
+        top: 20px; 
+    }
     .ach-icon { font-size: 32px; }
-    .ach-title { color: #ffff55; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
-    .ach-name { color: #ffffff; font-size: 18px; font-weight: bold; }
+    .ach-content { display: flex; flex-direction: column; }
+    .ach-title { color: #ffff55; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; line-height: 1; }
+    .ach-name { color: #ffffff; font-size: 18px; font-weight: bold; line-height: 1; }
 `;
 document.head.appendChild(style);
 
-// 3. THE LOGIC (Saves to Firebase + Shows Popup)
+// 3. THE LOGIC (Saves to Firebase + Shows Popup + Plays Sound)
 export async function unlockAchievement(uid, achId) {
     const ach = ACHIEVEMENT_LIB[achId];
     if (!ach || !uid) return;
 
-    const db = getDatabase();
-    const achRef = ref(db, `users/${uid}/Achievements/${achId}`);
+    try {
+        const db = getDatabase();
+        const achRef = ref(db, `users/${uid}/Achievements/${achId}`);
 
-    // Check if already unlocked to prevent spamming
-    const snapshot = await get(achRef);
-    if (!snapshot.exists()) {
-        // 1. Save to Firebase folder: users/UID/Achievements/ID: true
-        await update(ref(db, `users/${uid}/Achievements`), {
-            [achId]: true
-        });
+        // Check if already unlocked to prevent spamming
+        const snapshot = await get(achRef);
+        if (!snapshot.exists()) {
+            // 1. Save to Firebase
+            await update(ref(db, `users/${uid}/Achievements`), {
+                [achId]: true
+            });
 
-        // 2. Show the visual popup
-        showPopup(ach);
-        console.log(`🏆 Achievement Unlocked: ${ach.name}`);
+            // 2. Show visual popup and play sound
+            showPopup(ach);
+            console.log(`🏆 Achievement Unlocked: ${ach.name}`);
+        }
+    } catch (error) {
+        console.error("Achievement Error:", error);
     }
 }
 
 function showPopup(ach) {
+    // Play Achievement Sound
+    const achSound = new Audio('./Sounds/achievement.mp3');
+    achSound.volume = 0.5;
+    achSound.play().catch(e => console.log("Audio play blocked until user interacts with page."));
+
     let popup = document.getElementById('ach-popup');
     if (!popup) {
         popup = document.createElement('div');
@@ -64,6 +84,13 @@ function showPopup(ach) {
         </div>
     `;
 
-    popup.classList.add('show');
-    setTimeout(() => popup.classList.remove('show'), 5000);
+    // Slide in
+    setTimeout(() => {
+        popup.classList.add('show');
+    }, 100);
+
+    // Slide out after 5 seconds
+    setTimeout(() => {
+        popup.classList.remove('show');
+    }, 5000);
 }
