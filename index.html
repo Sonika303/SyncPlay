@@ -282,6 +282,10 @@
     let currentUser;
     let selectedColor = "#6c5ce7";
     
+    // Check for room code in URL (if player was sent back from controller)
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoRoomCode = urlParams.get('code');
+
     // UI Setup for Palette
     const palette = [];
     for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
@@ -338,6 +342,12 @@
                 selectedColor = snap.val().profileColor || selectedColor;
             }
             updateUI(username, selectedColor);
+
+            // If we came back from a game, re-join the lobby automatically
+            if(autoRoomCode) {
+                document.getElementById("partyCode").value = autoRoomCode;
+                joinParty();
+            }
         }
     });
 
@@ -384,14 +394,15 @@
             document.getElementById("partyScreen").classList.remove("hidden");
 
             // --- REDIRECT LISTENER ---
-            // When the Host changes redirect to "controller", this triggers.
+            // Fix path to match your folder structure exactly
             onValue(ref(db, `parties/${code}/gameData/redirect`), (gsnap) => {
-                if(gsnap.val() === "controller") {
+                const val = gsnap.val();
+                if(val === "controller") {
                     window.location.href = `Games/Word Bomb/controller.html?code=${code}`;
                 }
             });
 
-            // Heartbeat so the host knows the player is still here
+            // Heartbeat
             setInterval(() => {
                 update(ref(db, `parties/${code}/players/${currentUser.uid}`), {
                     lastPing: serverTimestamp()

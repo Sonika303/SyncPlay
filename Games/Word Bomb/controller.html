@@ -160,9 +160,15 @@
                 
                 disconnectRef.remove();
 
+                // Status listener for Redirects
                 onValue(ref(db, `parties/${code}/gameData/status`), (snap) => {
-                    if (snap.val() === "playing") {
+                    const status = snap.val();
+                    if (status === "playing") {
                         disconnectRef.cancel(); 
+                    }
+                    // FIX: Go back to lobby if host ends game
+                    if (status === "lobby") {
+                        window.location.href = `lobby.html?code=${code}`;
                     }
                 });
 
@@ -190,7 +196,13 @@
                     if(!snap.exists()) return;
                     const gameData = snap.val();
                     
-                    if (gameData.status === "finished") {
+                    // Safety Redirect Check
+                    if (gameData.redirect === false || gameData.status === "lobby") {
+                        window.location.href = `lobby.html?code=${code}`;
+                        return;
+                    }
+
+                    if (gameData.status === "finished" || gameData.status === "gameOver") {
                         document.getElementById("status").innerText = "GAME OVER";
                         document.getElementById("wordInput").disabled = true;
                         document.getElementById("sendBtn").disabled = true;
@@ -218,13 +230,12 @@
                         status.classList.remove("active-status");
                         card.classList.remove("my-turn");
                         document.getElementById("feedback").innerText = "";
-                        input.value = "";
+                        // Don't clear if user is mid-typing, only clear on turn start/end logic
                     }
                 });
             }
         });
 
-        // Use a function defined in the module and attach event listeners
         const submitWord = async () => {
             const input = document.getElementById("wordInput");
             const feedback = document.getElementById("feedback");
@@ -244,7 +255,7 @@
                 return;
             }
 
-            // If local checks pass, send to host for dictionary validation
+            // Send to host
             await set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
@@ -256,7 +267,6 @@
             input.value = "";
         };
 
-        // Attach listeners since we are in a module
         document.getElementById("sendBtn").addEventListener("click", submitWord);
         document.getElementById("wordInput").addEventListener("keypress", (e) => {
             if (e.key === "Enter") submitWord();

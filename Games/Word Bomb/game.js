@@ -23,7 +23,7 @@ let isHost = false;
 let gameActive = false;
 let timerInterval = null;
 let usedWords = [];
-let currentTurnUid = null; // Track this for UI highlighting
+let currentTurnUid = null;
 
 const syllables = ["ION", "ENT", "TER", "ING", "PRO", "STA", "CON", "ATE", "PRE", "VER", "TION", "IC", "AL", "OUS", "ABLE", "MENT", "ACK", "IGHT", "AND", "EST"];
 
@@ -38,7 +38,6 @@ onAuthStateChanged(auth, async (user) => {
         const partyData = partySnap.val();
         if (partyData.hostId === myUid) {
             isHost = true;
-            // Host UI Setup
             document.getElementById('host-controls').style.display = 'flex';
             document.getElementById('player-msg').style.display = 'none';
             
@@ -120,11 +119,10 @@ async function updateTurn(idx) {
 }
 
 function listenToGame() {
-    // Listener for Game State
     onValue(ref(db, `parties/${partyCode}/gameData`), (snap) => {
         if (!snap.exists()) return;
         const data = snap.val();
-        currentTurnUid = data.turn; // Sync current turn
+        currentTurnUid = data.turn; 
         
         document.getElementById("syllable").innerText = data.syllable || "---";
         document.getElementById("timer").innerText = data.timer ?? "0";
@@ -140,6 +138,7 @@ function listenToGame() {
         if (data.status === "finished" || data.status === "gameOver") {
             showVictoryScreen();
         } else if (data.status === "lobby") {
+            // This is the Host's auto-redirect back to lobby
             window.location.href = `../../host.html?code=${partyCode}`;
         } else {
             document.getElementById("victory-overlay").style.display = "none";
@@ -147,7 +146,6 @@ function listenToGame() {
         }
     });
 
-    // Listener for Players/Lives
     onValue(ref(db, `parties/${partyCode}/playersData`), (snap) => {
         if (!snap.exists()) return;
         const data = snap.val();
@@ -207,9 +205,19 @@ async function handleExplosion(uid) {
     if (pSnap.exists()) {
         const newLives = Math.max(0, pSnap.val().lives - 1);
         await update(pRef, { lives: newLives });
+        
+        // After explosion, immediately check if game is over before moving turn
         const idsSnap = await get(ref(db, `parties/${partyCode}/playersData`));
-        const keys = Object.keys(idsSnap.val());
-        updateTurn(keys.indexOf(uid) + 1);
+        const playersData = idsSnap.val();
+        const alive = Object.keys(playersData).filter(id => playersData[id].lives > 0);
+        
+        if (alive.length > 1) {
+            const keys = Object.keys(playersData);
+            updateTurn(keys.indexOf(uid) + 1);
+        } else {
+            // Only one or zero players left, let checkWinner handle it
+            checkWinner(playersData);
+        }
     }
 }
 
@@ -251,11 +259,12 @@ async function isValidWord(word) {
 }
 
 async function checkWinner(playersData) {
+    if (!gameActive) return;
     const players = Object.keys(playersData);
     const alive = players.filter(uid => playersData[uid].lives > 0);
     
-    // Check if only 1 player remains
-    if (players.length > 1 && alive.length === 1 && gameActive) {
+    if (players.length > 1 && alive.length === 1) {
+        gameActive = false; // Stop timer immediately
         await update(ref(db, `parties/${partyCode}/gameData`), { status: "gameOver" });
     }
 }
@@ -274,19 +283,16 @@ async function showVictoryScreen() {
             const overlay = document.getElementById("victory-overlay");
             const winnerContainer = document.getElementById("winner-container");
             
-            // Generate the animated winner UI
             winnerContainer.innerHTML = `
                 <div class="crown-icon">👑</div>
                 <div class="winner-avatar-spin" style="background: ${winner.color}">
                     ${winner.name.charAt(0).toUpperCase()}
                 </div>
                 <h1 id="winner-text" style="font-size: 3.5rem; margin-top: 20px;">${winner.name.toUpperCase()} WINS!</h1>
-                <p style="font-size: 1.5rem; color: #aaa;">The Word Bomb Master.</p>
+                <p style="font-size: 1.5rem; color: #aaa;">Word Bomb Champion</p>
             `;
             
             overlay.style.display = "flex";
-            
-            // Trigger confetti
             if (window.confetti) {
                 confetti({ particleCount: 250, spread: 100, origin: { y: 0.6 }, colors: [winner.color, '#ffffff', '#f1c40f'] });
             }
@@ -300,9 +306,13 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 document.getElementById('btn-lobby').addEventListener('click', async () => {
-    // Critical: Tell controllers to go home by setting redirect to false
+    // 1. Update DB to trigger redirects for everyone
     await update(ref(db, `parties/${partyCode}/gameData`), { 
         status: "lobby",
         redirect: false 
     });
+    // 2. Clear host side local data
+    if (timerInterval) clearInterval(timerInterval);
+    // 3. Navigate host back
+    window.location.href = `../../host.html?code=${partyCode}`;
 });
