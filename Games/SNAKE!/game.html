@@ -2,74 +2,150 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SNAKE! - Mesh Edition</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #010409; font-family: 'Segoe UI', sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #010409; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         canvas { display: block; }
         
         .ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: white; }
         
         /* Stats Styling */
-        .stats-card { position: absolute; top: 20px; left: 20px; background: rgba(13, 17, 23, 0.85); padding: 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); }
+        .stats-card { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            background: rgba(13, 17, 23, 0.7); 
+            padding: 20px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
         
         /* Biome & Weather Styling */
         .biome-header { position: absolute; top: 20px; right: 20px; text-align: right; }
-        .biome-name { font-size: 32px; font-weight: 900; color: #10b981; margin: 0; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 20px rgba(16,185,129,0.4); }
+        .biome-name { 
+            font-size: 32px; 
+            font-weight: 900; 
+            color: #10b981; 
+            margin: 0; 
+            text-transform: uppercase; 
+            letter-spacing: 3px; 
+            text-shadow: 0 0 20px rgba(16,185,129,0.5); 
+        }
         
         .weather-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 5px; }
-        .timer-wrap { width: 120px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+        .timer-wrap { width: 140px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; margin-top: 6px; }
         #timer-fill { height: 100%; width: 100%; background: #60a5fa; transition: width 1s linear; box-shadow: 0 0 10px #60a5fa; }
+
+        /* Navigation / Lobby Button */
+        .lobby-box { position: absolute; bottom: 20px; left: 20px; pointer-events: all; }
+        .lobby-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .lobby-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+            transform: translateY(-2px);
+        }
 
         /* Shop Styling */
         .shop-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: none; place-items: center; pointer-events: all; z-index: 1000; backdrop-filter: blur(10px); }
-        .shop-card { background: #161b22; padding: 40px; border-radius: 30px; border: 2px solid #10b981; text-align: center; box-shadow: 0 0 50px rgba(16,185,129,0.2); }
-        .shop-btn { padding: 15px 30px; background: #10b981; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; color: white; transition: 0.3s; }
-        .shop-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+        .shop-card { 
+            background: #161b22; 
+            padding: 40px; 
+            border-radius: 30px; 
+            border: 1px solid rgba(16, 185, 129, 0.5); 
+            text-align: center; 
+            box-shadow: 0 0 50px rgba(16,185,129,0.15);
+            max-width: 400px;
+        }
+        .shop-btn { 
+            width: 100%;
+            padding: 16px; 
+            background: #10b981; 
+            border: none; 
+            border-radius: 14px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            color: white; 
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+        .shop-btn:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(16,185,129,0.4); }
 
         /* Minimap Box */
         .minimap-box { 
             position: absolute; 
             bottom: 20px; 
             right: 20px; 
-            border: 2px solid rgba(255,255,255,0.2); 
-            border-radius: 15px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 20px; 
             overflow: hidden; 
-            background: rgba(0,0,0,0.9); 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: rgba(13, 17, 23, 0.8); 
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            padding: 5px;
         }
+        #minimap { border-radius: 15px; display: block; }
     </style>
 </head>
 <body>
 
     <div class="ui-layer">
         <div class="stats-card">
-            <div style="font-size: 26px;">🍎 <span id="s-norm">0</span> | <span style="color:#fbbf24">⭐ <span id="s-gold">0</span></span></div>
-            <div style="font-size: 10px; opacity: 0.4; margin-top: 10px; letter-spacing: 1px;">PRESS [E] FOR SHOP</div>
+            <div style="font-size: 26px; font-weight: 800; letter-spacing: -1px;">
+                🍎 <span id="s-norm">0</span> <span style="margin: 0 10px; opacity: 0.2;">|</span> <span style="color:#fbbf24">⭐ <span id="s-gold">0</span></span>
+            </div>
+            <div style="font-size: 11px; opacity: 0.5; margin-top: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                Hold [E] for Shop
+            </div>
         </div>
 
         <div class="biome-header">
             <p class="biome-name" id="biome-txt">Forest</p>
             <div class="weather-row">
                 <div style="text-align: right">
-                    <div id="weather-label" style="font-size: 13px; font-weight: bold; letter-spacing: 1px;">CLEAR SKIES</div>
+                    <div id="weather-label" style="font-size: 12px; font-weight: 800; letter-spacing: 1px; opacity: 0.8; text-transform: uppercase;">Clear Skies</div>
                     <div class="timer-wrap"><div id="timer-fill"></div></div>
                 </div>
-                <div id="w-icon" style="font-size: 40px;">☀️</div>
+                <div id="w-icon" style="font-size: 42px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));">☀️</div>
             </div>
         </div>
 
+        <div class="lobby-box">
+            <button class="lobby-btn" id="btn-lobby">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Back to Lobby
+            </button>
+        </div>
+
         <div class="minimap-box">
-            <canvas id="minimap" width="200" height="200"></canvas>
+            <canvas id="minimap" width="180" height="180"></canvas>
         </div>
     </div>
 
     <div class="shop-overlay" id="shop">
         <div class="shop-card">
-            <h1 style="color:#10b981; margin-top:0;">GLOBAL REWARDS</h1>
-            <p>High-Precision 3D Compass</p>
-            <p style="font-size: 14px; opacity: 0.6; margin-bottom: 20px;">Unlock to see Biome borders on Minimap</p>
+            <h1 style="color:#10b981; margin-top:0; font-size: 28px; letter-spacing: -1px;">GLOBAL SHOP</h1>
+            <p style="color: rgba(255,255,255,0.8); margin-bottom: 5px; font-weight: 600;">High-Precision 3D Compass</p>
+            <p style="font-size: 14px; opacity: 0.5; margin-bottom: 30px; line-height: 1.5;">Enhance your minimap to track biome borders and legendary apple spawns.</p>
             <button id="buy-btn" class="shop-btn">PURCHASE (10🍎 + 1⭐)</button>
-            <p id="close-shop" style="margin-top:20px; cursor:pointer; opacity:0.5; font-size: 12px;">[ CLOSE MENU ]</p>
+            <p id="close-shop" style="margin-top:25px; cursor:pointer; opacity:0.4; font-size: 12px; font-weight: 700; letter-spacing: 1px;">[ CLOSE MENU ]</p>
         </div>
     </div>
 
@@ -78,12 +154,25 @@
     <script type="module" src="game.js"></script>
 
     <script>
-        // Simple UI-only bridge to help the JS
+        // UI Bridge
         window.toggleShop = function() {
             const s = document.getElementById('shop');
             s.style.display = (s.style.display === 'grid') ? 'none' : 'grid';
         };
+        
         document.getElementById('close-shop').onclick = window.toggleShop;
+
+        // "Back to Lobby" functionality - simple redirect
+        document.getElementById('btn-lobby').onclick = function() {
+            if(confirm("Are you sure you want to leave the party?")) {
+                window.location.href = 'index.html'; // Adjust this to your actual lobby filename
+            }
+        };
+
+        // Listen for 'E' key for shop
+        window.addEventListener('keydown', (e) => {
+            if(e.key.toLowerCase() === 'e') window.toggleShop();
+        });
     </script>
 </body>
 </html>

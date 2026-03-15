@@ -16,6 +16,7 @@ const db = getDatabase(app);
 
 const urlParams = new URLSearchParams(window.location.search);
 const partyCode = urlParams.get('code');
+const lobbyURL = `https://sonika303.github.io/SyncPlay/?code=${partyCode}`;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -30,6 +31,9 @@ let shopTile = {gx: 10, gy: 10};
 let partyScore = 0;
 let goldApples = 0;
 let trees = [];
+
+// NEW: Sync-Lock State
+let isShifting = false;
 
 // Weather State
 let weatherTimer = 60;
@@ -49,6 +53,21 @@ function init() {
     if (!partyCode) return;
     resize();
     window.addEventListener('resize', resize);
+    
+    // BACK TO LOBBY SYSTEM: Redirect Listener
+    onValue(ref(db, `parties/${partyCode}/status`), (snap) => {
+        if (snap.val() === "lobby") {
+            window.location.href = lobbyURL;
+        }
+    });
+
+    // BACK TO LOBBY SYSTEM: Button Logic
+    const lobbyBtn = document.getElementById('btn-lobby');
+    if (lobbyBtn) {
+        lobbyBtn.onclick = () => {
+            update(ref(db, `parties/${partyCode}`), { status: "lobby" });
+        };
+    }
     
     onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
         const data = snapshot.val();
@@ -82,7 +101,6 @@ function init() {
         if(shop) shop.style.display = snapshot.val() ? 'grid' : 'none';
     });
 
-    // Weather Countdown logic
     setInterval(() => {
         weatherTimer--;
         const timerFill = document.getElementById('timer-fill');
@@ -129,6 +147,9 @@ function spawnApple() {
 }
 
 function shiftWorld(dx, dy) {
+    if (isShifting) return; // Prevention for "Fast Switching"
+    isShifting = true;
+
     currentBiomeIndex = (currentBiomeIndex + 1) % biomes.length;
     const b = biomes[currentBiomeIndex];
     const bTxt = document.getElementById('biome-txt');
@@ -149,6 +170,9 @@ function shiftWorld(dx, dy) {
     spawnApple();
     shopTile.gx = Math.floor(Math.random() * (cols - 2)) + 1;
     shopTile.gy = Math.floor(Math.random() * (rows - 2)) + 1;
+
+    // Release shift lock after 400ms pause
+    setTimeout(() => { isShifting = false; }, 400);
 }
 
 function drawSnake(p) {
@@ -159,7 +183,6 @@ function drawSnake(p) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // SINGLE MODEL MESH RENDERING
     ctx.beginPath();
     p.parts.forEach((part, i) => {
         const x = part.gx * gridSize + gridSize/2;
@@ -173,29 +196,35 @@ function drawSnake(p) {
         else ctx.lineTo(finalX, finalY);
     });
 
-    // Body Stroke
     ctx.shadowBlur = 15;
     ctx.shadowColor = p.color;
     ctx.strokeStyle = p.color;
     ctx.lineWidth = 36;
     ctx.stroke();
 
-    // Shine/Depth Effect
     ctx.shadowBlur = 0;
     ctx.strokeStyle = "rgba(255,255,255,0.2)";
     ctx.lineWidth = 12;
     ctx.stroke();
 
-    // Head Details
     const head = p.parts[0];
     const hX = head.gx * gridSize + gridSize/2;
     const hY = head.gy * gridSize + gridSize/2;
     
+    // Eyes
     ctx.fillStyle = "white";
     ctx.beginPath();
     ctx.arc(hX + p.dir.x*12 - p.dir.y*8, hY + p.dir.y*12 + p.dir.x*8, 6, 0, Math.PI*2);
     ctx.arc(hX + p.dir.x*12 + p.dir.y*8, hY + p.dir.y*12 - p.dir.x*8, 6, 0, Math.PI*2);
     ctx.fill();
+
+    // USERNAME: Floating Badge
+    ctx.font = "bold 16px Segoe UI";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(hX - 50, hY - 65, 100, 25); // Subtle background
+    ctx.fillStyle = "white";
+    ctx.fillText(p.name, hX, hY - 47);
 
     ctx.restore();
 }
@@ -211,23 +240,19 @@ function drawMinimap() {
 
     const scale = mCanvas.width / cols;
 
-    // Minimap: Trees
     mCtx.fillStyle = b.accent;
     trees.forEach(t => mCtx.fillRect(t.gx * scale, t.gy * scale, scale, scale));
 
-    // Minimap: Apple
     mCtx.fillStyle = apple.isGold ? "#fbbf24" : "#ef4444";
     mCtx.beginPath();
     mCtx.arc(apple.gx * scale + scale/2, apple.gy * scale + scale/2, scale, 0, Math.PI*2);
     mCtx.fill();
 
-    // Minimap: Players
     Object.values(players).forEach(p => {
         mCtx.fillStyle = p.color;
         mCtx.fillRect(p.parts[0].gx * scale - scale, p.parts[0].gy * scale - scale, scale*3, scale*3);
     });
 
-    // Biome UI on Minimap
     mCtx.fillStyle = "white";
     mCtx.font = "bold 10px sans-serif";
     mCtx.fillText(b.name, 8, 18);
@@ -262,6 +287,8 @@ function drawWeatherEffect() {
 }
 
 function updatePlayers() {
+    if (isShifting) return; // Stop movement while world is adjusting
+
     let shiftX = 0, shiftY = 0;
     Object.keys(players).forEach(uid => {
         const p = players[uid];
@@ -296,7 +323,6 @@ function gameLoop() {
     ctx.fillStyle = biome.bg1;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Subtle Grid
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
     ctx.lineWidth = 1;
     for(let i=0; i<=cols; i++) { ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke(); }
@@ -304,7 +330,6 @@ function gameLoop() {
 
     trees.forEach(drawTree);
     
-    // Shop Tile Visual
     ctx.fillStyle = biome.accent;
     ctx.globalAlpha = 0.15;
     ctx.beginPath();
