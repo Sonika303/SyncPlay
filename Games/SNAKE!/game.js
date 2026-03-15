@@ -33,8 +33,9 @@ let trees = [];
 
 // Weather State
 let weatherTimer = 60;
-let currentWeather = "CLEAR"; // CLEAR, RAIN, SNOW, FOG
+let currentWeather = "CLEAR"; 
 const weathers = ["CLEAR", "RAIN", "SNOW", "FOG"];
+const weatherIcons = { "CLEAR": "☀️", "RAIN": "🌧️", "SNOW": "❄️", "FOG": "🌫️" };
 
 const biomes = [
     { name: "FOREST", bg1: "#1a2e1a", bg2: "#233d23", accent: "#10b981", type: 'land' },
@@ -84,9 +85,16 @@ function init() {
     // Weather Countdown logic
     setInterval(() => {
         weatherTimer--;
+        const timerFill = document.getElementById('timer-fill');
+        if(timerFill) timerFill.style.width = (weatherTimer / 60 * 100) + "%";
+
         if (weatherTimer <= 0) {
             weatherTimer = 60;
             currentWeather = weathers[Math.floor(Math.random() * weathers.length)];
+            const wLabel = document.getElementById('weather-label');
+            const wIcon = document.getElementById('w-icon');
+            if(wLabel) wLabel.innerText = currentWeather + " SKIES";
+            if(wIcon) wIcon.innerText = weatherIcons[currentWeather];
         }
     }, 1000);
 
@@ -100,7 +108,7 @@ function resize() {
     canvas.height = window.innerHeight;
     cols = Math.floor(canvas.width / gridSize);
     rows = Math.floor(canvas.height / gridSize);
-    if(mCanvas) { mCanvas.width = 150; mCanvas.height = 150; }
+    if(mCanvas) { mCanvas.width = 180; mCanvas.height = 180; }
 }
 
 function spawnTrees() {
@@ -124,7 +132,11 @@ function shiftWorld(dx, dy) {
     currentBiomeIndex = (currentBiomeIndex + 1) % biomes.length;
     const b = biomes[currentBiomeIndex];
     const bTxt = document.getElementById('biome-txt');
-    if(bTxt) { bTxt.innerText = b.name; bTxt.style.color = b.accent; }
+    if(bTxt) { 
+        bTxt.innerText = b.name; 
+        bTxt.style.color = b.accent; 
+        bTxt.style.textShadow = `0 0 20px ${b.accent}66`;
+    }
 
     Object.keys(players).forEach(uid => {
         const p = players[uid];
@@ -139,7 +151,6 @@ function shiftWorld(dx, dy) {
     shopTile.gy = Math.floor(Math.random() * (rows - 2)) + 1;
 }
 
-// UPGRADED: Single Model Snake Rendering
 function drawSnake(p) {
     const isWater = biomes[currentBiomeIndex].type === 'water';
     p.swimPhase += 0.15;
@@ -148,14 +159,13 @@ function drawSnake(p) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Path for the whole body
+    // SINGLE MODEL MESH RENDERING
     ctx.beginPath();
     p.parts.forEach((part, i) => {
         const x = part.gx * gridSize + gridSize/2;
         const y = part.gy * gridSize + gridSize/2;
         const swimOff = isWater ? Math.sin(p.swimPhase + i * 0.5) * 15 : 0;
         
-        // Offset for movement smoothness
         const finalX = x + (p.dir.y * swimOff);
         const finalY = y + (p.dir.x * swimOff);
 
@@ -163,19 +173,20 @@ function drawSnake(p) {
         else ctx.lineTo(finalX, finalY);
     });
 
-    // Outer Glow / Skin
+    // Body Stroke
     ctx.shadowBlur = 15;
     ctx.shadowColor = p.color;
     ctx.strokeStyle = p.color;
-    ctx.lineWidth = 35;
+    ctx.lineWidth = 36;
     ctx.stroke();
 
-    // Inner detail / Shine
+    // Shine/Depth Effect
+    ctx.shadowBlur = 0;
     ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 12;
     ctx.stroke();
 
-    // Head details (Eyes)
+    // Head Details
     const head = p.parts[0];
     const hX = head.gx * gridSize + gridSize/2;
     const hY = head.gy * gridSize + gridSize/2;
@@ -195,31 +206,33 @@ function drawMinimap() {
     const nextB = biomes[(currentBiomeIndex + 1) % biomes.length];
     
     mCtx.clearRect(0,0,mCanvas.width, mCanvas.height);
-    mCtx.fillStyle = "rgba(0,0,0,0.7)";
+    mCtx.fillStyle = "rgba(0,0,0,0.85)";
     mCtx.fillRect(0,0, mCanvas.width, mCanvas.height);
 
     const scale = mCanvas.width / cols;
 
-    // Draw Trees on Minimap
+    // Minimap: Trees
     mCtx.fillStyle = b.accent;
     trees.forEach(t => mCtx.fillRect(t.gx * scale, t.gy * scale, scale, scale));
 
-    // Draw Apple
+    // Minimap: Apple
     mCtx.fillStyle = apple.isGold ? "#fbbf24" : "#ef4444";
-    mCtx.fillRect(apple.gx * scale, apple.gy * scale, scale*1.5, scale*1.5);
+    mCtx.beginPath();
+    mCtx.arc(apple.gx * scale + scale/2, apple.gy * scale + scale/2, scale, 0, Math.PI*2);
+    mCtx.fill();
 
-    // Draw Players
+    // Minimap: Players
     Object.values(players).forEach(p => {
         mCtx.fillStyle = p.color;
-        mCtx.fillRect(p.parts[0].gx * scale, p.parts[0].gy * scale, scale*2, scale*2);
+        mCtx.fillRect(p.parts[0].gx * scale - scale, p.parts[0].gy * scale - scale, scale*3, scale*3);
     });
 
-    // Biome Indicators
+    // Biome UI on Minimap
     mCtx.fillStyle = "white";
-    mCtx.font = "10px Inter";
-    mCtx.fillText(`CURRENT: ${b.name}`, 5, 12);
+    mCtx.font = "bold 10px sans-serif";
+    mCtx.fillText(b.name, 8, 18);
     mCtx.fillStyle = nextB.accent;
-    mCtx.fillText(`NEXT → ${nextB.name}`, 5, mCanvas.height - 5);
+    mCtx.fillText(`NEXT: ${nextB.name} →`, 8, mCanvas.height - 10);
 }
 
 function drawWeatherEffect() {
@@ -228,18 +241,21 @@ function drawWeatherEffect() {
     if (currentWeather === "RAIN") {
         ctx.strokeStyle = "rgba(174,194,224,0.4)";
         ctx.lineWidth = 1;
-        for(let i=0; i<40; i++) {
+        for(let i=0; i<50; i++) {
             let rx = Math.random() * canvas.width;
             let ry = Math.random() * canvas.height;
-            ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 10, ry + 20); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 8, ry + 15); ctx.stroke();
         }
     } else if (currentWeather === "SNOW") {
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        for(let i=0; i<30; i++) {
-            ctx.beginPath(); ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        for(let i=0; i<40; i++) {
+            ctx.beginPath(); ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 2.5, 0, Math.PI*2); ctx.fill();
         }
     } else if (currentWeather === "FOG") {
-        ctx.fillStyle = "rgba(200,200,200,0.2)";
+        let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
+        grad.addColorStop(0, "transparent");
+        grad.addColorStop(1, "rgba(255,255,255,0.15)");
+        ctx.fillStyle = grad;
         ctx.fillRect(0,0, canvas.width, canvas.height);
     }
     ctx.restore();
@@ -249,7 +265,7 @@ function updatePlayers() {
     let shiftX = 0, shiftY = 0;
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        p.moveProgress += 0.2; // Slightly faster/smoother
+        p.moveProgress += 0.22; 
         if (p.moveProgress >= 1) {
             p.moveProgress = 0;
             p.dir = p.nextDir;
@@ -263,8 +279,10 @@ function updatePlayers() {
 
             if (ngx === apple.gx && ngy === apple.gy) {
                 if (apple.isGold) goldApples++; else partyScore++;
-                document.getElementById('s-norm').innerText = partyScore;
-                document.getElementById('s-gold').innerText = goldApples;
+                const sn = document.getElementById('s-norm');
+                const sg = document.getElementById('s-gold');
+                if(sn) sn.innerText = partyScore;
+                if(sg) sg.innerText = goldApples;
                 spawnApple();
             } else { p.parts.pop(); }
             p.parts.unshift({ gx: ngx, gy: ngy });
@@ -278,30 +296,21 @@ function gameLoop() {
     ctx.fillStyle = biome.bg1;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid
+    // Subtle Grid
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
     ctx.lineWidth = 1;
     for(let i=0; i<=cols; i++) { ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke(); }
     for(let i=0; i<=rows; i++) { ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke(); }
 
-    trees.forEach(t => {
-        const b = biomes[currentBiomeIndex];
-        if (b.type === 'water') return;
-        ctx.save();
-        ctx.translate(t.gx * gridSize + gridSize/2, t.gy * gridSize + gridSize/2);
-        ctx.scale(t.scale, t.scale);
-        ctx.fillStyle = "#452714"; ctx.fillRect(-10, 0, 20, 30);
-        ctx.fillStyle = b.accent;
-        for(let i=0; i<3; i++) {
-            ctx.beginPath(); ctx.arc(0, -15 - (i*15), 25 - (i*5), 0, Math.PI*2); ctx.fill();
-        }
-        ctx.restore();
-    });
+    trees.forEach(drawTree);
     
-    // UI: Countdown & Weather
-    ctx.fillStyle = "white";
-    ctx.font = "bold 16px Inter";
-    ctx.fillText(`WEATHER: ${currentWeather} (${weatherTimer}s)`, 20, 30);
+    // Shop Tile Visual
+    ctx.fillStyle = biome.accent;
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    ctx.roundRect(shopTile.gx * gridSize + 5, shopTile.gy * gridSize + 5, gridSize - 10, gridSize - 10, 20);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
 
     drawApple(apple.gx, apple.gy, apple.isGold);
     updatePlayers();
@@ -312,7 +321,20 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// DrawApple helper (re-used from your file)
+function drawTree(tree) {
+    const b = biomes[currentBiomeIndex];
+    if (b.type === 'water') return;
+    ctx.save();
+    ctx.translate(tree.gx * gridSize + gridSize/2, tree.gy * gridSize + gridSize/2);
+    ctx.scale(tree.scale, tree.scale);
+    ctx.fillStyle = "#452714"; ctx.fillRect(-10, 0, 20, 30);
+    ctx.fillStyle = b.accent;
+    for(let i=0; i<3; i++) {
+        ctx.beginPath(); ctx.arc(0, -15 - (i*15), 25 - (i*5), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+}
+
 function drawApple(x, y, isGold) {
     const time = Date.now() / 200;
     const bounce = Math.sin(time) * 5;
