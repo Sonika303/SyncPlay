@@ -71,11 +71,6 @@ function init() {
         });
     });
 
-    onValue(ref(db, `parties/${partyCode}/gameState/shopOpen`), (snapshot) => {
-        const shop = document.getElementById('shop');
-        if(shop) shop.style.display = snapshot.val() ? 'grid' : 'none';
-    });
-
     spawnTrees();
     spawnApple();
     requestAnimationFrame(gameLoop);
@@ -89,18 +84,17 @@ function resize() {
 }
 
 function spawnTrees() {
-    trees = Array.from({length: 12}, () => ({
+    trees = Array.from({length: 10}, () => ({
         gx: Math.floor(Math.random() * cols),
         gy: Math.floor(Math.random() * rows),
-        scale: 0.6 + Math.random() * 0.8,
-        flip: Math.random() > 0.5
+        scale: 0.7 + Math.random() * 0.6
     }));
 }
 
 function spawnApple() {
     apple.gx = Math.floor(Math.random() * (cols - 4)) + 2;
     apple.gy = Math.floor(Math.random() * (rows - 4)) + 2;
-    apple.isGold = Math.random() > 0.92;
+    apple.isGold = Math.random() > 0.9;
 }
 
 function shiftWorld(dx, dy) {
@@ -124,28 +118,25 @@ function shiftWorld(dx, dy) {
 
 function drawMinimap() {
     if(!mCtx) return;
-    mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
-    mCtx.fillStyle = "rgba(0,0,0,0.5)";
-    mCtx.fillRect(0,0, mCanvas.width, mCanvas.height);
+    mCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
 
     const sX = mCanvas.width / cols;
     const sY = mCanvas.height / rows;
 
-    // Trees
-    mCtx.fillStyle = "#166534";
+    // Minimap Trees
+    mCtx.fillStyle = "#14532d";
     trees.forEach(t => mCtx.fillRect(t.gx * sX, t.gy * sY, sX, sY));
 
-    // Apple
+    // Minimap Apple
     mCtx.fillStyle = apple.isGold ? "#fbbf24" : "#ef4444";
-    mCtx.beginPath();
-    mCtx.arc(apple.gx * sX + sX/2, apple.gy * sY + sY/2, sX, 0, Math.PI*2);
-    mCtx.fill();
+    mCtx.fillRect(apple.gx * sX, apple.gy * sY, sX * 1.5, sY * 1.5);
 
-    // Players
+    // Minimap Players
     Object.keys(players).forEach(uid => {
         const p = players[uid];
         mCtx.fillStyle = p.color;
-        p.parts.forEach(pt => mCtx.fillRect(pt.gx * sX, pt.gy * sY, sX*1.5, sY*1.5));
+        p.parts.forEach(pt => mCtx.fillRect(pt.gx * sX, pt.gy * sY, sX * 2, sY * 2));
     });
 }
 
@@ -154,15 +145,17 @@ function drawSnake(p) {
     p.swimPhase += 0.15;
 
     ctx.save();
-    ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
-    // 1. Draw Body Path (The "Single Model" look)
+    // Draw the continuous body path
     ctx.beginPath();
     p.parts.forEach((pt, i) => {
         const x = pt.gx * gridSize + gridSize/2;
         const y = pt.gy * gridSize + gridSize/2;
-        const swim = isWater ? Math.sin(p.swimPhase + i*0.8) * 20 : 0;
+        
+        // Swimming animation
+        const swim = isWater ? Math.sin(p.swimPhase + i * 0.7) * 18 : 0;
         const finalX = x + (p.dir.y * swim);
         const finalY = y + (p.dir.x * swim);
 
@@ -170,69 +163,99 @@ function drawSnake(p) {
         else ctx.lineTo(finalX, finalY);
     });
 
-    // Shadow/Glow
-    ctx.shadowBlur = 20;
+    // Outer Glow / Body
+    ctx.shadowBlur = 15;
     ctx.shadowColor = p.color;
     ctx.strokeStyle = p.color;
-    ctx.lineWidth = 35;
+    ctx.lineWidth = 38;
     ctx.stroke();
 
-    // Highlight center
+    // Inner detail (makes it look 3D/Single model)
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 10;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.lineWidth = 12;
     ctx.stroke();
 
-    // 2. Draw Head Details
+    // Head Details
     const h = p.parts[0];
     const hX = h.gx * gridSize + gridSize/2;
     const hY = h.gy * gridSize + gridSize/2;
+
+    // Eyes
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(hX + p.dir.x*15 - p.dir.y*10, hY + p.dir.y*15 + p.dir.x*10, 7, 0, Math.PI*2);
+    ctx.arc(hX + p.dir.x*15 + p.dir.y*10, hY + p.dir.y*15 - p.dir.x*10, 7, 0, Math.PI*2);
+    ctx.fill();
+    
+    // Pupils (looking forward)
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(hX + p.dir.x*20 - p.dir.y*10, hY + p.dir.y*20 + p.dir.x*10, 3, 0, Math.PI*2);
+    ctx.arc(hX + p.dir.x*20 + p.dir.y*10, hY + p.dir.y*20 - p.dir.x*10, 3, 0, Math.PI*2);
+    ctx.fill();
 
     // Tongue
     if(Math.random() > 0.98) p.tongueLen = 25;
     if(p.tongueLen > 0) {
         ctx.strokeStyle = "#ff4d4d";
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(hX, hY);
-        ctx.lineTo(hX + p.dir.x * (40+p.tongueLen), hY + p.dir.y * (40+p.tongueLen));
+        ctx.moveTo(hX + p.dir.x*20, hY + p.dir.y*20);
+        ctx.lineTo(hX + p.dir.x*(35 + p.tongueLen), hY + p.dir.y*(35 + p.tongueLen));
         ctx.stroke();
         p.tongueLen -= 1.5;
     }
 
-    // Eyes
-    ctx.fillStyle = "white";
-    const eyeOff = 12;
-    ctx.beginPath();
-    ctx.arc(hX + p.dir.x*15 - p.dir.y*eyeOff, hY + p.dir.y*15 + p.dir.x*eyeOff, 7, 0, Math.PI*2);
-    ctx.arc(hX + p.dir.x*15 + p.dir.y*eyeOff, hY + p.dir.y*15 - p.dir.x*eyeOff, 7, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(hX + p.dir.x*20 - p.dir.y*eyeOff, hY + p.dir.y*20 + p.dir.x*eyeOff, 3, 0, Math.PI*2);
-    ctx.arc(hX + p.dir.x*20 + p.dir.y*eyeOff, hY + p.dir.y*20 - p.dir.x*eyeOff, 3, 0, Math.PI*2);
-    ctx.fill();
-
     ctx.restore();
 }
 
-function updatePlayers() {
-    if (document.getElementById('shop')?.style.display === 'grid') return;
-    let sX = 0, sY = 0;
+function gameLoop() {
+    const biome = biomes[currentBiomeIndex];
+    ctx.fillStyle = biome.bg1;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Modern Grid
+    ctx.strokeStyle = biome.bg2;
+    ctx.lineWidth = 2;
+    for(let i=0; i<=cols; i++) { ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke(); }
+    for(let i=0; i<=rows; i++) { ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke(); }
+
+    // Trees
+    trees.forEach(t => {
+        ctx.save();
+        ctx.translate(t.gx*gridSize+gridSize/2, t.gy*gridSize+gridSize/2);
+        ctx.scale(t.scale, t.scale);
+        ctx.fillStyle = "#3f2b1a"; ctx.fillRect(-8, 0, 16, 25);
+        ctx.fillStyle = biome.accent;
+        ctx.beginPath(); ctx.moveTo(0, -45); ctx.lineTo(35, 10); ctx.lineTo(-35, 10); ctx.fill();
+        ctx.restore();
+    });
+
+    // Shop Tile
+    ctx.fillStyle = biome.accent; ctx.globalAlpha = 0.2;
+    ctx.beginPath(); ctx.roundRect(shopTile.gx*gridSize+10, shopTile.gy*gridSize+10, gridSize-20, gridSize-20, 15); ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    drawApple(apple.gx, apple.gy, apple.isGold);
+    updatePlayers();
+    Object.keys(players).forEach(uid => drawSnake(players[uid]));
+    drawMinimap();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function updatePlayers() {
+    let sX = 0, sY = 0;
     Object.keys(players).forEach(uid => {
         const p = players[uid];
-        p.moveProgress += 0.22; // Speed boost
-
+        p.moveProgress += 0.22; 
         if (p.moveProgress >= 1) {
             p.moveProgress = 0;
             p.dir = p.nextDir;
-            let nX = p.parts[0].gx + p.dir.x;
-            let nY = p.parts[0].gy + p.dir.y;
-
+            let nX = p.parts[0].gx + p.dir.x, nY = p.parts[0].gy + p.dir.y;
             if (nX < 0) sX = -1; else if (nX >= cols) sX = 1;
             else if (nY < 0) sY = -1; else if (nY >= rows) sY = 1;
-
             if (nX === apple.gx && nY === apple.gy) {
                 if (apple.isGold) goldApples++; else partyScore++;
                 document.getElementById('s-norm').innerText = partyScore;
@@ -244,38 +267,5 @@ function updatePlayers() {
     });
     if (sX !== 0 || sY !== 0) shiftWorld(sX, sY);
 }
-
-function gameLoop() {
-    const biome = biomes[currentBiomeIndex];
-    ctx.fillStyle = biome.bg1;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Dynamic Grid Graphics
-    ctx.strokeStyle = biome.bg2;
-    ctx.lineWidth = 2;
-    for(let i=0; i<=cols; i++) { ctx.beginPath(); ctx.moveTo(i*gridSize, 0); ctx.lineTo(i*gridSize, canvas.height); ctx.stroke(); }
-    for(let i=0; i<=rows; i++) { ctx.beginPath(); ctx.moveTo(0, i*gridSize); ctx.lineTo(canvas.width, i*gridSize); ctx.stroke(); }
-
-    // Render Assets
-    trees.forEach(t => {
-        ctx.save();
-        ctx.translate(t.gx*gridSize+gridSize/2, t.gy*gridSize+gridSize/2);
-        ctx.scale(t.scale * (t.flip ? -1 : 1), t.scale);
-        ctx.fillStyle = "#3f2b1a"; ctx.fillRect(-8, 0, 16, 25);
-        ctx.fillStyle = biome.accent;
-        ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(30, 5); ctx.lineTo(-30, 5); ctx.closeFill();
-        ctx.restore();
-    });
-
-    drawApple(apple.gx, apple.gy, apple.isGold);
-    updatePlayers();
-    Object.keys(players).forEach(uid => drawSnake(players[uid]));
-    drawMinimap();
-
-    requestAnimationFrame(gameLoop);
-}
-
-// Helper for Triangle Trees
-CanvasRenderingContext2D.prototype.closeFill = function() { this.closePath(); this.fill(); };
 
 init();
