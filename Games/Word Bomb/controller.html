@@ -160,15 +160,25 @@
                 
                 disconnectRef.remove();
 
-                // Status listener for Redirects
+                // Listen for game status changes
                 onValue(ref(db, `parties/${code}/gameData/status`), (snap) => {
                     const status = snap.val();
                     if (status === "playing") {
                         disconnectRef.cancel(); 
                     }
-                    // FIX: Go back to lobby if host ends game
-                    if (status === "lobby") {
-                        window.location.href = `lobby.html?code=${code}`;
+                    
+                    // REDIRECT LOGIC: Go back to index.html with the code
+                    if (status === "lobby" || status === "waiting") {
+                        window.location.href = `../../index.html?code=${code}`;
+                    }
+                });
+
+                // Listen for the specific Redirect flag
+                onValue(ref(db, `parties/${code}/gameData/redirect`), (snap) => {
+                    const redirectValue = snap.val();
+                    // If the host sets redirect to false or lobby, send player back
+                    if (redirectValue === "lobby" || redirectValue === false) {
+                        window.location.href = `../../index.html?code=${code}`;
                     }
                 });
 
@@ -176,7 +186,6 @@
                     usedWords = snap.val() || [];
                 });
 
-                // Handle heart updates and elimination
                 onValue(ref(db, `parties/${code}/playersData/${myUid}`), (snap) => {
                     const data = snap.val();
                     if(!data) return;
@@ -191,17 +200,10 @@
                     }
                 });
 
-                // Game Loop sync
                 onValue(ref(db, `parties/${code}/gameData`), (snap) => {
                     if(!snap.exists()) return;
                     const gameData = snap.val();
                     
-                    // Safety Redirect Check
-                    if (gameData.redirect === false || gameData.status === "lobby") {
-                        window.location.href = `lobby.html?code=${code}`;
-                        return;
-                    }
-
                     if (gameData.status === "finished" || gameData.status === "gameOver") {
                         document.getElementById("status").innerText = "GAME OVER";
                         document.getElementById("wordInput").disabled = true;
@@ -230,7 +232,6 @@
                         status.classList.remove("active-status");
                         card.classList.remove("my-turn");
                         document.getElementById("feedback").innerText = "";
-                        // Don't clear if user is mid-typing, only clear on turn start/end logic
                     }
                 });
             }
@@ -255,7 +256,6 @@
                 return;
             }
 
-            // Send to host
             await set(ref(db, `parties/${code}/action`), { 
                 uid: auth.currentUser.uid, 
                 word: word,
