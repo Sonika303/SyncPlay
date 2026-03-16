@@ -148,7 +148,7 @@
         .color-cell { aspect-ratio: 1; border-radius: 10px; cursor: pointer; border: 3px solid transparent; }
         .color-cell.active { border-color: #2d3436; transform: scale(1.15); }
 
-        /* Achievement Styles - Minecraft Advancement Vibe */
+        /* Achievement Styles */
         .achievement-item {
             display: flex; align-items: center; gap: 15px; padding: 18px;
             background: #212121; border: 3px solid #000; border-radius: 4px; 
@@ -256,13 +256,6 @@
         <div style="width:40px;"></div>
     </div>
     <div style="max-width: 450px; margin: 0 auto; width: 100%;">
-        <div class="custom-picker-box">
-            <input type="color" id="customColorInput" oninput="pickCustomColor(this.value)" style="width:60px; height:60px; border-radius:15px; border:none; cursor:pointer;">
-            <div style="text-align:left;">
-                <div style="font-size: 12px; font-weight: 800; color: #b2bec3;">CUSTOM SLIDER</div>
-                <div style="font-size: 15px; font-weight: 700;">Pick a unique hex</div>
-            </div>
-        </div>
         <div class="color-grid" id="colorGrid"></div>
     </div>
 </div>
@@ -281,8 +274,14 @@
     import { getDatabase, ref, set, get, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     
-    // IMPORT THE LISTENER FROM YOUR ACHIEVEMENTS.JS
-    import { startAchievementListener } from "./achievements.js";
+    // We wrap this in a try-catch so if your file is missing it doesn't break the whole app
+    let startAchievementListener;
+    try {
+        const module = await import("./achievements.js");
+        startAchievementListener = module.startAchievementListener;
+    } catch (e) {
+        console.warn("Achievements module not found or failed to load.");
+    }
 
     const firebaseConfig = {
         apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -309,6 +308,7 @@
         WORD_BOMB_10:   { name: "Word Master", icon: "💣", desc: "Survived 10 Rounds" }
     };
 
+    // Color Grid Init
     const palette = [];
     for(let i=0; i<100; i++) { palette.push(`hsl(${Math.floor(i * 3.6)}, 70%, 55%)`); }
     const grid = document.getElementById("colorGrid");
@@ -352,40 +352,28 @@
         if(!currentUser) return;
         const snap = await get(ref(db, `users/${currentUser.uid}/Achievements`));
         const unlocked = snap.val() || {};
-        
         const list = document.getElementById("achievementList");
         list.innerHTML = "";
         let count = 0;
-
         Object.keys(ACHIEVEMENT_LIB).forEach(id => {
             const ach = ACHIEVEMENT_LIB[id];
             const isUnlocked = unlocked[id];
             if(isUnlocked) count++;
-
             const item = document.createElement("div");
             item.className = `achievement-item ${isUnlocked ? 'unlocked' : ''}`;
-            item.innerHTML = `
-                <div class="ach-icon-box">${isUnlocked ? ach.icon : '🔒'}</div>
-                <div>
-                    <div class="ach-label">${isUnlocked ? 'Advancement Made!' : 'Locked'}</div>
-                    <div class="ach-name-text">${ach.name}</div>
-                    <div class="ach-desc-text">${ach.desc}</div>
-                </div>
-            `;
+            item.innerHTML = `<div class="ach-icon-box">${isUnlocked ? ach.icon : '🔒'}</div>
+                <div><div class="ach-label">${isUnlocked ? 'Advancement Made!' : 'Locked'}</div>
+                <div class="ach-name-text">${ach.name}</div><div class="ach-desc-text">${ach.desc}</div></div>`;
             list.appendChild(item);
         });
-
-        document.getElementById("ach-count").innerText = `${count}/${Object.keys(ACHIEVEMENT_LIB).length} Advancements`;
+        document.getElementById("ach-count").innerText = `${count}/4 Advancements`;
     }
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
+            if (startAchievementListener) startAchievementListener(user.uid);
             
-            // --- START THE LIVE ACHIEVEMENT LISTENER ---
-            startAchievementListener(user.uid);
-            // -------------------------------------------
-
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
             document.getElementById("setBtn").style.display = "block";
@@ -397,7 +385,10 @@
                 selectedColor = snap.val().profileColor || selectedColor;
             }
             updateUI(username, selectedColor);
-            loadAchievements(); 
+        } else {
+            document.getElementById("login").style.display = "block";
+            document.getElementById("mainUI").style.display = "none";
+            document.getElementById("setBtn").style.display = "none";
         }
     });
 
@@ -420,7 +411,7 @@
         toggleSettings();
     };
 
-    window.googleLogin = () => signInWithPopup(auth, provider);
+    window.googleLogin = () => signInWithPopup(auth, provider).catch(err => alert(err.message));
     window.goToHost = () => window.location.href = "host.html";
     window.joinParty = async () => {
         const code = document.getElementById("partyCode").value.trim().toUpperCase();
