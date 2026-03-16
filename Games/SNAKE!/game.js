@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, onValue, update, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-// Import the achievement logic
-import { unlockAchievement } from "./achievements.js";
+// FIXED: Using absolute path to find achievements.js in the main area
+import { unlockAchievement } from "/SyncPlay/achievements.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",

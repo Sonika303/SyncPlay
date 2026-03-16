@@ -255,7 +255,7 @@
     let partyCode;
     let currentUser;
     let selectedGame = "SNAKE!";
-    let knownPlayers = new Set(); // Track unique joins in this session
+    let knownPlayers = new Set(); 
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -318,7 +318,6 @@
                     count++;
                     const p = players[uid];
 
-                    // TRIGGER: WELCOME_JOIN achievement
                     if (!knownPlayers.has(uid)) {
                         unlockAchievement(uid, "WELCOME_JOIN");
                         knownPlayers.add(uid);
@@ -346,6 +345,7 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> DEPLOYING...`;
         lucide.createIcons();
 
+        // Standardized pathing: ensures redirect works for both folders
         const controllerPath = `Games/${selectedGame}/controller.html`;
         
         await update(ref(db, `parties/${partyCode}`), { 
@@ -357,6 +357,7 @@
             }
         });
 
+        // Delay to allow database to sync before host redirects
         setTimeout(() => {
             window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
         }, 1500);

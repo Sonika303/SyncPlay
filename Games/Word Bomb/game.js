@@ -1,8 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, get, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-// ACHIEVEMENT SYSTEM IMPORT
-import { unlockAchievement } from "./achievements.js";
+
+// ACHIEVEMENT SYSTEM IMPORT - Using absolute path to find root file
+import { unlockAchievement } from "/SyncPlay/achievements.js";
 
 const firebaseConfig = { 
     apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -269,7 +270,6 @@ async function checkWinner(playersData) {
 }
 
 async function showVictoryScreen() {
-    // Prevent multiple triggers
     if (document.getElementById("victory-overlay").style.display === "flex") return;
     
     gameActive = false;
@@ -283,9 +283,9 @@ async function showVictoryScreen() {
         if (winnerEntry) {
             const [uid, winner] = winnerEntry;
 
-            // --- UNLOCK FINAL ACHIEVEMENT: BOMB SQUAD ---
+            // --- UPDATED ACHIEVEMENT TRIGGER ---
             if (isHost) {
-                unlockAchievement(uid, "BOMB_SQUAD");
+                unlockAchievement(uid, "WORD_BOMB_10");
             }
 
             const overlay = document.getElementById("victory-overlay");

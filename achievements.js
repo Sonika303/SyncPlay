@@ -94,8 +94,8 @@ function showPopup(ach) {
         document.head.appendChild(style);
     }
 
-    // Play Sound
-    const achSound = new Audio('./Sounds/achievement.mp3');
+    // Play Sound - FIXED: Added absolute path so it works from any folder
+    const achSound = new Audio('/SyncPlay/Sounds/achievement.mp3');
     achSound.volume = 0.6;
     achSound.play().catch(e => console.warn("Audio blocked: Click page to enable sounds."));
 
