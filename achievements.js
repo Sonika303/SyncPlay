@@ -1,5 +1,6 @@
-import { getDatabase, ref, update, get, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+// 1. ACHIEVEMENT DEFINITIONS
 export const ACHIEVEMENT_LIB = {
     WELCOME_JOIN:   { name: "First Steps", icon: "🎟️", desc: "Joined the Arena" },
     APPLE_10:       { name: "Hungry Snake", icon: "🍎", desc: "Collected 10 Apples" },
@@ -7,30 +8,39 @@ export const ACHIEVEMENT_LIB = {
     WORD_BOMB_10:   { name: "Word Master", icon: "💣", desc: "Survived 10 Rounds" }
 };
 
-// --- 1. THE LISTENER (Add this part!) ---
-// This watches Firebase and triggers showPopup automatically
+// 2. THE LIVE LISTENER (Silent on refresh, loud on new earn)
 export function startAchievementListener(uid) {
     if (!uid) return;
     const db = getDatabase();
     const achRef = ref(db, `users/${uid}/Achievements`);
 
-    // We use onValue to watch for ANY changes in the Achievements folder
+    let isFirstLoad = true; // Prevents old achievements from popping up on refresh
+
     onValue(achRef, (snapshot) => {
         const data = snapshot.val();
-        if (!data) return;
-
-        // Check if the user just earned any of our library achievements
-        Object.keys(ACHIEVEMENT_LIB).forEach(achId => {
-            // If the achievement is true in Firebase AND hasn't been shown in this session yet
-            if (data[achId] === true && !window[`shown_${achId}`]) {
-                showPopup(ACHIEVEMENT_LIB[achId]);
-                window[`shown_${achId}`] = true; // Mark as shown so it doesn't spam
-            }
-        });
+        
+        if (data) {
+            Object.keys(ACHIEVEMENT_LIB).forEach(achId => {
+                // If it exists in DB and hasn't been shown in this session
+                if (data[achId] === true && !window[`shown_${achId}`]) {
+                    
+                    // Only show the visual popup if this isn't the initial page load
+                    if (!isFirstLoad) {
+                        showPopup(ACHIEVEMENT_LIB[achId]);
+                    }
+                    
+                    // Mark as shown globally for this session
+                    window[`shown_${achId}`] = true;
+                }
+            });
+        }
+        
+        // After the first data check is done, allow popups for future changes
+        isFirstLoad = false;
     });
 }
 
-// --- 2. THE UNLOCKER (To be called from inside games) ---
+// 3. THE UNLOCKER (Call this from your games)
 export async function unlockAchievement(uid, achId) {
     const ach = ACHIEVEMENT_LIB[achId];
     if (!ach || !uid) return;
@@ -39,6 +49,7 @@ export async function unlockAchievement(uid, achId) {
         const db = getDatabase();
         const achRef = ref(db, `users/${uid}/Achievements/${achId}`);
 
+        // Check if already unlocked in DB to avoid unnecessary writes
         const snapshot = await get(achRef);
         if (!snapshot.exists()) {
             await update(ref(db, `users/${uid}/Achievements`), {
@@ -51,8 +62,9 @@ export async function unlockAchievement(uid, achId) {
     }
 }
 
-// --- 3. THE POPUP UI ---
+// 4. THE VISUAL POPUP & SOUND
 function showPopup(ach) {
+    // Inject Styles if they don't exist
     if (!document.getElementById('ach-style')) {
         const style = document.createElement('style');
         style.id = 'ach-style';
@@ -82,10 +94,12 @@ function showPopup(ach) {
         document.head.appendChild(style);
     }
 
+    // Play Sound
     const achSound = new Audio('./Sounds/achievement.mp3');
     achSound.volume = 0.6;
-    achSound.play().catch(e => console.warn("Audio blocked: User must click page first."));
+    achSound.play().catch(e => console.warn("Audio blocked: Click page to enable sounds."));
 
+    // Create/Get Popup Element
     let popup = document.getElementById('ach-popup');
     if (!popup) {
         popup = document.createElement('div');
@@ -93,6 +107,7 @@ function showPopup(ach) {
         document.body.appendChild(popup);
     }
 
+    // Update Content
     popup.innerHTML = `
         <div class="ach-icon">${ach.icon}</div>
         <div class="ach-content">
@@ -101,6 +116,11 @@ function showPopup(ach) {
         </div>
     `;
 
+    // Animate In
     setTimeout(() => popup.classList.add('show'), 100);
-    setTimeout(() => popup.classList.remove('show'), 5000);
+    
+    // Animate Out
+    setTimeout(() => {
+        popup.classList.remove('show');
+    }, 5000);
 }
