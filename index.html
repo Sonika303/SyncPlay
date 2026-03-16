@@ -280,6 +280,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, get, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    
+    // IMPORT THE LISTENER FROM YOUR ACHIEVEMENTS.JS
+    import { startAchievementListener } from "./achievements.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -299,7 +302,6 @@
     let currentUser;
     let selectedColor = "#6c5ce7";
     
-    // EXACT DATA FROM YOUR ACHIEVEMENT.JS
     const ACHIEVEMENT_LIB = {
         WELCOME_JOIN:   { name: "First Steps", icon: "🎟️", desc: "Joined the Arena" },
         APPLE_10:       { name: "Hungry Snake", icon: "🍎", desc: "Collected 10 Apples" },
@@ -348,7 +350,6 @@
 
     async function loadAchievements() {
         if(!currentUser) return;
-        // MATCHES YOUR FIREBASE PATH: users/UID/Achievements
         const snap = await get(ref(db, `users/${currentUser.uid}/Achievements`));
         const unlocked = snap.val() || {};
         
@@ -380,6 +381,11 @@
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
+            
+            // --- START THE LIVE ACHIEVEMENT LISTENER ---
+            startAchievementListener(user.uid);
+            // -------------------------------------------
+
             document.getElementById("login").style.display = "none";
             document.getElementById("mainUI").style.display = "block";
             document.getElementById("setBtn").style.display = "block";

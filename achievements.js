@@ -8,36 +8,7 @@ export const ACHIEVEMENT_LIB = {
     WORD_BOMB_10:   { name: "Word Master", icon: "💣", desc: "Survived 10 Rounds" }
 };
 
-// 2. CSS INJECTION (The Minecraft Vibe)
-const style = document.createElement('style');
-style.textContent = `
-    #ach-popup {
-        position: fixed; 
-        top: -150px; 
-        right: 20px;
-        background: #212121; 
-        border: 4px solid #000;
-        padding: 12px 24px; 
-        display: flex !important; 
-        align-items: center; 
-        gap: 16px;
-        font-family: 'Courier New', Courier, monospace; 
-        z-index: 999999 !important; 
-        transition: 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
-        pointer-events: none;
-    }
-    #ach-popup.show { 
-        top: 20px; 
-    }
-    .ach-icon { font-size: 32px; }
-    .ach-content { display: flex; flex-direction: column; }
-    .ach-title { color: #ffff55; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; line-height: 1; }
-    .ach-name { color: #ffffff; font-size: 18px; font-weight: bold; line-height: 1; }
-`;
-document.head.appendChild(style);
-
-// 3. THE LOGIC (Saves to Firebase + Shows Popup + Plays Sound)
+// 2. THE LOGIC
 export async function unlockAchievement(uid, achId) {
     const ach = ACHIEVEMENT_LIB[achId];
     if (!ach || !uid) return;
@@ -46,15 +17,12 @@ export async function unlockAchievement(uid, achId) {
         const db = getDatabase();
         const achRef = ref(db, `users/${uid}/Achievements/${achId}`);
 
-        // Check if already unlocked to prevent spamming
         const snapshot = await get(achRef);
         if (!snapshot.exists()) {
-            // 1. Save to Firebase
             await update(ref(db, `users/${uid}/Achievements`), {
                 [achId]: true
             });
 
-            // 2. Show visual popup and play sound
             showPopup(ach);
             console.log(`🏆 Achievement Unlocked: ${ach.name}`);
         }
@@ -64,11 +32,44 @@ export async function unlockAchievement(uid, achId) {
 }
 
 function showPopup(ach) {
-    // Play Achievement Sound
-    const achSound = new Audio('./Sounds/achievement.mp3');
-    achSound.volume = 0.5;
-    achSound.play().catch(e => console.log("Audio play blocked until user interacts with page."));
+    // --- 1. FORCE INJECT CSS (If not already there) ---
+    if (!document.getElementById('ach-style')) {
+        const style = document.createElement('style');
+        style.id = 'ach-style';
+        style.textContent = `
+            #ach-popup {
+                position: fixed !important;
+                top: -150px;
+                right: 20px;
+                background: #212121 !important;
+                border: 4px solid #000 !important;
+                padding: 12px 24px !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 16px !important;
+                font-family: 'Courier New', Courier, monospace !important;
+                z-index: 2147483647 !important; /* Max possible z-index */
+                transition: 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+                pointer-events: none;
+            }
+            #ach-popup.show { top: 20px !important; }
+            .ach-icon { font-size: 32px !important; }
+            .ach-content { display: flex !important; flex-direction: column !important; }
+            .ach-title { color: #ffff55 !important; font-size: 11px !important; font-weight: bold !important; text-transform: uppercase !important; margin: 0 !important; }
+            .ach-name { color: #ffffff !important; font-size: 18px !important; font-weight: bold !important; margin: 0 !important; }
+        `;
+        document.head.appendChild(style);
+    }
 
+    // --- 2. HANDLE SOUND ---
+    // Try absolute path if relative fails
+    const audioPath = './Sounds/achievement.mp3';
+    const achSound = new Audio(audioPath);
+    achSound.volume = 0.6;
+    achSound.play().catch(e => console.warn("Audio blocked: User must click page first."));
+
+    // --- 3. HANDLE HTML ---
     let popup = document.getElementById('ach-popup');
     if (!popup) {
         popup = document.createElement('div');
@@ -84,12 +85,10 @@ function showPopup(ach) {
         </div>
     `;
 
-    // Slide in
-    setTimeout(() => {
-        popup.classList.add('show');
-    }, 100);
-
-    // Slide out after 5 seconds
+    // Trigger animation
+    setTimeout(() => popup.classList.add('show'), 100);
+    
+    // Remove after 5s
     setTimeout(() => {
         popup.classList.remove('show');
     }, 5000);
