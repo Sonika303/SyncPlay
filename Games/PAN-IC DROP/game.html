@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAN-IC DROP: ELITE CHEF</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        canvas { background: #d2b48c; border: 8px solid #3e2723; box-shadow: 0 0 50px rgba(0,0,0,1); cursor: none; }
+        #ui { position: absolute; top: 10px; color: #fff; text-shadow: 2px 2px #000; pointer-events: none; text-align: center; z-index: 100; }
+        #warning-label { position: absolute; bottom: 60px; color: #ffeb3b; font-size: 24px; text-transform: uppercase; opacity: 0; transition: 0.2s; }
+        #dash-ui { position: absolute; bottom: 20px; width: 200px; height: 10px; background: #333; border: 2px solid #fff; border-radius: 5px; }
+        #dash-bar { width: 0%; height: 100%; background: #fff; box-shadow: 0 0 10px #fff; transition: width 0.1s; }
+        .show-warning { opacity: 1 !important; transform: scale(1.2); }
+        .multiplier { color: #00ff00; font-size: 1.5em; }
+        .shake { animation: shake 0.2s; }
+        @keyframes shake { 0% { transform: translate(5px, 5px); } 50% { transform: translate(-5px, -5px); } 100% { transform: translate(0,0); } }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>PAN-IC DROP</h1>
+        <h2>SCORE: <span id="score">0</span> <span id="mult" class="multiplier"></span></h2>
+        <h3>DIFF: <span id="diff">1.0</span>x</h3>
+    </div>
+    <div id="warning-label">DISASTER INCOMING!</div>
+    <div id="dash-ui"><div id="dash-bar"></div></div>
+    <canvas id="gameCanvas"></canvas>
+    
+    <script src="disasters.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
