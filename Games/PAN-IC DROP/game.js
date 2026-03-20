@@ -44,7 +44,8 @@ function createChef(id, name, index) {
         radius: 18, baseSpeed: 1.2, vx: 0, vy: 0,
         friction: 0.82, facing: 1, dashCharge: 100,
         name: name, color: colors[index % colors.length],
-        remoteInput: { x: 0, y: 0, dash: false }
+        remoteInput: { x: 0, y: 0, dash: false },
+        lastDashState: false // Track button state to prevent spam
     };
 }
 
@@ -52,7 +53,7 @@ let critic = { x: -50, y: 400, active: false, speed: 1.5 };
 const items = [];
 const hazards = [];
 
-// --- CONNECTION LOGIC (FIXED FOR SEPARATE CHARACTERS) ---
+// --- CONNECTION LOGIC ---
 if (partyCode) {
     onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
         if (snapshot.exists()) {
@@ -66,23 +67,26 @@ if (partyCode) {
 
             playerIds.forEach((id, index) => {
                 if (!chefs[id]) {
-                    let cleanName = playersData[id].name ? playersData[id].name.split(' ')[0].toUpperCase() : "CHEF";
-                    chefs[id] = createChef(id, cleanName, index);
+                    let cleanName = playersData[id].name || "CHEF";
+                    chefs[id] = createChef(id, cleanName.toUpperCase(), index);
                 }
 
                 const pData = playersData[id];
                 if (pData.inputs) {
-                    // Trigger dash for specific chef
-                    if (pData.inputs.dash && chefs[id].dashCharge >= 100) {
-                        chefs[id].vx *= 6; chefs[id].vy *= 6;
+                    // Optimized Dash Trigger: Only dash if dash was FALSE and is now TRUE
+                    if (pData.inputs.dash && !chefs[id].lastDashState && chefs[id].dashCharge >= 100) {
+                        chefs[id].vx *= 6; 
+                        chefs[id].vy *= 6;
                         chefs[id].dashCharge = 0;
                         canvas.classList.add('shake');
                         setTimeout(() => canvas.classList.remove('shake'), 100);
                     }
+                    chefs[id].lastDashState = pData.inputs.dash;
                     chefs[id].remoteInput = pData.inputs;
                 }
             });
 
+            // Cleanup disconnected chefs
             Object.keys(chefs).forEach(id => { if (!playersData[id]) delete chefs[id]; });
         }
     });
@@ -123,17 +127,16 @@ function update(time) {
     if (slowMoTimer > 0) { slowMoTimer--; timeScale = 0.4; } else { timeScale = 1; }
     if (magnetTimer > 0) magnetTimer--;
 
-    // Update Every Chef
     Object.values(chefs).forEach(p => {
         if (p.dashCharge < 100) p.dashCharge += 0.8;
         
         let f = p.friction;
         hazards.forEach(h => { if (Math.hypot(p.x - h.x, p.y - h.y) < h.r) f = 0.98; });
 
-        let moveX = p.remoteInput.x;
-        let moveY = p.remoteInput.y;
+        let moveX = p.remoteInput.x || 0;
+        let moveY = p.remoteInput.y || 0;
 
-        // Add keyboard support to the first chef for testing
+        // Keyboard Support for Chef 1
         if (p === Object.values(chefs)[0]) {
             if (keys.w) moveY -= 1; if (keys.s) moveY += 1;
             if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
@@ -149,7 +152,6 @@ function update(time) {
 
         if (p.vx < -0.1) p.facing = -1; if (p.vx > 0.1) p.facing = 1;
 
-        // Power-up Logic for each player
         if (typeof DisasterSystem !== 'undefined') {
             DisasterSystem.soaps.forEach((s, i) => {
                 if (Math.hypot(p.x - s.x, p.y - s.y) < 30) DisasterSystem.soaps.splice(i, 1);
@@ -165,7 +167,6 @@ function update(time) {
             if (DisasterSystem.hotTile.active && p.x > DisasterSystem.hotTile.x && p.x < DisasterSystem.hotTile.x + 50 && p.y > DisasterSystem.hotTile.y && p.y < DisasterSystem.hotTile.y + 50) die(p.name + " BURNED!");
         }
 
-        // Critic Logic
         if (critic.active && Math.hypot(p.x - critic.x, p.y - critic.y) < 30) { 
             score = Math.max(0, score-5); critic.active = false; 
         }
@@ -178,7 +179,6 @@ function update(time) {
     }
 
     if (typeof DisasterSystem !== 'undefined') DisasterSystem.triggerRandom(time);
-
     if (time - lastSpawn > Math.max(150, 1100 - (score * 10))) { spawnItem(); lastSpawn = time; }
 
     render(time);
@@ -212,7 +212,6 @@ function render(time) {
                 setTimeout(() => canvas.classList.remove('shake'), 200);
             }
             
-            // CHECK COLLISION FOR ALL
             Object.values(chefs).forEach(p => {
                 if (Math.hypot(p.x - item.targetX, p.y - item.targetY) < item.radius) die(p.name + " BONKED!");
             });

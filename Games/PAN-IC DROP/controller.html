@@ -18,21 +18,31 @@
             user-select: none;
         }
 
+        #status-container {
+            position: absolute; top: 30px;
+            text-align: center;
+        }
+
         #status {
-            position: absolute; top: 20px;
-            font-size: 14px; color: #6c5ce7;
+            font-size: 12px; color: #6c5ce7;
             text-transform: uppercase; letter-spacing: 2px;
-            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #chef-name {
+            font-size: 24px; color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
 
         #dashBtn {
             position: absolute; bottom: 50px; right: 30px;
-            width: 90px; height: 90px;
+            width: 100px; height: 100px;
             background: #ff7675; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 8px 0 #d63031;
             transition: transform 0.05s, box-shadow 0.05s;
             cursor: pointer;
+            z-index: 10;
         }
 
         #dashBtn:active { 
@@ -42,7 +52,7 @@
         }
 
         #joystickContainer {
-            width: 220px; height: 220px;
+            width: 240px; height: 240px;
             background: rgba(255,255,255,0.03);
             border: 4px solid rgba(255,255,255,0.1);
             border-radius: 50%;
@@ -52,7 +62,7 @@
         }
 
         #joystickKnob {
-            width: 80px; height: 80px;
+            width: 90px; height: 90px;
             background: #6c5ce7; border-radius: 50%;
             position: absolute;
             box-shadow: 0 0 30px rgba(108, 92, 231, 0.4);
@@ -62,7 +72,7 @@
 
         .instruction {
             margin-top: 40px; color: #636e72;
-            font-size: 12px; text-align: center;
+            font-size: 11px; text-align: center;
             line-height: 1.6;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -71,17 +81,20 @@
 </head>
 <body>
 
-    <div id="status">INITIALIZING...</div>
+    <div id="status-container">
+        <div id="status">INITIALIZING...</div>
+        <div id="chef-name">CHEF ???</div>
+    </div>
 
     <div id="joystickContainer">
         <div id="joystickKnob"></div>
     </div>
 
     <div id="dashBtn">
-        <i data-lucide="zap" color="white" size="40"></i>
+        <i data-lucide="zap" color="white" size="45"></i>
     </div>
 
-    <div class="instruction">DRAG CENTER TO MOVE<br>TAP BUTTON TO DASH</div>
+    <div class="instruction">DRAG JOYSTICK TO MOVE<br>SMASH BUTTON TO DASH</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -103,58 +116,56 @@
     const urlParams = new URLSearchParams(window.location.search);
     const partyCode = urlParams.get('code');
     const statusEl = document.getElementById('status');
+    const nameEl = document.getElementById('chef-name');
     
-    // --- UNIQUE SESSION ID LOGIC ---
-    // Generate an ID if it doesn't exist, store it so refreshes don't create new players
     let userId = localStorage.getItem('syncplay_chef_id');
     if (!userId) {
-        userId = 'chef_' + Math.random().toString(36).substr(2, 9);
+        userId = 'chef_' + Math.random().toString(36).substr(2, 6);
         localStorage.setItem('syncplay_chef_id', userId);
     }
 
-    // Initialize Connection
+    const myName = "CHEF " + userId.split('_')[1].toUpperCase();
+    nameEl.innerText = myName;
+
+    // --- CONNECTION ---
     if (partyCode) {
-        statusEl.innerText = "CHEF CONNECTED";
+        statusEl.innerText = "CONNECTED TO " + partyCode;
         const playerRef = ref(db, `parties/${partyCode}/players/${userId}`);
         
-        // Use SET to initialize, then UPDATE for inputs
         set(playerRef, {
-            name: "CHEF " + userId.split('_')[1].toUpperCase(),
-            inputs: { x: 0, y: 0, dash: false, ts: Date.now() }
+            name: myName,
+            inputs: { x: 0, y: 0, dash: false }
         });
 
-        // Clean up when leaving
         onDisconnect(playerRef).remove();
     } else {
-        statusEl.innerText = "MISSING ROOM CODE";
+        statusEl.innerText = "ERROR: NO CODE";
     }
 
-    let lastSent = 0;
-    const sendInputs = (x, y, dash = false) => {
-        if (!partyCode) return;
-        
-        const now = Date.now();
-        // Throttle updates (50ms) to keep things smooth without lag
-        if (now - lastSent < 50 && !dash && (x !== 0 || y !== 0)) return;
-        lastSent = now;
+    // --- INPUT SENDING ---
+    let currentX = 0;
+    let currentY = 0;
+    let isDashing = false;
 
+    const sendInputs = () => {
+        if (!partyCode) return;
         update(ref(db, `parties/${partyCode}/players/${userId}/inputs`), {
-            x: Number(x.toFixed(2)),
-            y: Number(y.toFixed(2)),
-            dash: dash,
-            ts: now
+            x: Number(currentX.toFixed(2)),
+            y: Number(currentY.toFixed(2)),
+            dash: isDashing
         });
     };
+
+    // Heartbeat loop for smooth movement (30fps)
+    setInterval(sendInputs, 33);
 
     // --- JOYSTICK LOGIC ---
     const knob = document.getElementById('joystickKnob');
     const container = document.getElementById('joystickContainer');
     let dragging = false;
 
-    const handleInput = (e) => {
+    const moveJoystick = (e) => {
         if (!dragging) return;
-        if (e.cancelable) e.preventDefault();
-        
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         
@@ -162,47 +173,49 @@
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        let dx = clientX - centerX;
-        let dy = clientY - centerY;
+        const dx = clientX - centerX;
+        const dy = clientY - centerY;
         
         const maxRadius = 80;
         const distance = Math.min(Math.hypot(dx, dy), maxRadius);
         const angle = Math.atan2(dy, dx);
         
-        const moveX = Math.cos(angle) * distance;
-        const moveY = Math.sin(angle) * distance;
+        const visualX = Math.cos(angle) * distance;
+        const visualY = Math.sin(angle) * distance;
         
-        knob.style.transition = 'none';
-        knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+        knob.style.transform = `translate(${visualX}px, ${visualY}px)`;
         
-        sendInputs(moveX / maxRadius, moveY / maxRadius);
+        // Update values for the interval loop
+        currentX = visualX / maxRadius;
+        currentY = visualY / maxRadius;
     };
 
-    const startInput = (e) => { dragging = true; handleInput(e); };
-    const endInput = () => { 
-        dragging = false; 
-        knob.style.transition = 'transform 0.2s ease-out';
+    container.addEventListener('touchstart', (e) => { dragging = true; moveJoystick(e); });
+    container.addEventListener('mousedown', (e) => { dragging = true; moveJoystick(e); });
+    
+    window.addEventListener('touchmove', moveJoystick, { passive: false });
+    window.addEventListener('mousemove', moveJoystick);
+    
+    const resetJoystick = () => {
+        dragging = false;
         knob.style.transform = `translate(0px, 0px)`;
-        sendInputs(0, 0); 
+        currentX = 0;
+        currentY = 0;
     };
 
-    container.addEventListener('touchstart', startInput);
-    container.addEventListener('mousedown', startInput);
-    window.addEventListener('touchmove', handleInput, { passive: false });
-    window.addEventListener('mousemove', handleInput);
-    window.addEventListener('touchend', endInput);
-    window.addEventListener('mouseup', endInput);
+    window.addEventListener('touchend', resetJoystick);
+    window.addEventListener('mouseup', resetJoystick);
 
     // --- DASH BUTTON ---
     const dashBtn = document.getElementById('dashBtn');
-    const triggerDash = (e) => {
-        if (e.cancelable) e.preventDefault();
-        sendInputs(0, 0, true);
-        setTimeout(() => sendInputs(0, 0, false), 150);
-    };
-
-    dashBtn.addEventListener('touchstart', triggerDash);
-    dashBtn.addEventListener('mousedown', triggerDash);
+    dashBtn.addEventListener('touchstart', (e) => {
+        isDashing = true;
+        setTimeout(() => { isDashing = false; }, 100);
+    });
+    dashBtn.addEventListener('mousedown', (e) => {
+        isDashing = true;
+        setTimeout(() => { isDashing = false; }, 100);
+    });
 
     lucide.createIcons();
 </script>
