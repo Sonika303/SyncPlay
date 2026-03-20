@@ -208,7 +208,14 @@
         <p style="color: #636e72; margin: 0 0 30px 0;">Select a game module to deploy to your connected players.</p>
 
         <div class="game-grid">
-            <div class="game-card active" onclick="selectGame('SNAKE!', this)">
+            <div class="game-card active" onclick="selectGame('PAN-IC DROP', this)">
+                <div class="selected-badge">ACTIVE</div>
+                <div class="icon" style="background: #e67e22;"><i data-lucide="utensils"></i></div>
+                <h3>PAN-IC DROP</h3>
+                <p>Avoid the kitchen disasters! Dodge falling objects and survive the mayhem.</p>
+            </div>
+
+            <div class="game-card" onclick="selectGame('SNAKE!', this)">
                 <div class="selected-badge">ACTIVE</div>
                 <div class="icon" style="background: #00b894;"><i data-lucide="box"></i></div>
                 <h3>SNAKE!</h3>
@@ -221,12 +228,6 @@
                 <h3>Word Bomb</h3>
                 <p>A frantic vocabulary battle. Think fast before the fuse runs out.</p>
             </div>
-            
-            <div class="game-card" style="opacity: 0.6; cursor: default;">
-                <div class="icon" style="background: #b2bec3;"><i data-lucide="lock"></i></div>
-                <h3>More Coming...</h3>
-                <p>New game modules are currently being developed for SyncPlay.</p>
-            </div>
         </div>
     </div>
 </div>
@@ -234,8 +235,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue, remove, serverTimestamp, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    // Achievement Logic
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { unlockAchievement } from "./achievements.js";
 
     const firebaseConfig = {
@@ -254,7 +254,7 @@
 
     let partyCode;
     let currentUser;
-    let selectedGame = "SNAKE!";
+    let selectedGame = "PAN-IC DROP";
     let knownPlayers = new Set(); 
 
     onAuthStateChanged(auth, (user) => {
@@ -263,11 +263,12 @@
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             if(code) rejoinLobby(code);
+        } else {
+            signInAnonymously(auth);
         }
     });
 
     window.selectGame = (game, el) => {
-        if (game === "locked") return;
         selectedGame = game;
         document.querySelectorAll('.game-card').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
@@ -345,7 +346,7 @@
         startBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> DEPLOYING...`;
         lucide.createIcons();
 
-        // Standardized pathing: ensures redirect works for both folders
+        // Pathing for Games folder
         const controllerPath = `Games/${selectedGame}/controller.html`;
         
         await update(ref(db, `parties/${partyCode}`), { 
@@ -357,7 +358,6 @@
             }
         });
 
-        // Delay to allow database to sync before host redirects
         setTimeout(() => {
             window.location.href = `Games/${selectedGame}/game.html?code=${partyCode}`;
         }, 1500);

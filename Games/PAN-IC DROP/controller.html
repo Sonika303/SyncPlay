@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chef Controller | SyncPlay</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap');
+
+        body {
+            margin: 0; padding: 0; height: 100vh;
+            background: #1a1a1a; color: white;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            overflow: hidden; touch-action: none;
+        }
+
+        #status {
+            position: absolute; top: 20px;
+            font-size: 14px; color: #6c5ce7;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+
+        #dashBtn {
+            position: absolute; bottom: 50px; right: 30px;
+            width: 80px; height: 80px;
+            background: #ff7675; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 8px 0 #d63031;
+            transition: 0.1s;
+        }
+
+        #dashBtn:active { transform: translateY(4px); box-shadow: 0 4px 0 #d63031; background: #ff4757; }
+
+        #joystickContainer {
+            width: 220px; height: 220px;
+            background: rgba(255,255,255,0.05);
+            border: 4px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+
+        #joystickKnob {
+            width: 90px; height: 90px;
+            background: #6c5ce7; border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 30px rgba(108, 92, 231, 0.4);
+            pointer-events: none;
+        }
+
+        .instruction {
+            margin-top: 40px; color: #636e72;
+            font-size: 12px; text-align: center;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">Syncing Chef...</div>
+
+    <div id="joystickContainer">
+        <div id="joystickKnob"></div>
+    </div>
+
+    <div id="dashBtn">
+        <i data-lucide="zap" color="white" size="36"></i>
+    </div>
+
+    <div class="instruction">DRAG TO MOVE<br>TAP THUNDER TO DASH</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
+        authDomain: "syncplay-17b6e.firebaseapp.com",
+        databaseURL: "https://syncplay-17b6e-default-rtdb.firebaseio.com",
+        projectId: "syncplay-17b6e",
+        storageBucket: "syncplay-17b6e.firebasestorage.app",
+        messagingSenderId: "86016195929",
+        appId: "1:86016195929:web:40262a28786f2ead712048"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const partyCode = urlParams.get('code');
+    let userId = null;
+    let lastSent = 0;
+
+    // Sign in to get a UID
+    signInAnonymously(auth).catch(console.error);
+
+    onAuthStateChanged(auth, (user) => {
+        if (user && partyCode) {
+            userId = user.uid;
+            document.getElementById('status').innerText = "Chef Connected";
+            
+            // Clean up inputs if player leaves
+            onDisconnect(ref(db, `parties/${partyCode}/players/${userId}/inputs`)).remove();
+        }
+    });
+
+    const sendInputs = (x, y, dash = false) => {
+        if (!userId || !partyCode) return;
+        
+        // Throttling: Only send every 50ms unless it's a dash or a "stop" (0,0)
+        const now = Date.now();
+        if (now - lastSent < 50 && !dash && (x !== 0 || y !== 0)) return;
+        lastSent = now;
+
+        update(ref(db, `parties/${partyCode}/players/${userId}/inputs`), {
+            x: parseFloat(x.toFixed(2)),
+            y: parseFloat(y.toFixed(2)),
+            dash: dash,
+            ts: now
+        });
+    };
+
+    // Joystick Logic
+    const knob = document.getElementById('joystickKnob');
+    const container = document.getElementById('joystickContainer');
+    let dragging = false;
+
+    const handleMove = (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        
+        const maxRadius = 70;
+        const distance = Math.min(Math.hypot(dx, dy), maxRadius);
+        const angle = Math.atan2(dy, dx);
+        
+        const moveX = Math.cos(angle) * distance;
+        const moveY = Math.sin(angle) * distance;
+        
+        knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+        
+        // Normalize for game logic (-1 to 1)
+        sendInputs(moveX / maxRadius, moveY / maxRadius);
+    };
+
+    container.addEventListener('touchstart', (e) => { dragging = true; handleMove(e); });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', () => { 
+        dragging = false; 
+        knob.style.transform = `translate(0px, 0px)`;
+        sendInputs(0, 0); 
+    });
+
+    // Dash Button Logic
+    document.getElementById('dashBtn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        // Send a burst
+        sendInputs(0, 0, true);
+        setTimeout(() => sendInputs(0, 0, false), 150);
+    });
+
+    lucide.createIcons();
+</script>
+</body>
+</html>
