@@ -85,8 +85,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, update, set, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, update, onDisconnect, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCODp3h025sM3jl7Ji0GJgVuGoWCD1wddU",
@@ -100,44 +99,42 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const auth = getAuth(app);
 
     const urlParams = new URLSearchParams(window.location.search);
     const partyCode = urlParams.get('code');
     const statusEl = document.getElementById('status');
     
-    let userId = null;
+    // --- UNIQUE SESSION ID LOGIC ---
+    // Generate an ID if it doesn't exist, store it so refreshes don't create new players
+    let userId = localStorage.getItem('syncplay_chef_id');
+    if (!userId) {
+        userId = 'chef_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('syncplay_chef_id', userId);
+    }
+
+    // Initialize Connection
+    if (partyCode) {
+        statusEl.innerText = "CHEF CONNECTED";
+        const playerRef = ref(db, `parties/${partyCode}/players/${userId}`);
+        
+        // Use SET to initialize, then UPDATE for inputs
+        set(playerRef, {
+            name: "CHEF " + userId.split('_')[1].toUpperCase(),
+            inputs: { x: 0, y: 0, dash: false, ts: Date.now() }
+        });
+
+        // Clean up when leaving
+        onDisconnect(playerRef).remove();
+    } else {
+        statusEl.innerText = "MISSING ROOM CODE";
+    }
+
     let lastSent = 0;
-
-    // Sign in and set up player slot
-    signInAnonymously(auth).catch(err => {
-        statusEl.innerText = "AUTH ERROR";
-        console.error(err);
-    });
-
-    onAuthStateChanged(auth, (user) => {
-        if (user && partyCode) {
-            userId = user.uid;
-            statusEl.innerText = "CHEF CONNECTED";
-            
-            // Initial data structure to ensure game sees the player
-            set(ref(db, `parties/${partyCode}/players/${userId}`), {
-                name: "Chef " + userId.substring(0,4),
-                inputs: { x: 0, y: 0, dash: false, ts: Date.now() }
-            });
-
-            // Auto-remove on disconnect
-            onDisconnect(ref(db, `parties/${partyCode}/players/${userId}`)).remove();
-        } else if (!partyCode) {
-            statusEl.innerText = "MISSING PARTY CODE";
-        }
-    });
-
     const sendInputs = (x, y, dash = false) => {
-        if (!userId || !partyCode) return;
+        if (!partyCode) return;
         
         const now = Date.now();
-        // Throttle to avoid Firebase lag (50ms)
+        // Throttle updates (50ms) to keep things smooth without lag
         if (now - lastSent < 50 && !dash && (x !== 0 || y !== 0)) return;
         lastSent = now;
 
@@ -149,7 +146,7 @@
         });
     };
 
-    // Joystick Logic
+    // --- JOYSTICK LOGIC ---
     const knob = document.getElementById('joystickKnob');
     const container = document.getElementById('joystickContainer');
     let dragging = false;
@@ -189,23 +186,19 @@
         sendInputs(0, 0); 
     };
 
-    // Listeners for both Touch and Mouse
     container.addEventListener('touchstart', startInput);
     container.addEventListener('mousedown', startInput);
-    
     window.addEventListener('touchmove', handleInput, { passive: false });
     window.addEventListener('mousemove', handleInput);
-    
     window.addEventListener('touchend', endInput);
     window.addEventListener('mouseup', endInput);
 
-    // Dash Button Logic
+    // --- DASH BUTTON ---
     const dashBtn = document.getElementById('dashBtn');
     const triggerDash = (e) => {
         if (e.cancelable) e.preventDefault();
         sendInputs(0, 0, true);
-        // Instant reset so the game logic sees it as a "click"
-        setTimeout(() => sendInputs(0, 0, false), 100);
+        setTimeout(() => sendInputs(0, 0, false), 150);
     };
 
     dashBtn.addEventListener('touchstart', triggerDash);
