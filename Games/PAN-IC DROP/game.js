@@ -23,7 +23,6 @@ const statusEl = document.getElementById('conn-status');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
-const dashBar = document.getElementById('dash-bar');
 
 canvas.width = 600; canvas.height = 600;
 let score = 0;
@@ -45,7 +44,8 @@ function createChef(id, name, index) {
         friction: 0.82, facing: 1, dashCharge: 100,
         name: name, color: colors[index % colors.length],
         remoteInput: { x: 0, y: 0, dash: false },
-        lastDashState: false // Track button state to prevent spam
+        lastDashState: false,
+        lastActive: Date.now() // Track for duplicate cleanup
     };
 }
 
@@ -53,27 +53,26 @@ let critic = { x: -50, y: 400, active: false, speed: 1.5 };
 const items = [];
 const hazards = [];
 
-// --- CONNECTION LOGIC ---
+// --- CONNECTION LOGIC (WITH ANTI-DUPLICATE FIX) ---
 if (partyCode) {
     onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
         if (snapshot.exists()) {
             const playersData = snapshot.val();
             const playerIds = Object.keys(playersData);
-
-            if (statusEl) {
-                statusEl.innerText = `${playerIds.length} CHEFS CONNECTED`;
-                statusEl.style.color = "#00ff00";
-            }
+            const now = Date.now();
 
             playerIds.forEach((id, index) => {
-                if (!chefs[id]) {
-                    let cleanName = playersData[id].name || "CHEF";
-                    chefs[id] = createChef(id, cleanName.toUpperCase(), index);
-                }
-
                 const pData = playersData[id];
+                
+                // Only process players who have sent an input object
                 if (pData.inputs) {
-                    // Optimized Dash Trigger: Only dash if dash was FALSE and is now TRUE
+                    // 1. Create Chef if they don't exist
+                    if (!chefs[id]) {
+                        let cleanName = pData.name || "CHEF";
+                        chefs[id] = createChef(id, cleanName.toUpperCase(), index);
+                    }
+
+                    // 2. Update Input and Activity Timestamp
                     if (pData.inputs.dash && !chefs[id].lastDashState && chefs[id].dashCharge >= 100) {
                         chefs[id].vx *= 6; 
                         chefs[id].vy *= 6;
@@ -81,13 +80,25 @@ if (partyCode) {
                         canvas.classList.add('shake');
                         setTimeout(() => canvas.classList.remove('shake'), 100);
                     }
+                    
                     chefs[id].lastDashState = pData.inputs.dash;
                     chefs[id].remoteInput = pData.inputs;
+                    chefs[id].lastActive = now; // Refresh their life on screen
                 }
             });
 
-            // Cleanup disconnected chefs
-            Object.keys(chefs).forEach(id => { if (!playersData[id]) delete chefs[id]; });
+            // 3. HARD CLEANUP: Remove chefs not in Firebase OR haven't moved in 3 seconds
+            Object.keys(chefs).forEach(id => {
+                const isStale = (now - chefs[id].lastActive) > 3000;
+                if (!playersData[id] || isStale) {
+                    delete chefs[id];
+                }
+            });
+
+            if (statusEl) {
+                statusEl.innerText = `${Object.keys(chefs).length} CHEFS ACTIVE`;
+                statusEl.style.color = "#00ff00";
+            }
         }
     });
 }
@@ -136,7 +147,7 @@ function update(time) {
         let moveX = p.remoteInput.x || 0;
         let moveY = p.remoteInput.y || 0;
 
-        // Keyboard Support for Chef 1
+        // Keyboard Support for the very first active chef
         if (p === Object.values(chefs)[0]) {
             if (keys.w) moveY -= 1; if (keys.s) moveY += 1;
             if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
