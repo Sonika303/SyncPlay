@@ -15,66 +15,77 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             overflow: hidden; touch-action: none;
+            user-select: none;
         }
 
         #status {
             position: absolute; top: 20px;
             font-size: 14px; color: #6c5ce7;
             text-transform: uppercase; letter-spacing: 2px;
+            font-weight: bold;
         }
 
         #dashBtn {
             position: absolute; bottom: 50px; right: 30px;
-            width: 80px; height: 80px;
+            width: 90px; height: 90px;
             background: #ff7675; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 8px 0 #d63031;
-            transition: 0.1s;
+            transition: transform 0.05s, box-shadow 0.05s;
+            cursor: pointer;
         }
 
-        #dashBtn:active { transform: translateY(4px); box-shadow: 0 4px 0 #d63031; background: #ff4757; }
+        #dashBtn:active { 
+            transform: translateY(4px); 
+            box-shadow: 0 4px 0 #d63031; 
+            background: #ff4757; 
+        }
 
         #joystickContainer {
             width: 220px; height: 220px;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.03);
             border: 4px solid rgba(255,255,255,0.1);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             position: relative;
+            touch-action: none;
         }
 
         #joystickKnob {
-            width: 90px; height: 90px;
+            width: 80px; height: 80px;
             background: #6c5ce7; border-radius: 50%;
             position: absolute;
             box-shadow: 0 0 30px rgba(108, 92, 231, 0.4);
             pointer-events: none;
+            transition: transform 0.1s ease-out;
         }
 
         .instruction {
             margin-top: 40px; color: #636e72;
             font-size: 12px; text-align: center;
             line-height: 1.6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
     </style>
 </head>
 <body>
 
-    <div id="status">Syncing Chef...</div>
+    <div id="status">INITIALIZING...</div>
 
     <div id="joystickContainer">
         <div id="joystickKnob"></div>
     </div>
 
     <div id="dashBtn">
-        <i data-lucide="zap" color="white" size="36"></i>
+        <i data-lucide="zap" color="white" size="40"></i>
     </div>
 
-    <div class="instruction">DRAG TO MOVE<br>TAP THUNDER TO DASH</div>
+    <div class="instruction">DRAG CENTER TO MOVE<br>TAP BUTTON TO DASH</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, update, set, onDisconnect } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -93,33 +104,46 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const partyCode = urlParams.get('code');
+    const statusEl = document.getElementById('status');
+    
     let userId = null;
     let lastSent = 0;
 
-    // Sign in to get a UID
-    signInAnonymously(auth).catch(console.error);
+    // Sign in and set up player slot
+    signInAnonymously(auth).catch(err => {
+        statusEl.innerText = "AUTH ERROR";
+        console.error(err);
+    });
 
     onAuthStateChanged(auth, (user) => {
         if (user && partyCode) {
             userId = user.uid;
-            document.getElementById('status').innerText = "Chef Connected";
+            statusEl.innerText = "CHEF CONNECTED";
             
-            // Clean up inputs if player leaves
-            onDisconnect(ref(db, `parties/${partyCode}/players/${userId}/inputs`)).remove();
+            // Initial data structure to ensure game sees the player
+            set(ref(db, `parties/${partyCode}/players/${userId}`), {
+                name: "Chef " + userId.substring(0,4),
+                inputs: { x: 0, y: 0, dash: false, ts: Date.now() }
+            });
+
+            // Auto-remove on disconnect
+            onDisconnect(ref(db, `parties/${partyCode}/players/${userId}`)).remove();
+        } else if (!partyCode) {
+            statusEl.innerText = "MISSING PARTY CODE";
         }
     });
 
     const sendInputs = (x, y, dash = false) => {
         if (!userId || !partyCode) return;
         
-        // Throttling: Only send every 50ms unless it's a dash or a "stop" (0,0)
         const now = Date.now();
+        // Throttle to avoid Firebase lag (50ms)
         if (now - lastSent < 50 && !dash && (x !== 0 || y !== 0)) return;
         lastSent = now;
 
         update(ref(db, `parties/${partyCode}/players/${userId}/inputs`), {
-            x: parseFloat(x.toFixed(2)),
-            y: parseFloat(y.toFixed(2)),
+            x: Number(x.toFixed(2)),
+            y: Number(y.toFixed(2)),
             dash: dash,
             ts: now
         });
@@ -130,46 +154,62 @@
     const container = document.getElementById('joystickContainer');
     let dragging = false;
 
-    const handleMove = (e) => {
+    const handleInput = (e) => {
         if (!dragging) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         
-        const touch = e.touches ? e.touches[0] : e;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
         const rect = container.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        let dx = touch.clientX - centerX;
-        let dy = touch.clientY - centerY;
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
         
-        const maxRadius = 70;
+        const maxRadius = 80;
         const distance = Math.min(Math.hypot(dx, dy), maxRadius);
         const angle = Math.atan2(dy, dx);
         
         const moveX = Math.cos(angle) * distance;
         const moveY = Math.sin(angle) * distance;
         
+        knob.style.transition = 'none';
         knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
         
-        // Normalize for game logic (-1 to 1)
         sendInputs(moveX / maxRadius, moveY / maxRadius);
     };
 
-    container.addEventListener('touchstart', (e) => { dragging = true; handleMove(e); });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', () => { 
+    const startInput = (e) => { dragging = true; handleInput(e); };
+    const endInput = () => { 
         dragging = false; 
+        knob.style.transition = 'transform 0.2s ease-out';
         knob.style.transform = `translate(0px, 0px)`;
         sendInputs(0, 0); 
-    });
+    };
+
+    // Listeners for both Touch and Mouse
+    container.addEventListener('touchstart', startInput);
+    container.addEventListener('mousedown', startInput);
+    
+    window.addEventListener('touchmove', handleInput, { passive: false });
+    window.addEventListener('mousemove', handleInput);
+    
+    window.addEventListener('touchend', endInput);
+    window.addEventListener('mouseup', endInput);
 
     // Dash Button Logic
-    document.getElementById('dashBtn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        // Send a burst
+    const dashBtn = document.getElementById('dashBtn');
+    const triggerDash = (e) => {
+        if (e.cancelable) e.preventDefault();
         sendInputs(0, 0, true);
-        setTimeout(() => sendInputs(0, 0, false), 150);
-    });
+        // Instant reset so the game logic sees it as a "click"
+        setTimeout(() => sendInputs(0, 0, false), 100);
+    };
+
+    dashBtn.addEventListener('touchstart', triggerDash);
+    dashBtn.addEventListener('mousedown', triggerDash);
 
     lucide.createIcons();
 </script>
