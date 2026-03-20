@@ -23,8 +23,6 @@ const statusEl = document.getElementById('conn-status');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
-const diffEl = document.getElementById('diff');
-const multEl = document.getElementById('mult');
 const dashBar = document.getElementById('dash-bar');
 
 canvas.width = 600; canvas.height = 600;
@@ -36,69 +34,67 @@ let multiplier = 1;
 let magnetTimer = 0;
 let slowMoTimer = 0;
 
-const player = { 
-    x: 300, y: 300, radius: 18, baseSpeed: 1.2, vx: 0, vy: 0, 
-    friction: 0.82, facing: 1, dashCharge: 100,
-    name: "WAITING...",
-    remoteInput: { x: 0, y: 0, dash: false }
-};
+// --- MULTI-CHARACTER STATE ---
+const chefs = {}; 
+const colors = ['#6c5ce7', '#ff7675', '#55efc4', '#fab1a0', '#fdcb6e', '#0984e3'];
+
+function createChef(id, name, index) {
+    return {
+        id, x: 100 + (index * 80), y: 300,
+        radius: 18, baseSpeed: 1.2, vx: 0, vy: 0,
+        friction: 0.82, facing: 1, dashCharge: 100,
+        name: name, color: colors[index % colors.length],
+        remoteInput: { x: 0, y: 0, dash: false }
+    };
+}
 
 let critic = { x: -50, y: 400, active: false, speed: 1.5 };
 const items = [];
 const hazards = [];
 
-// --- CONNECTION LOGIC ---
+// --- CONNECTION LOGIC (FIXED FOR SEPARATE CHARACTERS) ---
 if (partyCode) {
     onValue(ref(db, `parties/${partyCode}/players`), (snapshot) => {
         if (snapshot.exists()) {
-            const players = snapshot.val();
-            const playerIds = Object.keys(players);
-            // We take the first person who joined as the Chef
-            const pData = players[playerIds[0]]; 
-            
+            const playersData = snapshot.val();
+            const playerIds = Object.keys(playersData);
+
             if (statusEl) {
-                statusEl.innerText = `CHEF CONNECTED: ${pData.name || "PLAYER"}`;
+                statusEl.innerText = `${playerIds.length} CHEFS CONNECTED`;
                 statusEl.style.color = "#00ff00";
             }
 
-            // Sync inputs
-            if (pData.inputs) {
-                // If dash just turned true, trigger it
-                if (pData.inputs.dash && !player.remoteInput.dash) {
-                    triggerDash();
+            playerIds.forEach((id, index) => {
+                if (!chefs[id]) {
+                    let cleanName = playersData[id].name ? playersData[id].name.split(' ')[0].toUpperCase() : "CHEF";
+                    chefs[id] = createChef(id, cleanName, index);
                 }
-                player.remoteInput = pData.inputs;
-            }
-            if (pData.name) player.name = pData.name.toUpperCase();
-        } else {
-            if (statusEl) statusEl.innerText = "WAITING FOR CHEF...";
+
+                const pData = playersData[id];
+                if (pData.inputs) {
+                    // Trigger dash for specific chef
+                    if (pData.inputs.dash && chefs[id].dashCharge >= 100) {
+                        chefs[id].vx *= 6; chefs[id].vy *= 6;
+                        chefs[id].dashCharge = 0;
+                        canvas.classList.add('shake');
+                        setTimeout(() => canvas.classList.remove('shake'), 100);
+                    }
+                    chefs[id].remoteInput = pData.inputs;
+                }
+            });
+
+            Object.keys(chefs).forEach(id => { if (!playersData[id]) delete chefs[id]; });
         }
     });
 }
 
-// --- DASH FUNCTION ---
-function triggerDash() {
-    if (player.dashCharge >= 100) {
-        // Boost velocity based on current direction
-        player.vx *= 6; 
-        player.vy *= 6;
-        player.dashCharge = 0;
-        // Visual feedback
-        canvas.classList.add('shake');
-        setTimeout(() => canvas.classList.remove('shake'), 100);
-    }
-}
-
-// --- INPUT HANDLING ---
+// --- KEYBOARD (BACKUP FOR HOST) ---
 const keys = { w: false, a: false, s: false, d: false, " ": false };
 window.addEventListener('keydown', (e) => { 
-    const k = e.key.toLowerCase();
-    if(keys.hasOwnProperty(k)) keys[k] = true; 
-    if(k === " ") triggerDash();
+    const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k] = true; 
 });
 window.addEventListener('keyup', (e) => { 
-    const k = e.key.toLowerCase();
-    if(keys.hasOwnProperty(k)) keys[k] = false; 
+    const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k] = false; 
 });
 
 function getRank(s) {
@@ -124,82 +120,65 @@ function spawnItem() {
 function update(time) {
     if (gameOver) return;
 
-    // Dash Recharge
-    if (player.dashCharge < 100) player.dashCharge += 0.8;
-    if (dashBar) dashBar.style.width = player.dashCharge + "%";
-
-    // Powerup Timers
     if (slowMoTimer > 0) { slowMoTimer--; timeScale = 0.4; } else { timeScale = 1; }
     if (magnetTimer > 0) magnetTimer--;
 
-    // Friction Logic
-    let f = player.friction;
-    hazards.forEach(h => { if (Math.hypot(player.x - h.x, player.y - h.y) < h.r) f = 0.98; });
+    // Update Every Chef
+    Object.values(chefs).forEach(p => {
+        if (p.dashCharge < 100) p.dashCharge += 0.8;
+        
+        let f = p.friction;
+        hazards.forEach(h => { if (Math.hypot(p.x - h.x, p.y - h.y) < h.r) f = 0.98; });
 
-    // MOVEMENT CALCULATION
-    let moveX = 0;
-    let moveY = 0;
+        let moveX = p.remoteInput.x;
+        let moveY = p.remoteInput.y;
 
-    // Add Keyboard
-    if (keys.w) moveY -= 1; 
-    if (keys.s) moveY += 1;
-    if (keys.a) moveX -= 1; 
-    if (keys.d) moveX += 1;
+        // Add keyboard support to the first chef for testing
+        if (p === Object.values(chefs)[0]) {
+            if (keys.w) moveY -= 1; if (keys.s) moveY += 1;
+            if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
+        }
 
-    // Add Remote (Controller)
-    moveX += player.remoteInput.x;
-    moveY += player.remoteInput.y;
+        p.vx += moveX * p.baseSpeed;
+        p.vy += moveY * p.baseSpeed;
+        p.x += p.vx; p.y += p.vy;
+        p.vx *= f; p.vy *= f;
 
-    // Apply acceleration (Clamped to prevent super-speed)
-    player.vx += moveX * player.baseSpeed;
-    player.vy += moveY * player.baseSpeed;
+        p.x = Math.max(15, Math.min(585, p.x));
+        p.y = Math.max(15, Math.min(585, p.y));
 
-    // Apply physics
-    player.x += player.vx; 
-    player.y += player.vy;
-    player.vx *= f; 
-    player.vy *= f;
+        if (p.vx < -0.1) p.facing = -1; if (p.vx > 0.1) p.facing = 1;
 
-    // Boundary check
-    player.x = Math.max(15, Math.min(585, player.x));
-    player.y = Math.max(15, Math.min(585, player.y));
+        // Power-up Logic for each player
+        if (typeof DisasterSystem !== 'undefined') {
+            DisasterSystem.soaps.forEach((s, i) => {
+                if (Math.hypot(p.x - s.x, p.y - s.y) < 30) DisasterSystem.soaps.splice(i, 1);
+            });
+            DisasterSystem.powerups.forEach((pow, i) => {
+                if (Math.hypot(p.x - pow.x, p.y - pow.y) < 30) {
+                    if (pow.type === 'MAGNET') magnetTimer = 400;
+                    if (pow.type === 'CLOCK') slowMoTimer = 300;
+                    DisasterSystem.powerups.splice(i, 1);
+                }
+            });
+            if (DisasterSystem.blender.active && Math.hypot(p.x - 300, p.y - 300) < 75) die(p.name + " SHREDDED!");
+            if (DisasterSystem.hotTile.active && p.x > DisasterSystem.hotTile.x && p.x < DisasterSystem.hotTile.x + 50 && p.y > DisasterSystem.hotTile.y && p.y < DisasterSystem.hotTile.y + 50) die(p.name + " BURNED!");
+        }
 
-    // Powerup Logic: Magnet
-    if (magnetTimer > 0 && typeof DisasterSystem !== 'undefined') {
-        DisasterSystem.soaps.forEach(s => {
-            s.x += (player.x - s.x) * 0.1; 
-            s.y += (player.y - s.y) * 0.1;
-        });
-    }
+        // Critic Logic
+        if (critic.active && Math.hypot(p.x - critic.x, p.y - critic.y) < 30) { 
+            score = Math.max(0, score-5); critic.active = false; 
+        }
+    });
 
-    // Critic logic
     if (!critic.active && Math.random() < 0.006) { critic.active = true; critic.x = -50; critic.y = 100 + Math.random()*400; }
     if (critic.active) {
         critic.x += critic.speed * timeScale;
-        if (Math.hypot(player.x - critic.x, player.y - critic.y) < 30) { score = Math.max(0, score-5); critic.active = false; }
-        if (critic.x > 650) { critic.active = false; }
+        if (critic.x > 650) critic.active = false;
     }
 
-    // Disaster collisions
-    if (typeof DisasterSystem !== 'undefined') {
-        DisasterSystem.triggerRandom(time);
-        if (DisasterSystem.blender.active && Math.hypot(player.x - 300, player.y - 300) < 75) die("SHREDDED!");
-        if (DisasterSystem.hotTile.active && player.x > DisasterSystem.hotTile.x && player.x < DisasterSystem.hotTile.x + 50 && player.y > DisasterSystem.hotTile.y && player.y < DisasterSystem.hotTile.y + 50) die("BURNED!");
-        
-        DisasterSystem.soaps.forEach((s, i) => {
-            if (Math.hypot(player.x - s.x, player.y - s.y) < 30) { DisasterSystem.soaps.splice(i, 1); }
-        });
-        
-        DisasterSystem.powerups.forEach((p, i) => {
-            if (Math.hypot(player.x - p.x, player.y - p.y) < 30) {
-                if (p.type === 'MAGNET') magnetTimer = 400;
-                if (p.type === 'CLOCK') slowMoTimer = 300;
-                DisasterSystem.powerups.splice(i, 1);
-            }
-        });
-    }
+    if (typeof DisasterSystem !== 'undefined') DisasterSystem.triggerRandom(time);
 
-    // Spawning logic
     if (time - lastSpawn > Math.max(150, 1100 - (score * 10))) { spawnItem(); lastSpawn = time; }
 
     render(time);
@@ -219,7 +198,6 @@ function render(time) {
     });
 
     items.forEach((item, index) => {
-        // Shadow
         ctx.beginPath(); ctx.ellipse(item.targetX, item.targetY, item.radius, item.radius/2, 0, 0, Math.PI*2);
         ctx.fillStyle = item.type === 'HAND' ? "rgba(255, 0, 0, 0.2)" : "rgba(0,0,0,0.1)";
         ctx.fill();
@@ -233,8 +211,12 @@ function render(time) {
                 canvas.classList.add('shake');
                 setTimeout(() => canvas.classList.remove('shake'), 200);
             }
-            if (Math.hypot(player.x - item.targetX, player.y - item.targetY) < item.radius) die("BONKED!");
             
+            // CHECK COLLISION FOR ALL
+            Object.values(chefs).forEach(p => {
+                if (Math.hypot(p.x - item.targetX, p.y - item.targetY) < item.radius) die(p.name + " BONKED!");
+            });
+
             if (item.type === 'OIL') hazards.push({x: item.targetX, y: item.targetY, r: 75, timer: 400});
             score += 1 * multiplier; 
             if(scoreEl) scoreEl.innerText = score + " [" + getRank(score) + "]";
@@ -243,7 +225,8 @@ function render(time) {
         if (item.landed) item.timer++;
         if (item.timer > 20) items.splice(index, 1);
     });
-    drawPlayer(player);
+
+    Object.values(chefs).forEach(p => drawPlayer(p));
 }
 
 function die(m) { 
@@ -268,17 +251,14 @@ function drawCritic(x, y) {
 
 function drawPlayer(p) {
     ctx.save(); ctx.translate(p.x, p.y);
-    ctx.fillStyle = "black"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center";
+    ctx.fillStyle = p.color; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(p.name, 0, -55);
-    if (p.vx < -0.1) p.facing = -1; if (p.vx > 0.1) p.facing = 1;
     ctx.scale(p.facing, 1);
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
-    // Hat
+    ctx.strokeStyle = p.color; ctx.lineWidth = 3; ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.fillRect(-12, -35, 24, 15);
     ctx.beginPath(); ctx.arc(0, -35, 14, 0, Math.PI*2); ctx.fill();
     ctx.stroke();
-    // Eyes
     ctx.fillStyle = "#333"; ctx.fillRect(6, -5, 3, 3); ctx.fillRect(-2, -5, 3, 3);
     ctx.restore();
 }
@@ -304,7 +284,6 @@ function drawPolishedItem(item) {
     ctx.restore();
 }
 
-// Fallback for DisasterSystem
 if (typeof window.DisasterSystem === 'undefined') {
     window.DisasterSystem = { triggerRandom: () => {}, draw: () => {}, soaps: [], powerups: [], blender: {active: false}, hotTile: {active: false} };
 }
